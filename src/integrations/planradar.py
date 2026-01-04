@@ -1,0 +1,208 @@
+"""PlanRadar API client for project and task management."""
+from typing import Optional, List, Dict, Any
+import httpx
+from src.config import settings
+from src.utils.logger import log
+
+
+class PlanRadarClient:
+    """Client for interacting with PlanRadar API."""
+
+    def __init__(self):
+        """Initialize PlanRadar client."""
+        self.base_url = settings.planradar_api_url
+        self.api_key = settings.planradar_api_key
+        self.account_id = settings.planradar_account_id
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        log.info("PlanRadar client initialized")
+
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Make HTTP request to PlanRadar API."""
+        url = f"{self.base_url}/{endpoint}"
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    headers=self.headers,
+                    json=data,
+                    params=params,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPError as e:
+            log.error(f"PlanRadar API error: {e}")
+            return None
+
+    async def list_tasks(
+        self,
+        project_id: str,
+        status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List tasks for a specific project."""
+        params = {"project_id": project_id}
+        if status:
+            params["status"] = status
+
+        result = await self._request("GET", "tickets", params=params)
+        return result.get("data", []) if result else []
+
+    async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get detailed information about a specific task."""
+        result = await self._request("GET", f"tickets/{task_id}")
+        return result.get("data") if result else None
+
+    async def get_task_description(self, task_id: str) -> Optional[str]:
+        """Get task description."""
+        task = await self.get_task(task_id)
+        return task.get("description") if task else None
+
+    async def get_task_plans(self, task_id: str) -> List[Dict[str, Any]]:
+        """Get plans/blueprints associated with a task."""
+        result = await self._request("GET", f"tickets/{task_id}/plans")
+        return result.get("data", []) if result else []
+
+    async def get_task_images(self, task_id: str) -> List[Dict[str, Any]]:
+        """Get images attached to a task."""
+        result = await self._request("GET", f"tickets/{task_id}/attachments")
+        if result and result.get("data"):
+            # Filter for images only
+            return [
+                att for att in result["data"]
+                if att.get("type", "").startswith("image/")
+            ]
+        return []
+
+    async def get_documents(
+        self,
+        project_id: str,
+        folder_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get documents for a project."""
+        params = {"project_id": project_id}
+        if folder_id:
+            params["folder_id"] = folder_id
+
+        result = await self._request("GET", "documents", params=params)
+        return result.get("data", []) if result else []
+
+    async def add_task_comment(
+        self,
+        task_id: str,
+        comment_text: str,
+    ) -> bool:
+        """Add a comment to a task."""
+        data = {
+            "text": comment_text,
+        }
+        result = await self._request("POST", f"tickets/{task_id}/comments", data=data)
+        return result is not None
+
+    async def get_task_comments(self, task_id: str) -> List[Dict[str, Any]]:
+        """Get all comments for a task."""
+        result = await self._request("GET", f"tickets/{task_id}/comments")
+        return result.get("data", []) if result else []
+
+    async def submit_incident_report(
+        self,
+        project_id: str,
+        title: str,
+        description: str,
+        image_urls: List[str],
+        location: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Submit a new incident report."""
+        data = {
+            "project_id": project_id,
+            "title": title,
+            "description": description,
+            "type": "incident",
+            "attachments": [{"url": url, "type": "image"} for url in image_urls],
+        }
+        if location:
+            data["location"] = location
+
+        result = await self._request("POST", "tickets", data=data)
+        if result and result.get("data"):
+            return result["data"].get("id")
+        return None
+
+    async def update_incident_report(
+        self,
+        task_id: str,
+        additional_text: Optional[str] = None,
+        additional_images: Optional[List[str]] = None,
+    ) -> bool:
+        """Update an existing incident report with additional information."""
+        # Add comment if text provided
+        if additional_text:
+            await self.add_task_comment(task_id, additional_text)
+
+        # Add images if provided
+        if additional_images:
+            for image_url in additional_images:
+                data = {
+                    "url": image_url,
+                    "type": "image",
+                }
+                await self._request(
+                    "POST",
+                    f"tickets/{task_id}/attachments",
+                    data=data
+                )
+
+        return True
+
+    async def update_task_progress(
+        self,
+        task_id: str,
+        status: str,
+        progress_note: Optional[str] = None,
+        image_urls: Optional[List[str]] = None,
+    ) -> bool:
+        """Update task progress with status, notes, and images."""
+        # Update status
+        data = {"status": status}
+        result = await self._request("PATCH", f"tickets/{task_id}", data=data)
+
+        if not result:
+            return False
+
+        # Add progress note as comment
+        if progress_note:
+            await self.add_task_comment(task_id, progress_note)
+
+        # Add progress images
+        if image_urls:
+            for image_url in image_urls:
+                data = {
+                    "url": image_url,
+                    "type": "image",
+                }
+                await self._request(
+                    "POST",
+                    f"tickets/{task_id}/attachments",
+                    data=data
+                )
+
+        return True
+
+    async def mark_task_complete(self, task_id: str) -> bool:
+        """Mark a task as complete."""
+        data = {"status": "completed"}
+        result = await self._request("PATCH", f"tickets/{task_id}", data=data)
+        return result is not None
+
+
+# Global instance
+planradar_client = PlanRadarClient()
