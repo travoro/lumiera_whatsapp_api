@@ -341,13 +341,23 @@ async def process_inbound_message(
         response_text = response_data["message"]
         escalation = response_data["escalation"]
         session_id = response_data["session_id"]
+        intent = response_data.get("intent")
+        confidence = response_data.get("confidence", 0.0)
+        detected_language = response_data.get("detected_language", user_language)
+
+        # Use detected language (from pipeline) instead of profile language
+        if detected_language != user_language:
+            log.info(f"🌍 Using detected language: {detected_language} (profile: {user_language})")
+        user_language = detected_language
 
         # Interactive formatting
         log.info(f"📱 Formatting response for interactive delivery")
         message_text, interactive_data = format_for_interactive(response_text, user_language)
 
-        # Detect greeting intent for template selection (simplified - could be enhanced)
-        is_greeting_intent = "bonjour" in message_body.lower() or "hello" in message_body.lower()
+        # Use intent classification to detect greeting (not naive text matching)
+        is_greeting_intent = (intent == "greeting")
+        if is_greeting_intent:
+            log.info(f"✅ Detected greeting intent (confidence: {confidence:.2%}), will use greeting template with menu")
 
         # Send response via Twilio
         send_whatsapp_message_smart(

@@ -132,12 +132,15 @@ class MessagePipeline:
             # Stage 9: Save to database
             await self._persist_messages(ctx)
 
-            # Return final response
+            # Return final response (including detected language!)
             return Result.ok({
                 "message": ctx.response_text,
                 "escalation": ctx.escalation,
                 "tools_called": ctx.tools_called,
-                "session_id": ctx.session_id
+                "session_id": ctx.session_id,
+                "intent": ctx.intent,
+                "confidence": ctx.confidence,
+                "detected_language": ctx.user_language  # Include detected language!
             })
 
         except LumieraException as e:
@@ -179,10 +182,43 @@ class MessagePipeline:
             return Result.from_exception(e)
 
     async def _detect_language(self, ctx: MessageContext) -> Result[None]:
-        """Stage 3: Detect message language if not in user profile."""
+        """Stage 3: Detect message language from content or use profile default."""
         try:
-            # Language already set from user profile in authenticate stage
-            log.info(f"✅ Language: {ctx.user_language}")
+            profile_language = ctx.user_language  # From user profile
+            detected_language = profile_language  # Default to profile
+
+            # Try to detect language from message content
+            if ctx.message_body and len(ctx.message_body.strip()) > 5:
+                try:
+                    from langdetect import detect, LangDetectException
+                    detected_language = detect(ctx.message_body)
+
+                    # Map language codes (langdetect uses 'ro' for Romanian, etc.)
+                    # Validate against supported languages
+                    supported = ['fr', 'en', 'es', 'pt', 'ar', 'de', 'it', 'ro', 'pl']
+                    if detected_language in supported:
+                        if detected_language != profile_language:
+                            log.info(
+                                f"🌍 Language detected from message: {detected_language} "
+                                f"(profile: {profile_language})"
+                            )
+                            # Use detected language for this conversation
+                            ctx.user_language = detected_language
+                        else:
+                            log.info(f"✅ Language: {detected_language} (matches profile)")
+                    else:
+                        log.warning(
+                            f"⚠️ Detected unsupported language: {detected_language}, "
+                            f"using profile: {profile_language}"
+                        )
+                        ctx.user_language = profile_language
+
+                except (LangDetectException, Exception) as e:
+                    log.warning(f"⚠️ Language detection failed: {e}, using profile: {profile_language}")
+                    ctx.user_language = profile_language
+            else:
+                log.info(f"✅ Using profile language: {profile_language}")
+
             return Result.ok(None)
 
         except Exception as e:
@@ -219,6 +255,22 @@ class MessagePipeline:
             # Update context with transcription
             ctx.message_body = transcription
             log.info(f"✅ Audio transcribed: {transcription[:50]}...")
+
+            # Detect language from transcription (override profile if different)
+            if len(transcription.strip()) > 5:
+                try:
+                    from langdetect import detect, LangDetectException
+                    detected_lang = detect(transcription)
+
+                    supported = ['fr', 'en', 'es', 'pt', 'ar', 'de', 'it', 'ro', 'pl']
+                    if detected_lang in supported and detected_lang != ctx.user_language:
+                        log.info(
+                            f"🌍 Audio language detected: {detected_lang} "
+                            f"(overriding profile: {ctx.user_language})"
+                        )
+                        ctx.user_language = detected_lang
+                except (LangDetectException, Exception) as e:
+                    log.debug(f"Could not detect audio language: {e}")
 
             # Update media URL to point to stored file (not Twilio URL)
             if storage_url:

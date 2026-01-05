@@ -119,8 +119,8 @@ class TranscriptionService:
                 transcript = self.client.audio.transcriptions.create(
                     model=self.model,
                     file=audio_file,
-                    response_format="text",
-                    language=target_language if target_language and len(target_language) == 2 else None
+                    response_format="text"
+                    # language parameter removed - let Whisper auto-detect the language
                 )
 
             # Clean up temp file
@@ -181,8 +181,8 @@ class TranscriptionService:
                 transcript = self.client.audio.transcriptions.create(
                     model=self.model,
                     file=audio_file,
-                    response_format="text",
-                    language=target_language if target_language and len(target_language) == 2 else None
+                    response_format="text"
+                    # language parameter removed - let Whisper auto-detect the language
                 )
 
             # Clean up
