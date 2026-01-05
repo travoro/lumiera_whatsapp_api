@@ -248,18 +248,28 @@ class SupabaseClient:
 
         Returns:
             List of messages in chronological order (oldest first)
+            Note: Filters out messages with null/empty content
         """
         try:
             response = self.client.table("messages").select(
                 "id, direction, content, language, created_at"
             ).eq("subcontractor_id", user_id).order(
                 "created_at", desc=True
-            ).limit(limit).execute()
+            ).limit(limit * 2).execute()  # Get more to account for filtering
 
             if response.data:
+                # Filter out messages with null or empty content
+                valid_messages = [
+                    msg for msg in response.data
+                    if msg.get("content") and msg["content"].strip()
+                ]
+
+                # Limit to requested number after filtering
+                valid_messages = valid_messages[:limit]
+
                 # Reverse to get chronological order (oldest first)
-                messages = list(reversed(response.data))
-                log.info(f"Retrieved {len(messages)} messages for user {user_id}")
+                messages = list(reversed(valid_messages))
+                log.info(f"Retrieved {len(messages)} valid messages for user {user_id}")
                 return messages
             return []
         except Exception as e:

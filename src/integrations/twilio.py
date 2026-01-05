@@ -31,8 +31,13 @@ class TwilioClient:
             if not to.startswith("whatsapp:"):
                 to = f"whatsapp:{to}"
 
+            # Ensure 'from' number is in WhatsApp format
+            from_number = self.whatsapp_number
+            if not from_number.startswith("whatsapp:"):
+                from_number = f"whatsapp:{from_number}"
+
             message_params = {
-                "from_": self.whatsapp_number,
+                "from_": from_number,
                 "to": to,
                 "body": body,
             }
