@@ -144,25 +144,26 @@ class TranscriptionService:
         message_sid: str,
         target_language: Optional[str] = None,
         content_type: str = "audio/ogg"
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Download, store, and transcribe audio file.
 
         Args:
             audio_url: URL of audio file (e.g., from Twilio)
             user_id: User ID for storage organization
             message_sid: Message SID for unique filename
-            target_language: Language code for transcription hint
+            target_language: Language code for transcription hint (unused, kept for compatibility)
             content_type: MIME type of audio
 
         Returns:
-            Tuple of (transcribed_text, storage_url)
-            Either can be None if that step fails
+            Tuple of (transcribed_text, storage_url, detected_language)
+            Any can be None if that step fails
+            detected_language is the ISO 639-1 code detected by Whisper
         """
         try:
             # Download audio
             audio_data = await self.download_audio(audio_url)
             if not audio_data:
-                return None, None
+                return None, None, None
 
             # Upload to permanent storage
             storage_url = await self.upload_audio_to_storage(
@@ -178,11 +179,12 @@ class TranscriptionService:
                 f.write(audio_data)
 
             with open(temp_file_path, "rb") as audio_file:
+                # Use verbose_json to get detected language from Whisper
                 transcript = self.client.audio.transcriptions.create(
                     model=self.model,
                     file=audio_file,
-                    response_format="text"
-                    # language parameter removed - let Whisper auto-detect the language
+                    response_format="verbose_json"
+                    # No language parameter - let Whisper auto-detect
                 )
 
             # Clean up
@@ -191,14 +193,20 @@ class TranscriptionService:
             except:
                 pass
 
-            transcribed_text = transcript if isinstance(transcript, str) else transcript.text
-            log.info(f"✅ Audio processed: transcribed and stored")
+            # Extract text and detected language from Whisper response
+            transcribed_text = transcript.text if hasattr(transcript, 'text') else str(transcript)
+            detected_language = transcript.language if hasattr(transcript, 'language') else None
 
-            return transcribed_text, storage_url
+            log.info(
+                f"✅ Audio processed: transcribed and stored "
+                f"(Whisper detected language: {detected_language})"
+            )
+
+            return transcribed_text, storage_url, detected_language
 
         except Exception as e:
             log.error(f"Error in transcribe_and_store_audio: {e}")
-            return None, None
+            return None, None, None
 
 
 # Global instance

@@ -258,7 +258,7 @@ class MessagePipeline:
             log.info(f"🎤 Processing audio message (transcribe + store)")
 
             # Download, store, and transcribe audio
-            transcription, storage_url = await transcription_service.transcribe_and_store_audio(
+            transcription, storage_url, whisper_detected_lang = await transcription_service.transcribe_and_store_audio(
                 audio_url=ctx.media_url,
                 user_id=ctx.user_id,
                 message_sid=ctx.message_sid or "unknown",
@@ -273,29 +273,27 @@ class MessagePipeline:
             ctx.message_body = transcription
             log.info(f"✅ Audio transcribed: {transcription[:50]}...")
 
-            # Detect language from transcription (override profile if different)
-            if len(transcription.strip()) > 5:
-                try:
-                    from langdetect import detect, LangDetectException
-                    detected_lang = detect(transcription)
+            # Use Whisper's detected language (more accurate than langdetect for audio)
+            if whisper_detected_lang:
+                supported = ['fr', 'en', 'es', 'pt', 'ar', 'de', 'it', 'ro', 'pl']
 
-                    supported = ['fr', 'en', 'es', 'pt', 'ar', 'de', 'it', 'ro', 'pl']
-                    if detected_lang in supported and detected_lang != ctx.user_language:
+                if whisper_detected_lang in supported:
+                    if whisper_detected_lang != ctx.user_language:
                         log.info(
-                            f"🌍 Audio language detected: {detected_lang} "
+                            f"🌍 Audio language detected by Whisper: {whisper_detected_lang} "
                             f"(differs from profile: {ctx.user_language})"
                         )
 
                         # Update user profile language permanently
                         update_success = await supabase_client.update_user_language(
                             ctx.user_id,
-                            detected_lang
+                            whisper_detected_lang
                         )
 
                         if update_success:
                             log.info(
                                 f"✅ User profile language updated: "
-                                f"{ctx.user_language} → {detected_lang}"
+                                f"{ctx.user_language} → {whisper_detected_lang}"
                             )
                         else:
                             log.warning(
@@ -303,9 +301,13 @@ class MessagePipeline:
                             )
 
                         # Use detected language for this message
-                        ctx.user_language = detected_lang
-                except (LangDetectException, Exception) as e:
-                    log.debug(f"Could not detect audio language: {e}")
+                        ctx.user_language = whisper_detected_lang
+                    else:
+                        log.info(f"✅ Whisper detected language: {whisper_detected_lang} (matches profile)")
+                else:
+                    log.warning(f"⚠️ Whisper detected unsupported language: {whisper_detected_lang}")
+            else:
+                log.warning("⚠️ Whisper did not return detected language")
 
             # Update media URL to point to stored file (not Twilio URL)
             if storage_url:
