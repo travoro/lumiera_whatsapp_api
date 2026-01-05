@@ -35,7 +35,7 @@ class TranscriptionService:
                 auth = (settings.twilio_account_sid, settings.twilio_auth_token)
                 log.info("Downloading audio from Twilio with authentication")
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.get(url, auth=auth, timeout=30.0)
                 response.raise_for_status()
                 log.info(f"Downloaded audio file: {len(response.content)} bytes")
