@@ -29,6 +29,11 @@ INTENTS = {
         "tools": ["report_incident_tool"],
         "requires_confirmation": False
     },
+    "update_progress": {
+        "keywords": ["update", "progress", "progression", "mettre à jour", "actualizar", "atualizar", "avancement", "progreso", "progresso"],
+        "tools": ["update_task_progress_tool"],
+        "requires_confirmation": False
+    },
     "general": {
         "keywords": [],
         "tools": "all",  # All tools available
@@ -92,8 +97,9 @@ class IntentClassifier:
 - list_projects (user wants to see their projects/chantiers)
 - list_tasks (user wants to see tasks/tâches)
 - report_incident (user wants to report a problem/incident)
+- update_progress (user wants to update task progress/progression)
 - escalate (user wants to speak with human/admin/help)
-- general (anything else - questions, updates, etc.)
+- general (anything else - questions, clarifications, etc.)
 
 Message: {message}
 
