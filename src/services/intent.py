@@ -43,7 +43,7 @@ class IntentClassifier:
     def __init__(self):
         """Initialize intent classifier with Claude Haiku for speed."""
         self.haiku = ChatAnthropic(
-            model="claude-haiku-3-5-20241022",
+            model="claude-3-5-haiku-20241022",
             api_key=settings.anthropic_api_key,
             temperature=0.1,
             max_tokens=50

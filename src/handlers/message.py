@@ -14,6 +14,10 @@ from src.services.intent import intent_classifier
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client
 from src.utils.logger import log
+from src.utils.whatsapp_formatter import send_whatsapp_message_smart
+from src.utils.response_parser import format_for_interactive
+
+
 
 
 def convert_messages_to_langchain(messages: list) -> list:
@@ -229,19 +233,44 @@ async def process_inbound_message(
         else:
             response_text = response_in_french
 
+        # Interactive formatting - NOW ENABLED via direct Twilio REST API!
+        # Using requests library to call Twilio API directly (Python SDK doesn't support it yet)
+        USE_INTERACTIVE_FORMATTING = True
+
+        if USE_INTERACTIVE_FORMATTING:
+            # Format for interactive messages
+            log.info(f"📱 Response text before formatting ({len(response_text)} chars): {response_text[:200]}...")
+            message_text, interactive_data = format_for_interactive(response_text)
+            log.info(f"📱 Message text after formatting ({len(message_text)} chars): {message_text[:200]}...")
+            log.info(f"📱 Interactive data present: {interactive_data is not None}")
+        else:
+            # Send as plain text - no extraction
+            message_text = response_text
+            interactive_data = None
+            log.info(f"📱 Sending as plain text (no formatting)")
+
         # Save outbound message with session tracking
         await supabase_client.save_message(
             user_id=user_id,
-            message_text=response_text,
+            message_text=message_text,
             original_language=user_language,
             direction="outbound",
             session_id=session_id,
         )
 
-        # Send response via Twilio
-        twilio_client.send_message(from_number, response_text)
+        # Send response via Twilio with interactive support
+        send_whatsapp_message_smart(
+            to=from_number,
+            text=message_text,
+            interactive_data=interactive_data,
+            user_name=user_name,
+            language=user_language
+        )
 
-        log.info(f"Response sent to {from_number}")
+        if interactive_data:
+            log.info(f"Interactive message sent to {from_number}")
+        else:
+            log.info(f"Text message sent to {from_number}")
 
     except Exception as e:
         log.error(f"Error processing message: {e}")

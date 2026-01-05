@@ -12,7 +12,7 @@ class ConversationMemoryService:
     def __init__(self):
         """Initialize the conversation memory service."""
         self.llm = ChatAnthropic(
-            model="claude-haiku-3-5-20241022",  # Use Haiku for fast summarization
+            model="claude-3-5-haiku-20241022",  # Use Haiku for fast summarization
             api_key=settings.anthropic_api_key,
             temperature=0.3,
             max_tokens=500,
