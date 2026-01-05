@@ -150,11 +150,43 @@ async def handle_escalation(
         return None
 
 
+async def handle_report_incident(
+    user_id: str,
+    phone_number: str,
+    user_name: str,
+    language: str,
+    **kwargs
+) -> Dict[str, Any]:
+    """Handle report incident intent directly.
+
+    Returns:
+        Dict with message, escalation, tools_called
+    """
+    log.info(f"🚀 FAST PATH: Handling report incident for {user_id}")
+
+    messages = {
+        "fr": "Je vais vous aider à signaler un incident. 🚨\n\nPour créer un rapport d'incident, j'ai besoin de :\n\n1. 📸 *Au moins une photo* du problème\n2. 📝 *Une description* de ce qui s'est passé\n3. 🏗️ *Le chantier concerné*\n\nPouvez-vous m'envoyer une photo du problème ?",
+        "en": "I'll help you report an incident. 🚨\n\nTo create an incident report, I need:\n\n1. 📸 *At least one photo* of the problem\n2. 📝 *A description* of what happened\n3. 🏗️ *The project concerned*\n\nCan you send me a photo of the problem?",
+        "es": "Te ayudaré a reportar un incidente. 🚨\n\nPara crear un reporte de incidente, necesito:\n\n1. 📸 *Al menos una foto* del problema\n2. 📝 *Una descripción* de lo que pasó\n3. 🏗️ *El proyecto concernido*\n\n¿Puedes enviarme una foto del problema?",
+        "ro": "Te voi ajuta să raportezi un incident. 🚨\n\nPentru a crea un raport de incident, am nevoie de:\n\n1. 📸 *Cel puțin o fotografie* a problemei\n2. 📝 *O descriere* a ceea ce s-a întâmplat\n3. 🏗️ *Șantierul în cauză*\n\nPoți să-mi trimiți o fotografie a problemei?",
+    }
+
+    message = messages.get(language, messages["fr"])
+
+    return {
+        "message": message,
+        "escalation": False,
+        "tools_called": [],
+        "fast_path": True
+    }
+
+
 # Intent handler mapping
 INTENT_HANDLERS = {
     "greeting": handle_greeting,
     "list_projects": handle_list_projects,
     "escalate": handle_escalation,
+    "report_incident": handle_report_incident,
     # Add more handlers as needed
 }
 
