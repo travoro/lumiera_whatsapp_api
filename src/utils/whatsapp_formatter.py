@@ -213,86 +213,77 @@ def send_whatsapp_message_smart(
     ENABLE_INTERACTIVE = True
 
     # Try interactive message first if data provided and enabled
-    if ENABLE_INTERACTIVE and interactive_data:
-        msg_type = interactive_data.get("type")
+    # OR if this is a greeting (greeting template has built-in menu)
+    if ENABLE_INTERACTIVE and (interactive_data or is_greeting):
+        msg_type = interactive_data.get("type") if interactive_data else None
 
-        if msg_type == "list":
-            log.info(f"📋 Preparing interactive list for language: {language}")
+        # Handle greeting with universal template (has built-in menu)
+        if is_greeting:
+            log.info(f"✅ Processing greeting with universal template")
 
-            # ONLY use universal greeting template for actual greetings (hello intent)
-            if is_greeting:
-                log.info(f"✅ Using universal greeting template (hello intent)")
+            # Get language-specific content using robust translation system
+            greeting_template = get_translation(language, "greeting", "en")
+            button_text = get_translation(language, "button", "en")
+            menu_items = get_translation(language, "menu_items", "en")
 
-                # Get language-specific content using robust translation system
-                greeting_template = get_translation(language, "greeting", "en")
-                button_text = get_translation(language, "button", "en")
-                menu_items = get_translation(language, "menu_items", "en")
-
-                # Format greeting with user's name
-                if greeting_template:
-                    # Use user's name or fallback to "there"
-                    name = user_name.strip() if user_name else ""
-                    greeting = greeting_template.format(name=name) if name else greeting_template.replace(" {name},", "").replace("{name},", "")
-                else:
-                    greeting = "Hello, how can I help you today?"
-
-                log.info(f"📝 Personalized greeting: {greeting[:50]}...")
-
-                # Build content variables with strict character limits
-                # Variable 1: Body text (max 1024 chars)
-                # Variable 2: Button text (max 20 chars)
-                # Variables 3-20: 6 items (title 24, id 200, description 72 each)
-                content_variables = {
-                    "1": safe_truncate(greeting, 1024),
-                    "2": safe_truncate(button_text, 20) if button_text else "Options",
-                }
-
-                # Add 6 menu items with strict limits
-                if not menu_items:
-                    menu_items = []
-
-                for idx in range(6):
-                    if idx < len(menu_items):
-                        item = menu_items[idx]
-                        title = item.get("title", f"Option {idx+1}")
-                        item_id = item.get("id", f"option_{idx+1}")
-                        description = item.get("description", "")
-                    else:
-                        # Pad with empty items if less than 6
-                        title = ""
-                        item_id = f"empty_{idx+1}"
-                        description = ""
-
-                    # Calculate variable positions: 3,4,5 for item 0; 6,7,8 for item 1; etc.
-                    var_base = (idx * 3) + 3
-
-                    content_variables[str(var_base)] = safe_truncate(title, 24)
-                    content_variables[str(var_base + 1)] = safe_truncate(item_id, 200)
-                    content_variables[str(var_base + 2)] = safe_truncate(description, 72)
-
-                log.info(f"📝 Content variables prepared:")
-                log.info(f"   Body length: {len(content_variables['1'])} chars")
-                log.info(f"   Button: {content_variables['2']}")
-                log.info(f"   Items: {len([k for k in content_variables if k.isdigit() and int(k) >= 3]) // 3}")
-
-                # Get universal template from database
-                content_sid = template_manager.get_template_from_database("greeting_menu", "all")
-
-                if not content_sid:
-                    log.error(f"❌ Universal template not found in database")
-                    # Fallback to text
-                    log.info("📱 Sending as regular text message")
-                    sid = twilio_client.send_message(to=to, body=text)
-                    return sid
-
-                log.info(f"📋 Using universal template: {content_sid}")
+            # Format greeting with user's name
+            if greeting_template:
+                # Use user's name or fallback to "there"
+                name = user_name.strip() if user_name else ""
+                greeting = greeting_template.format(name=name) if name else greeting_template.replace(" {name},", "").replace("{name},", "")
             else:
-                # AI-generated response with interactive list - DON'T use greeting template
-                log.info(f"⚠️ AI response with interactive list - falling back to plain text")
-                log.info(f"   (Universal template only for greetings)")
-                # Send as regular text message (the formatted text includes the list)
+                greeting = "Hello, how can I help you today?"
+
+            log.info(f"📝 Personalized greeting: {greeting[:50]}...")
+
+            # Build content variables with strict character limits
+            # Variable 1: Body text (max 1024 chars)
+            # Variable 2: Button text (max 20 chars)
+            # Variables 3-20: 6 items (title 24, id 200, description 72 each)
+            content_variables = {
+                "1": safe_truncate(greeting, 1024),
+                "2": safe_truncate(button_text, 20) if button_text else "Options",
+            }
+
+            # Add 6 menu items with strict limits
+            if not menu_items:
+                menu_items = []
+
+            for idx in range(6):
+                if idx < len(menu_items):
+                    item = menu_items[idx]
+                    title = item.get("title", f"Option {idx+1}")
+                    item_id = item.get("id", f"option_{idx+1}")
+                    description = item.get("description", "")
+                else:
+                    # Pad with empty items if less than 6
+                    title = ""
+                    item_id = f"empty_{idx+1}"
+                    description = ""
+
+                # Calculate variable positions: 3,4,5 for item 0; 6,7,8 for item 1; etc.
+                var_base = (idx * 3) + 3
+
+                content_variables[str(var_base)] = safe_truncate(title, 24)
+                content_variables[str(var_base + 1)] = safe_truncate(item_id, 200)
+                content_variables[str(var_base + 2)] = safe_truncate(description, 72)
+
+            log.info(f"📝 Content variables prepared:")
+            log.info(f"   Body length: {len(content_variables['1'])} chars")
+            log.info(f"   Button: {content_variables['2']}")
+            log.info(f"   Items: {len([k for k in content_variables if k.isdigit() and int(k) >= 3]) // 3}")
+
+            # Get universal template from database
+            content_sid = template_manager.get_template_from_database("greeting_menu", "all")
+
+            if not content_sid:
+                log.error(f"❌ Universal template not found in database")
+                # Fallback to text
+                log.info("📱 Sending as regular text message")
                 sid = twilio_client.send_message(to=to, body=text)
                 return sid
+
+            log.info(f"📋 Using universal template: {content_sid}")
 
             # Send using content template
             sid = twilio_client.send_message_with_content(
@@ -302,10 +293,21 @@ def send_whatsapp_message_smart(
             )
 
             if sid:
-                log.info(f"✅ Sent interactive list via template to {to}, SID: {sid}")
+                log.info(f"✅ Sent greeting via template to {to}, SID: {sid}")
                 return sid
             else:
                 log.error(f"❌ Content template send FAILED, falling back to text")
+                # Fallback to regular text
+                sid = twilio_client.send_message(to=to, body=text)
+                return sid
+
+        elif msg_type == "list":
+            # AI-generated response with interactive list - DON'T use greeting template
+            log.info(f"⚠️ AI response with interactive list - falling back to plain text")
+            log.info(f"   (Universal template only for greetings)")
+            # Send as regular text message (the formatted text includes the list)
+            sid = twilio_client.send_message(to=to, body=text)
+            return sid
 
         elif msg_type == "buttons":
             # Buttons not yet implemented
