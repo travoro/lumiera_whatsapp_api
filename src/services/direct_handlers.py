@@ -13,7 +13,9 @@ from src.utils.logger import log
 async def handle_greeting(
     user_id: str,
     user_name: str,
-    language: str
+    language: str,
+    phone_number: str = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Handle greeting intent directly.
 
@@ -43,7 +45,9 @@ async def handle_greeting(
 async def handle_list_projects(
     user_id: str,
     user_name: str,
-    language: str
+    language: str,
+    phone_number: str = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Handle list projects intent directly.
 
@@ -104,7 +108,8 @@ async def handle_escalation(
     phone_number: str,
     user_name: str,
     language: str,
-    reason: str = "User requested to speak with team"
+    reason: str = "User requested to speak with team",
+    **kwargs
 ) -> Dict[str, Any]:
     """Handle escalation intent directly.
 
