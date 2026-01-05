@@ -272,18 +272,29 @@ async def process_inbound_message(
             detected_language = user_language  # Keep current language
             log.info(f"⚙️ Action '{action_id}' will be processed by AI agent")
         else:
-            # Regular text message - detect language and update if changed
-            detected_language = await translation_service.detect_language(message_body)
-            log.info(f"Detected language: {detected_language} (original message: {message_body[:50]}...)")
+            # Regular text message - detect language with smart context
+            # Don't detect language for very short messages or pure numbers
+            message_stripped = message_body.strip()
+            is_very_short = len(message_stripped) < 5
+            is_number = message_stripped.isdigit()
 
-            # Update user language if it changed (only for typed messages)
-            if detected_language != user_language:
-                await supabase_client.create_or_update_user(
-                    phone_number=phone_number,
-                    language=detected_language,
-                )
-                user_language = detected_language
-                log.info(f"Updated user language to: {detected_language}")
+            if is_very_short or is_number:
+                # Keep current user language for short/numeric messages
+                detected_language = user_language
+                log.info(f"⚠️ Message too short/numeric ('{message_body}'), keeping current language: {user_language}")
+            else:
+                # Detect language for substantial messages
+                detected_language = await translation_service.detect_language(message_body)
+                log.info(f"Detected language: {detected_language} (original message: {message_body[:50]}...)")
+
+                # Update user language if it changed (only for typed messages)
+                if detected_language != user_language:
+                    await supabase_client.create_or_update_user(
+                        phone_number=phone_number,
+                        language=detected_language,
+                    )
+                    user_language = detected_language
+                    log.info(f"Updated user language to: {detected_language}")
 
             # Translate to French if needed (do this before validation)
             if detected_language != "fr":
@@ -364,7 +375,7 @@ async def process_inbound_message(
             log.info(f"Added interactive response context to chat history")
 
         # Process with agent (in French) with conversation history and context
-        response_in_french = await lumiera_agent.process_message(
+        agent_result = await lumiera_agent.process_message(
             user_id=user_id,
             phone_number=phone_number,
             language=user_language,
@@ -374,7 +385,17 @@ async def process_inbound_message(
             user_context=user_context_str,  # Pass user context for personalization
         )
 
+        # Extract output and escalation flag from agent result
+        if isinstance(agent_result, dict):
+            response_in_french = agent_result.get("output", "")
+            is_agent_escalation = agent_result.get("escalation_occurred", False)
+        else:
+            # Fallback for backward compatibility (if agent returns string)
+            response_in_french = agent_result
+            is_agent_escalation = False
+
         log.info(f"Agent response (French): {response_in_french[:100]}...")
+        log.info(f"Agent escalation detected: {is_agent_escalation}")
 
         # Translate response back to user language
         if user_language != "fr":
@@ -400,6 +421,9 @@ async def process_inbound_message(
             interactive_data = None
             log.info(f"📱 Sending as plain text (no formatting)")
 
+        # is_agent_escalation is already set from agent result (tool call detection)
+        # No need for keyword matching - the agent tells us if it called escalate_to_human_tool
+
         # Save outbound message with session tracking
         await supabase_client.save_message(
             user_id=user_id,
@@ -407,6 +431,7 @@ async def process_inbound_message(
             original_language=user_language,
             direction="outbound",
             session_id=session_id,
+            need_human=is_agent_escalation,  # Set need_human=True for escalations
         )
 
         # Check if this is a greeting intent (to use universal template)

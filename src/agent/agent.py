@@ -205,12 +205,34 @@ class LumieraAgent:
             # Extract output
             output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
 
-            log.info(f"Agent processed message for user {user_id}")
-            return output
+            # Check if escalation tool was called by examining intermediate steps
+            intermediate_steps = result.get("intermediate_steps", [])
+            escalation_occurred = False
+
+            for step in intermediate_steps:
+                # Each step is (AgentAction, tool_result)
+                if len(step) >= 1:
+                    agent_action = step[0]
+                    # Check if the tool name is escalate_to_human_tool
+                    if hasattr(agent_action, 'tool') and 'escalate_to_human' in agent_action.tool.lower():
+                        escalation_occurred = True
+                        log.info(f"🚨 Escalation detected: escalate_to_human_tool was called")
+                        break
+
+            log.info(f"Agent processed message for user {user_id}, escalation: {escalation_occurred}")
+
+            # Return both output and escalation flag
+            return {
+                "output": output,
+                "escalation_occurred": escalation_occurred
+            }
 
         except Exception as e:
             log.error(f"Error processing message: {e}")
-            return "Désolé, une erreur s'est produite. Veuillez réessayer."
+            return {
+                "output": "Désolé, une erreur s'est produite. Veuillez réessayer.",
+                "escalation_occurred": False
+            }
 
 
 # Global agent instance
