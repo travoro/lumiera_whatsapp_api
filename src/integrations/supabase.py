@@ -88,6 +88,7 @@ class SupabaseClient:
         session_id: Optional[str] = None,
         is_escalation: bool = False,
         escalation_reason: Optional[str] = None,
+        need_human: bool = False,
     ) -> bool:
         """Save message to database for audit trail with session tracking.
 
@@ -103,6 +104,7 @@ class SupabaseClient:
             session_id: Conversation session ID
             is_escalation: Flag to mark this as an escalation
             escalation_reason: Reason for escalation if applicable
+            need_human: Flag to indicate this message needs human attention (default: False)
         """
         try:
             message_data = {
@@ -124,13 +126,22 @@ class SupabaseClient:
             if session_id:
                 message_data["session_id"] = session_id
 
+            # Add metadata if applicable
+            metadata = {}
+
             # Add escalation metadata if applicable
             if is_escalation:
-                message_data["metadata"] = {
-                    "is_escalation": True,
-                    "escalation_reason": escalation_reason,
-                    "escalation_timestamp": datetime.utcnow().isoformat()
-                }
+                metadata["is_escalation"] = True
+                metadata["escalation_reason"] = escalation_reason
+                metadata["escalation_timestamp"] = datetime.utcnow().isoformat()
+
+            # Add need_human flag
+            if need_human:
+                metadata["need_human"] = True
+
+            # Save metadata if any flags are set
+            if metadata:
+                message_data["metadata"] = metadata
 
             self.client.table("messages").insert(message_data).execute()
             return True

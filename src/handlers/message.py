@@ -1,8 +1,13 @@
 """Message processing handler."""
 from typing import Optional, Dict, Any
 import httpx
+import re
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from src.agent.agent import lumiera_agent
+from src.agent.tools import (
+    list_projects_tool,
+    escalate_to_human_tool,
+)
 from src.services.translation import translation_service
 from src.services.transcription import transcription_service
 from src.services.escalation import escalation_service
@@ -18,6 +23,71 @@ from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 from src.utils.response_parser import format_for_interactive
 
 
+
+
+async def handle_direct_action(
+    action: str,
+    user_id: str,
+    phone_number: str,
+    language: str,
+) -> Optional[str]:
+    """Handle direct action execution without AI agent.
+
+    Args:
+        action: The action to execute (e.g., "view_sites", "talk_team")
+        user_id: User's ID
+        phone_number: User's WhatsApp phone number
+        language: User's language code
+
+    Returns:
+        Response text if action was handled, None if needs AI conversation flow
+    """
+    log.info(f"🎯 Direct action handler called for action: {action}")
+
+    # === DIRECT ACTIONS (No AI) ===
+
+    if action == "view_sites":
+        # Call list_projects_tool directly
+        log.info(f"📋 Calling list_projects_tool for user {user_id}")
+        response = await list_projects_tool.ainvoke({"user_id": user_id})
+        return response
+
+    elif action == "view_tasks":
+        # TODO: Implement list_tasks function
+        log.info(f"📋 DEBUG: You are in the view_tasks action for user {user_id}")
+        return "🔧 DEBUG: Action 'view_tasks' - Function not yet implemented. This will show your assigned tasks."
+
+    elif action == "view_documents":
+        # TODO: Implement list_documents function
+        log.info(f"📄 DEBUG: You are in the view_documents action for user {user_id}")
+        return "🔧 DEBUG: Action 'view_documents' - Function not yet implemented. This will show your project documents."
+
+    elif action == "talk_team":
+        # Escalate to human directly
+        log.info(f"🗣️ Escalating user {user_id} to human team")
+        response = await escalate_to_human_tool.ainvoke({
+            "user_id": user_id,
+            "phone_number": phone_number,
+            "language": language,
+            "reason": "L'utilisateur a demandé à parler avec l'équipe",
+        })
+        return response
+
+    # === AI CONVERSATION FLOW (Complex actions) ===
+
+    elif action == "report_incident":
+        # AI will ask: which project? description? photos?
+        log.info(f"🚨 Action 'report_incident' needs AI conversation flow")
+        return None  # Fall back to AI agent
+
+    elif action == "update_progress":
+        # AI will ask: which project? which task? status? notes?
+        log.info(f"✅ Action 'update_progress' needs AI conversation flow")
+        return None  # Fall back to AI agent
+
+    # Unknown action
+    log.warning(f"⚠️ Unknown action: {action}")
+    return None
 
 
 def convert_messages_to_langchain(messages: list) -> list:
@@ -48,6 +118,8 @@ async def process_inbound_message(
     message_sid: str,
     media_url: Optional[str] = None,
     media_content_type: Optional[str] = None,
+    button_payload: Optional[str] = None,
+    button_text: Optional[str] = None,
 ) -> None:
     """Process an inbound WhatsApp message.
 
@@ -57,6 +129,8 @@ async def process_inbound_message(
         message_sid: Twilio message SID
         media_url: Optional media URL if message includes media
         media_content_type: Content type of media
+        button_payload: Optional interactive list selection ID (e.g., "view_sites")
+        button_text: Optional interactive list selection display text
     """
     try:
         # Normalize phone number - remove 'whatsapp:' prefix if present
@@ -107,6 +181,11 @@ async def process_inbound_message(
             twilio_client.send_message(from_number, response_text)
             return
 
+        # Get or create session early (so direct actions also get session_id)
+        session = await session_service.get_or_create_session(user_id)
+        session_id = session['id'] if session else None
+        log.info(f"Session {session_id} for user {user_id}")
+
         # Handle audio message
         if media_url and media_content_type and media_content_type.startswith("audio"):
             log.info("Processing audio message")
@@ -126,27 +205,95 @@ async def process_inbound_message(
                 twilio_client.send_message(from_number, response_text)
                 return
 
-        # Detect language if not just French
-        detected_language = await translation_service.detect_language(message_body)
+        # Check if Body contains an interactive list action (e.g., "view_sites_es", "option_1_fr")
+        # Pattern: action_name followed by underscore and 2-letter language code
+        action_pattern = r'^(.+)_([a-z]{2})$'
+        action_match = re.match(action_pattern, message_body.strip())
 
-        # Translate to French if needed (do this before validation)
-        if detected_language != "fr":
-            message_in_french = await translation_service.translate_to_french(
-                message_body, detected_language
+        is_interactive_response = action_match is not None
+        action_id = None
+
+        if is_interactive_response:
+            # Extract action and language from the pattern
+            action_id = action_match.group(1)  # e.g., "view_sites" or "option_1"
+            action_language = action_match.group(2)  # e.g., "es", "fr"
+
+            log.info(f"🔘 Interactive action detected: {action_id} (language: {action_language})")
+
+            # Try to handle as direct action
+            direct_response = await handle_direct_action(
+                action=action_id,
+                user_id=user_id,
+                phone_number=phone_number,
+                language=user_language,
             )
 
-            # Update user language if it changed
+            if direct_response:
+                # Direct action was handled successfully
+                log.info(f"✅ Direct action '{action_id}' executed successfully")
+
+                # Translate response to user's language
+                if user_language != "fr":
+                    response_text = await translation_service.translate_from_french(
+                        direct_response, user_language
+                    )
+                else:
+                    response_text = direct_response
+
+                # Check if this is an escalation action (talk_team)
+                is_escalation_action = action_id == "talk_team"
+
+                # Save the interaction to database
+                await supabase_client.save_message(
+                    user_id=user_id,
+                    message_text=message_body,
+                    original_language=user_language,
+                    direction="inbound",
+                    message_sid=message_sid,
+                    session_id=session_id,
+                )
+
+                await supabase_client.save_message(
+                    user_id=user_id,
+                    message_text=response_text,
+                    original_language=user_language,
+                    direction="outbound",
+                    session_id=session_id,
+                    need_human=is_escalation_action,  # Set need_human=True for escalations
+                )
+
+                # Send response (no interactive formatting for direct actions)
+                twilio_client.send_message(from_number, response_text)
+                log.info(f"📤 Direct action response sent to {from_number}")
+                return
+
+            # Direct action not handled, continue with normal flow using action_id
+            message_in_french = action_id  # Use action without language suffix
+            detected_language = user_language  # Keep current language
+            log.info(f"⚙️ Action '{action_id}' will be processed by AI agent")
+        else:
+            # Regular text message - detect language and update if changed
+            detected_language = await translation_service.detect_language(message_body)
+            log.info(f"Detected language: {detected_language} (original message: {message_body[:50]}...)")
+
+            # Update user language if it changed (only for typed messages)
             if detected_language != user_language:
                 await supabase_client.create_or_update_user(
                     phone_number=phone_number,
                     language=detected_language,
                 )
                 user_language = detected_language
+                log.info(f"Updated user language to: {detected_language}")
 
-        else:
-            message_in_french = message_body
+            # Translate to French if needed (do this before validation)
+            if detected_language != "fr":
+                message_in_french = await translation_service.translate_to_french(
+                    message_body, detected_language
+                )
+            else:
+                message_in_french = message_body
 
-        log.info(f"Message in French: {message_in_french[:100]}...")
+            log.info(f"Message in French: {message_in_french[:100]}...")
 
         # === PHASE 2: VALIDATION, SESSION, INTENT, CONTEXT ===
 
@@ -165,10 +312,7 @@ async def process_inbound_message(
         # Use sanitized message
         message_in_french = validation_result["sanitized"]
 
-        # 2. Get or create session
-        session = await session_service.get_or_create_session(user_id)
-        session_id = session['id'] if session else None
-        log.info(f"Using session {session_id} for user {user_id}")
+        # 2. Session already created earlier (line 185)
 
         # 3. Classify intent for analytics and potential routing
         intent_result = await intent_classifier.classify(message_in_french, user_id)
@@ -199,7 +343,8 @@ async def process_inbound_message(
         # Optimize conversation history (summarize if too long)
         recent_messages, older_summary = await memory_service.get_optimized_history(
             messages=full_conversation_history,
-            recent_message_count=8  # Keep last 8 messages as-is
+            recent_message_count=15,  # Keep last 15 messages as-is (increased from 8)
+            user_id=user_id  # Pass user_id for caching
         )
 
         # Convert recent messages to LangChain format
@@ -211,6 +356,12 @@ async def process_inbound_message(
             log.info(f"Using summarized context + {len(recent_messages)} recent messages")
         else:
             log.info(f"Using {len(chat_history)} messages for context (no summary needed)")
+
+        # Add context if this is an interactive list response
+        if is_interactive_response:
+            context_msg = f"[CONTEXTE: L'utilisateur a sélectionné l'option '{button_payload}' depuis un menu interactif. Texte de l'option: '{button_text}']"
+            chat_history.insert(0, SystemMessage(content=context_msg))
+            log.info(f"Added interactive response context to chat history")
 
         # Process with agent (in French) with conversation history and context
         response_in_french = await lumiera_agent.process_message(
@@ -238,9 +389,9 @@ async def process_inbound_message(
         USE_INTERACTIVE_FORMATTING = True
 
         if USE_INTERACTIVE_FORMATTING:
-            # Format for interactive messages
+            # Format for interactive messages, passing user language for ID suffixes
             log.info(f"📱 Response text before formatting ({len(response_text)} chars): {response_text[:200]}...")
-            message_text, interactive_data = format_for_interactive(response_text)
+            message_text, interactive_data = format_for_interactive(response_text, user_language)
             log.info(f"📱 Message text after formatting ({len(message_text)} chars): {message_text[:200]}...")
             log.info(f"📱 Interactive data present: {interactive_data is not None}")
         else:
@@ -258,13 +409,17 @@ async def process_inbound_message(
             session_id=session_id,
         )
 
+        # Check if this is a greeting intent (to use universal template)
+        is_greeting_intent = intent_result.get('intent', '') in ['greeting', 'hello', 'bonjour', 'hola']
+
         # Send response via Twilio with interactive support
         send_whatsapp_message_smart(
             to=from_number,
             text=message_text,
             interactive_data=interactive_data,
             user_name=user_name,
-            language=user_language
+            language=user_language,
+            is_greeting=is_greeting_intent
         )
 
         if interactive_data:

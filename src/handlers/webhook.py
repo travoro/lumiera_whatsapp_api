@@ -17,6 +17,8 @@ async def whatsapp_webhook(
     MessageSid: str = Form(...),
     MediaUrl0: Optional[str] = Form(None),
     MediaContentType0: Optional[str] = Form(None),
+    ButtonPayload: Optional[str] = Form(None),  # Interactive list selection ID
+    ButtonText: Optional[str] = Form(None),     # Interactive list selection text
 ):
     """Handle incoming WhatsApp messages from Twilio.
 
@@ -27,22 +29,34 @@ async def whatsapp_webhook(
         MessageSid: Twilio message SID
         MediaUrl0: Optional first media URL
         MediaContentType0: Optional first media content type
+        ButtonPayload: Optional interactive list selection ID (e.g., "view_sites")
+        ButtonText: Optional interactive list selection display text
 
     Returns:
         Empty response with 200 status
     """
     try:
+        # Log all form parameters for debugging
+        form_data = dict(await request.form())
+        log.info(f"📥 Webhook received all params: {list(form_data.keys())}")
+
         # Validate webhook signature if enabled
         if request.app.state.config.verify_webhook_signature:
             url = str(request.url)
-            params = dict(await request.form())
+            params = form_data
             signature = request.headers.get("X-Twilio-Signature", "")
 
             if not twilio_client.validate_webhook(url, params, signature):
                 log.warning(f"Invalid webhook signature from {From}")
                 raise HTTPException(status_code=403, detail="Invalid signature")
 
-        log.info(f"Received webhook from {From}")
+        # Check if this is an interactive list response
+        is_interactive_response = ButtonPayload is not None
+
+        if is_interactive_response:
+            log.info(f"Received interactive list selection from {From}: {ButtonPayload}")
+        else:
+            log.info(f"Received webhook from {From}")
 
         # Process message asynchronously (fire and forget)
         # In production, consider using a task queue like Celery or background tasks
@@ -52,6 +66,8 @@ async def whatsapp_webhook(
             message_sid=MessageSid,
             media_url=MediaUrl0,
             media_content_type=MediaContentType0,
+            button_payload=ButtonPayload,
+            button_text=ButtonText,
         )
 
         # Return empty TwiML response
