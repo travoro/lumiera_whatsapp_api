@@ -197,29 +197,44 @@ class SupabaseClient:
             return False
 
     async def list_projects(self, user_id: str) -> List[Dict[str, Any]]:
-        """List all active projects (chantiers) for a user."""
+        """List all active projects (chantiers) for a user.
+
+        SECURITY: Filters projects by subcontractor_id to prevent unauthorized access.
+        """
         try:
             response = self.client.table("projects").select(
                 "*"
-            ).eq("active", True).execute()
+            ).eq("active", True).eq("subcontractor_id", user_id).execute()
 
+            log.info(f"Retrieved {len(response.data) if response.data else 0} projects for user {user_id}")
             return response.data if response.data else []
         except Exception as e:
-            log.error(f"Error listing projects: {e}")
+            log.error(f"Error listing projects for user {user_id}: {e}")
             return []
 
-    async def get_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get specific project details."""
+    async def get_project(self, project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get specific project details.
+
+        Args:
+            project_id: The project ID to retrieve
+            user_id: Optional user ID for authorization check
+
+        SECURITY: If user_id provided, ensures project belongs to user.
+        """
         try:
-            response = self.client.table("projects").select("*").eq(
-                "id", project_id
-            ).execute()
+            query = self.client.table("projects").select("*").eq("id", project_id)
+
+            # Add user filtering for security if user_id provided
+            if user_id:
+                query = query.eq("subcontractor_id", user_id)
+
+            response = query.execute()
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
             return None
         except Exception as e:
-            log.error(f"Error getting project: {e}")
+            log.error(f"Error getting project {project_id}: {e}")
             return None
 
     async def get_escalation_messages(self, user_id: str, limit: int = 10) -> list:

@@ -52,7 +52,8 @@ async def list_projects(user_id: str) -> Dict[str, Any]:
 async def get_project_details(user_id: str, project_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific project."""
     try:
-        project = await supabase_client.get_project(project_id)
+        # Pass user_id for authorization check
+        project = await supabase_client.get_project(project_id, user_id=user_id)
 
         if not project:
             return {
