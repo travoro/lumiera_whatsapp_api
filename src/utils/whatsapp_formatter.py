@@ -1,8 +1,151 @@
 """WhatsApp message formatter with interactive message support."""
 from typing import Dict, List, Optional, Any
+import re
 from src.integrations.twilio import twilio_client
 from src.services.template_manager import template_manager
 from src.utils.logger import log
+
+
+# Robust translation dictionary for WhatsApp interactive messages
+TRANSLATIONS = {
+    "fr": {
+        "greeting": "Bonjour {name}, comment puis-je vous aider aujourd'hui ?",
+        "button": "Options",
+        "menu_items": [
+            {"title": "Voir mes chantiers", "id": "view_sites", "description": "Projets actifs"},
+            {"title": "Consulter mes taches", "id": "view_tasks", "description": "Taches assignees"},
+            {"title": "Acceder aux documents", "id": "view_documents", "description": "Plans et docs"},
+            {"title": "Signaler un incident", "id": "report_incident", "description": "Declarer probleme"},
+            {"title": "Progression", "id": "update_progress", "description": "Mettre a jour taches"},
+            {"title": "Contacter equipe", "id": "talk_team", "description": "Parler administration"},
+        ],
+    },
+    "en": {
+        "greeting": "Hello {name}, how can I help you today?",
+        "button": "Options",
+        "menu_items": [
+            {"title": "View my sites", "id": "view_sites", "description": "Active projects"},
+            {"title": "Check my tasks", "id": "view_tasks", "description": "Assigned tasks"},
+            {"title": "Access documents", "id": "view_documents", "description": "Plans and docs"},
+            {"title": "Report incident", "id": "report_incident", "description": "Declare problem"},
+            {"title": "Update progress", "id": "update_progress", "description": "Update tasks"},
+            {"title": "Talk to team", "id": "talk_team", "description": "Contact admin"},
+        ],
+    },
+    "es": {
+        "greeting": "Hola {name}, ¿cómo puedo ayudarte hoy?",
+        "button": "Opciones",
+        "menu_items": [
+            {"title": "Ver mis obras", "id": "view_sites", "description": "Proyectos activos"},
+            {"title": "Ver mis tareas", "id": "view_tasks", "description": "Tareas asignadas"},
+            {"title": "Acceder documentos", "id": "view_documents", "description": "Planos y docs"},
+            {"title": "Reportar incidente", "id": "report_incident", "description": "Declarar problema"},
+            {"title": "Actualizar progreso", "id": "update_progress", "description": "Actualizar tareas"},
+            {"title": "Hablar con equipo", "id": "talk_team", "description": "Contactar admin"},
+        ],
+    },
+    "pt": {
+        "greeting": "Olá {name}, como posso ajudá-lo hoje?",
+        "button": "Opções",
+        "menu_items": [
+            {"title": "Ver minhas obras", "id": "view_sites", "description": "Projetos ativos"},
+            {"title": "Ver minhas tarefas", "id": "view_tasks", "description": "Tarefas atribuidas"},
+            {"title": "Acessar documentos", "id": "view_documents", "description": "Planos e docs"},
+            {"title": "Relatar incidente", "id": "report_incident", "description": "Declarar problema"},
+            {"title": "Atualizar progresso", "id": "update_progress", "description": "Atualizar tarefas"},
+            {"title": "Falar com equipe", "id": "talk_team", "description": "Contatar admin"},
+        ],
+    },
+    "de": {
+        "greeting": "Hallo {name}, wie kann ich Ihnen heute helfen?",
+        "button": "Optionen",
+        "menu_items": [
+            {"title": "Meine Baustellen", "id": "view_sites", "description": "Aktive Projekte"},
+            {"title": "Meine Aufgaben", "id": "view_tasks", "description": "Zugewiesene Aufgaben"},
+            {"title": "Dokumente", "id": "view_documents", "description": "Plane und Docs"},
+            {"title": "Vorfall melden", "id": "report_incident", "description": "Problem melden"},
+            {"title": "Fortschritt", "id": "update_progress", "description": "Aufgaben update"},
+            {"title": "Team kontaktieren", "id": "talk_team", "description": "Admin kontakt"},
+        ],
+    },
+    "it": {
+        "greeting": "Ciao {name}, come posso aiutarti oggi?",
+        "button": "Opzioni",
+        "menu_items": [
+            {"title": "Vedi cantieri", "id": "view_sites", "description": "Progetti attivi"},
+            {"title": "Vedi compiti", "id": "view_tasks", "description": "Compiti assegnati"},
+            {"title": "Accedi documenti", "id": "view_documents", "description": "Piani e docs"},
+            {"title": "Segnala incidente", "id": "report_incident", "description": "Dichiarare problema"},
+            {"title": "Aggiorna progresso", "id": "update_progress", "description": "Aggiornare compiti"},
+            {"title": "Parla con team", "id": "talk_team", "description": "Contattare admin"},
+        ],
+    },
+    "ro": {
+        "greeting": "Bună {name}, cum te pot ajuta astăzi?",
+        "button": "Opțiuni",
+        "menu_items": [
+            {"title": "Vezi santierele", "id": "view_sites", "description": "Proiecte active"},
+            {"title": "Vezi sarcinile", "id": "view_tasks", "description": "Sarcini atribuite"},
+            {"title": "Acceseaza documente", "id": "view_documents", "description": "Planuri si docs"},
+            {"title": "Raporteaza incident", "id": "report_incident", "description": "Declara problema"},
+            {"title": "Actualizeaza progres", "id": "update_progress", "description": "Actualizeaza sarcini"},
+            {"title": "Vorbeste cu echipa", "id": "talk_team", "description": "Contacteaza admin"},
+        ],
+    },
+    "pl": {
+        "greeting": "Cześć {name}, jak mogę Ci pomóc dzisiaj?",
+        "button": "Opcje",
+        "menu_items": [
+            {"title": "Zobacz place budowy", "id": "view_sites", "description": "Aktywne projekty"},
+            {"title": "Zobacz zadania", "id": "view_tasks", "description": "Przypisane zadania"},
+            {"title": "Dostep do dokumentow", "id": "view_documents", "description": "Plany i docs"},
+            {"title": "Zglosz incydent", "id": "report_incident", "description": "Zglaszanie problemu"},
+            {"title": "Aktualizuj postep", "id": "update_progress", "description": "Aktualizuj zadania"},
+            {"title": "Porozmawiaj", "id": "talk_team", "description": "Kontakt z admin"},
+        ],
+    },
+    "ar": {
+        "greeting": "مرحبا {name}، كيف يمكنني مساعدتك اليوم؟",
+        "button": "خيارات",
+        "menu_items": [
+            {"title": "عرض مواقعي", "id": "view_sites", "description": "المشاريع النشطة"},
+            {"title": "عرض مهامي", "id": "view_tasks", "description": "المهام المعينة"},
+            {"title": "الوثائق", "id": "view_documents", "description": "الخطط والوثائق"},
+            {"title": "الإبلاغ عن حادث", "id": "report_incident", "description": "الإبلاغ عن مشكلة"},
+            {"title": "تحديث التقدم", "id": "update_progress", "description": "تحديث المهام"},
+            {"title": "التحدث مع الفريق", "id": "talk_team", "description": "الاتصال بالإدارة"},
+        ],
+    },
+}
+
+
+def get_translation(language: str, key: str, default_language: str = "en") -> Any:
+    """Get translation for a specific language with fallback.
+
+    Args:
+        language: Target language code
+        key: Translation key (e.g., "greeting", "button", "menu_items")
+        default_language: Fallback language if target not found
+
+    Returns:
+        Translation value or fallback
+    """
+    if language in TRANSLATIONS and key in TRANSLATIONS[language]:
+        return TRANSLATIONS[language][key]
+    elif default_language in TRANSLATIONS and key in TRANSLATIONS[default_language]:
+        log.warning(f"Translation not found for {language}.{key}, using {default_language}")
+        return TRANSLATIONS[default_language][key]
+    else:
+        log.error(f"Translation not found for {language}.{key} and fallback {default_language}")
+        return None
+
+
+def safe_truncate(text: str, max_length: int) -> str:
+    """Safely truncate text to max length, removing emojis and special chars."""
+    # Remove emojis and special characters
+    text_clean = re.sub(r'[^\w\s-]', '', text).strip()
+    # Truncate to max length
+    return text_clean[:max_length] if text_clean else text[:max_length]
 
 
 def send_whatsapp_message_smart(
@@ -27,8 +170,7 @@ def send_whatsapp_message_smart(
     Returns:
         Message SID if successful
     """
-    # Interactive messages - ENABLED via Content Template!
-    # Using dynamically created templates per language
+    # Interactive messages - ENABLED via universal Content Template!
     ENABLE_INTERACTIVE = True
 
     # Try interactive message first if data provided and enabled
@@ -36,81 +178,84 @@ def send_whatsapp_message_smart(
         msg_type = interactive_data.get("type")
 
         if msg_type == "list":
-            sections = interactive_data.get("sections", [])
+            log.info(f"📋 Preparing interactive list for language: {language}")
 
-            if sections and len(sections) > 0:
-                # Extract items from sections
-                items = []
-                for section in sections:
-                    rows = section.get("rows", [])
-                    for row in rows:
-                        items.append({
-                            "id": row.get("id", ""),
-                            "title": row.get("title", ""),
-                            "description": row.get("description", "")
-                        })
+            # Get language-specific content using robust translation system
+            greeting_template = get_translation(language, "greeting", "en")
+            button_text = get_translation(language, "button", "en")
+            menu_items = get_translation(language, "menu_items", "en")
 
-                # Limit to 6 items (template supports 6)
-                items = items[:6]
+            # Format greeting with user's name
+            if greeting_template:
+                # Use user's name or fallback to "there"
+                name = user_name.strip() if user_name else ""
+                greeting = greeting_template.format(name=name) if name else greeting_template.replace(" {name},", "").replace("{name},", "")
+            else:
+                greeting = "Hello, how can I help you today?"
 
-                log.info(f"📋 Sending interactive list using content template with {len(items)} items")
+            log.info(f"📝 Personalized greeting: {greeting[:50]}...")
 
-                # Build content variables for template
-                # Variable 1: user name
-                # Variables 2-4, 5-7, 8-10, 11-13, 14-16, 17-19: items (title, id, description)
-                content_variables = {
-                    "1": user_name or "there"
-                }
+            # Build content variables with strict character limits
+            # Variable 1: Body text (max 1024 chars)
+            # Variable 2: Button text (max 20 chars)
+            # Variables 3-20: 6 items (title 24, id 200, description 72 each)
+            content_variables = {
+                "1": safe_truncate(greeting, 1024),
+                "2": safe_truncate(button_text, 20) if button_text else "Options",
+            }
 
-                # Add items to variables
-                for idx, item in enumerate(items):
-                    var_base = (idx * 3) + 2  # 2, 5, 8, 11, 14, 17
+            # Add 6 menu items with strict limits
+            if not menu_items:
+                menu_items = []
 
-                    # Get title and clean it (remove emojis and special chars)
-                    title = item.get("title") or f"Option {idx+1}"
-                    title_clean = title.replace("*", "").strip()
-                    # Remove emojis
-                    import re
-                    title_clean = re.sub(r'[^\w\s-]', '', title_clean).strip()
-
-                    # Generate meaningful ID from title
-                    item_id = item.get("id") or f"action_{title_clean.lower().replace(' ', '_')[:30]}"
-
-                    # Generate description from title if not provided (no emojis)
-                    description = item.get("description")
-                    if not description or description.strip() == "":
-                        description = f"Select to {title_clean.lower()}"
-
-                    content_variables[str(var_base)] = title_clean[:24]
-                    content_variables[str(var_base + 1)] = item_id[:200]
-                    content_variables[str(var_base + 2)] = description[:72]
-
-                log.info(f"📝 Content variables: {content_variables}")
-
-                # Get template from database for this language
-                content_sid = template_manager.get_template_from_database("greeting_menu", language)
-
-                if not content_sid:
-                    log.error(f"❌ Template not found in database for language: {language}")
-                    # Fallback to text
-                    log.info("📱 Sending as regular text message")
-                    sid = twilio_client.send_message(to=to, body=text)
-                    return sid
-
-                log.info(f"📋 Using template for language '{language}': {content_sid}")
-
-                # Send using content template
-                sid = twilio_client.send_message_with_content(
-                    to=to,
-                    content_sid=content_sid,
-                    content_variables=content_variables
-                )
-
-                if sid:
-                    log.info(f"✅ Sent interactive list via template to {to}, SID: {sid}")
-                    return sid
+            for idx in range(6):
+                if idx < len(menu_items):
+                    item = menu_items[idx]
+                    title = item.get("title", f"Option {idx+1}")
+                    item_id = item.get("id", f"option_{idx+1}")
+                    description = item.get("description", "")
                 else:
-                    log.error(f"❌ Content template send FAILED, falling back to text")
+                    # Pad with empty items if less than 6
+                    title = ""
+                    item_id = f"empty_{idx+1}"
+                    description = ""
+
+                # Calculate variable positions: 3,4,5 for item 0; 6,7,8 for item 1; etc.
+                var_base = (idx * 3) + 3
+
+                content_variables[str(var_base)] = safe_truncate(title, 24)
+                content_variables[str(var_base + 1)] = safe_truncate(item_id, 200)
+                content_variables[str(var_base + 2)] = safe_truncate(description, 72)
+
+            log.info(f"📝 Content variables prepared:")
+            log.info(f"   Body length: {len(content_variables['1'])} chars")
+            log.info(f"   Button: {content_variables['2']}")
+            log.info(f"   Items: {len([k for k in content_variables if k.isdigit() and int(k) >= 3]) // 3}")
+
+            # Get universal template from database
+            content_sid = template_manager.get_template_from_database("greeting_menu", "all")
+
+            if not content_sid:
+                log.error(f"❌ Universal template not found in database")
+                # Fallback to text
+                log.info("📱 Sending as regular text message")
+                sid = twilio_client.send_message(to=to, body=text)
+                return sid
+
+            log.info(f"📋 Using universal template: {content_sid}")
+
+            # Send using content template
+            sid = twilio_client.send_message_with_content(
+                to=to,
+                content_sid=content_sid,
+                content_variables=content_variables
+            )
+
+            if sid:
+                log.info(f"✅ Sent interactive list via template to {to}, SID: {sid}")
+                return sid
+            else:
+                log.error(f"❌ Content template send FAILED, falling back to text")
 
         elif msg_type == "buttons":
             # Buttons not yet implemented

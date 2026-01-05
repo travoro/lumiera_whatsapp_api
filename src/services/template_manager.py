@@ -175,12 +175,12 @@ class TemplateManager:
             log.error(f"❌ Error deleting template {content_sid}: {e}")
             return False
 
-    def get_template_from_database(self, template_name: str, language: str) -> Optional[str]:
+    def get_template_from_database(self, template_name: str, language: str = "all") -> Optional[str]:
         """Fetch template SID from database.
 
         Args:
             template_name: Template name (e.g., "greeting_menu")
-            language: Language code (e.g., "fr", "en", "es")
+            language: Language code (e.g., "fr", "en", "es") or "all" for universal template
 
         Returns:
             Content SID if found, None otherwise
@@ -193,7 +193,7 @@ class TemplateManager:
                 log.info(f"Using cached template from memory: {cache_key} (SID: {cached_sid})")
                 return cached_sid
 
-            # Query database
+            # Query database - try specific language first, then fallback to "all"
             result = supabase_client.client.table("templates")\
                 .select("twilio_content_sid")\
                 .eq("template_name", template_name)\
@@ -201,6 +201,17 @@ class TemplateManager:
                 .eq("is_active", True)\
                 .single()\
                 .execute()
+
+            if not result.data and language != "all":
+                # Fallback to universal template
+                log.info(f"Language-specific template not found, trying universal template")
+                result = supabase_client.client.table("templates")\
+                    .select("twilio_content_sid")\
+                    .eq("template_name", template_name)\
+                    .eq("language", "all")\
+                    .eq("is_active", True)\
+                    .single()\
+                    .execute()
 
             if result.data:
                 content_sid = result.data["twilio_content_sid"]

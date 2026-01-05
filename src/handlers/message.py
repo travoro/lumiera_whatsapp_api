@@ -94,7 +94,7 @@ async def process_inbound_message(
 
         user_id = user["id"]
         user_language = user.get("language", "fr")
-        user_name = user.get("contact_nom", "")  # Get official contact name
+        user_name = user.get("contact_prenom", "")  # Get contact first name
 
         # Check if user has active escalation
         is_blocked = await escalation_service.should_block_user(user_id)
