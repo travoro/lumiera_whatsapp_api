@@ -46,20 +46,14 @@ async def whatsapp_webhook(
         form_data = dict(await request.form())
         log.info(f"📥 Webhook received all params: {list(form_data.keys())}")
 
-        # Validate webhook signature (always required in production)
-        config = request.app.state.config
-        should_verify = config.verify_webhook_signature or config.is_production
+        # Validate webhook signature (ALWAYS enforced for security)
+        url = str(request.url)
+        params = form_data
+        signature = request.headers.get("X-Twilio-Signature", "")
 
-        if should_verify:
-            url = str(request.url)
-            params = form_data
-            signature = request.headers.get("X-Twilio-Signature", "")
-
-            if not twilio_client.validate_webhook(url, params, signature):
-                log.warning(f"Invalid webhook signature from {From}")
-                raise HTTPException(status_code=403, detail="Invalid signature")
-        elif not config.is_production:
-            log.warning("⚠️  Webhook signature verification is DISABLED (development only)")
+        if not twilio_client.validate_webhook(url, params, signature):
+            log.warning(f"🚫 Invalid webhook signature from {From}")
+            raise HTTPException(status_code=403, detail="Invalid signature")
 
         # Check if this is an interactive list response
         is_interactive_response = ButtonPayload is not None
