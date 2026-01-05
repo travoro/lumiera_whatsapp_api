@@ -21,6 +21,7 @@ from src.integrations.twilio import twilio_client
 from src.utils.logger import log
 from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 from src.utils.response_parser import format_for_interactive
+from src.services.intent_router import intent_router
 
 
 
@@ -53,15 +54,15 @@ async def handle_direct_action(
         return response
 
     elif action == "view_tasks":
-        # Use fast path handler for list_tasks
-        log.info(f"📋 Calling list_tasks fast path handler for user {user_id}")
-        from src.services.handlers import handle_list_tasks
+        # Route through intent router (proper layering)
+        log.info(f"📋 Routing view_tasks intent for user {user_id}")
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
         user_name = supabase_client.get_user_name(user_id)
 
-        result = await handle_list_tasks(
+        result = await intent_router.route_intent(
+            intent="view_tasks",
             user_id=user_id,
             phone_number=phone_number,
             user_name=user_name,
@@ -75,15 +76,15 @@ async def handle_direct_action(
             return None
 
     elif action == "view_documents":
-        # Use fast path handler for list_documents
-        log.info(f"📄 Calling list_documents fast path handler for user {user_id}")
-        from src.services.handlers import handle_list_documents
+        # Route through intent router (proper layering)
+        log.info(f"📄 Routing view_documents intent for user {user_id}")
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
         user_name = supabase_client.get_user_name(user_id)
 
-        result = await handle_list_documents(
+        result = await intent_router.route_intent(
+            intent="view_documents",
             user_id=user_id,
             phone_number=phone_number,
             user_name=user_name,
@@ -110,15 +111,15 @@ async def handle_direct_action(
     # === FAST PATH FOR COMPLEX ACTIONS ===
 
     elif action == "report_incident":
-        # Use fast path handler for report_incident
-        log.info(f"🚨 Calling report_incident fast path handler for user {user_id}")
-        from src.services.handlers import handle_report_incident
+        # Route through intent router (proper layering)
+        log.info(f"🚨 Routing report_incident intent for user {user_id}")
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
         user_name = supabase_client.get_user_name(user_id)
 
-        result = await handle_report_incident(
+        result = await intent_router.route_intent(
+            intent="report_incident",
             user_id=user_id,
             phone_number=phone_number,
             user_name=user_name,
@@ -132,15 +133,15 @@ async def handle_direct_action(
             return None
 
     elif action == "update_progress":
-        # Use fast path handler for update_progress
-        log.info(f"✅ Calling update_progress fast path handler for user {user_id}")
-        from src.services.handlers import handle_update_progress
+        # Route through intent router (proper layering)
+        log.info(f"✅ Routing update_progress intent for user {user_id}")
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
         user_name = supabase_client.get_user_name(user_id)
 
-        result = await handle_update_progress(
+        result = await intent_router.route_intent(
+            intent="update_progress",
             user_id=user_id,
             phone_number=phone_number,
             user_name=user_name,
