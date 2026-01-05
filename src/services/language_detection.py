@@ -1,7 +1,7 @@
 """Robust language detection service combining Claude AI and ML detection."""
 from typing import Optional, Tuple
 from lingua import Language, LanguageDetectorBuilder
-from anthropic import Anthropic
+from langchain_anthropic import ChatAnthropic
 from langsmith import traceable
 from src.config import settings
 from src.utils.logger import log
@@ -45,7 +45,12 @@ class LanguageDetectionService:
             min_confidence: Minimum confidence score for lingua detection (0.0 to 1.0)
         """
         self.min_confidence = min_confidence
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
+        self.llm = ChatAnthropic(
+            model="claude-3-5-haiku-20241022",
+            api_key=settings.anthropic_api_key,
+            temperature=0,
+            max_tokens=10
+        )
 
         # Build lingua detector with all supported languages
         self.detector = LanguageDetectorBuilder.from_languages(
@@ -63,11 +68,6 @@ class LanguageDetectionService:
 
         log.info("Language detection service initialized with Claude AI + lingua-py")
 
-    @traceable(
-        name="language_detection",
-        run_type="llm",
-        metadata={"service": "language_detection", "model": "claude-3-5-haiku-20241022"}
-    )
     async def detect_with_claude(self, text: str) -> Optional[str]:
         """Detect language using Claude AI (most accurate method).
 
@@ -84,14 +84,9 @@ Text: {text}
 
 Language code:"""
 
-            message = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",  # Fast and accurate
-                max_tokens=10,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            language_code = message.content[0].text.strip().lower()
+            # Use LangChain ChatAnthropic for automatic cost tracking
+            response = await self.llm.ainvoke([{"role": "user", "content": prompt}])
+            language_code = response.content.strip().lower()
 
             # Validate it's a supported language
             if language_code in settings.supported_languages_list:

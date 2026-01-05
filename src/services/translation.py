@@ -1,6 +1,6 @@
 """Translation service using Claude for high-quality contextual translation."""
 from typing import Optional
-from anthropic import Anthropic
+from langchain_anthropic import ChatAnthropic
 from langsmith import traceable
 from src.config import settings
 from src.utils.logger import log
@@ -11,16 +11,16 @@ class TranslationService:
     """Handle translation between user languages and French."""
 
     def __init__(self):
-        """Initialize translation service with Anthropic client."""
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
+        """Initialize translation service with ChatAnthropic for cost tracking."""
+        self.llm = ChatAnthropic(
+            model="claude-3-5-haiku-20241022",
+            api_key=settings.anthropic_api_key,
+            temperature=0,
+            max_tokens=1000
+        )
         self.default_language = settings.default_language
-        log.info("Translation service initialized")
+        log.info("Translation service initialized with ChatAnthropic")
 
-    @traceable(
-        name="translation_detect_language",
-        run_type="llm",
-        metadata={"service": "translation", "operation": "detect_language", "model": "claude-3-5-haiku-20241022"}
-    )
     @retry_on_api_error(max_attempts=3)
     async def detect_language(self, text: str) -> str:
         """Detect the language of input text with automatic retries."""
@@ -31,14 +31,9 @@ Text: {text}
 
 Language code:"""
 
-            message = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",  # Using Haiku for fast detection
-                max_tokens=10,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            language_code = message.content[0].text.strip().lower()
+            # Use LangChain ChatAnthropic for automatic cost tracking
+            response = await self.llm.ainvoke([{"role": "user", "content": prompt}])
+            language_code = response.content.strip().lower()
 
             # Validate it's a supported language
             if language_code in settings.supported_languages_list:
@@ -48,11 +43,6 @@ Language code:"""
             log.error(f"Error detecting language: {e}")
             return self.default_language
 
-    @traceable(
-        name="translate_to_french",
-        run_type="llm",
-        metadata={"service": "translation", "operation": "to_french", "model": "claude-3-5-haiku-20241022"}
-    )
     @retry_on_api_error(max_attempts=3)
     async def translate_to_french(
         self,
@@ -71,23 +61,13 @@ Text to translate: {text}
 
 French translation:"""
 
-            message = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
-                max_tokens=1000,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            return message.content[0].text.strip()
+            # Use LangChain ChatAnthropic for automatic cost tracking
+            response = await self.llm.ainvoke([{"role": "user", "content": prompt}])
+            return response.content.strip()
         except Exception as e:
             log.error(f"Error translating to French: {e}")
             return text  # Return original if translation fails
 
-    @traceable(
-        name="translate_from_french",
-        run_type="llm",
-        metadata={"service": "translation", "operation": "from_french", "model": "claude-3-5-haiku-20241022"}
-    )
     @retry_on_api_error(max_attempts=3)
     async def translate_from_french(
         self,
@@ -137,14 +117,9 @@ Text to translate: {text}
 
 {target_lang_name} translation:"""
 
-            message = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
-                max_tokens=1000,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            return message.content[0].text.strip()
+            # Use LangChain ChatAnthropic for automatic cost tracking
+            response = await self.llm.ainvoke([{"role": "user", "content": prompt}])
+            return response.content.strip()
         except Exception as e:
             log.error(f"Error translating from French: {e}")
             return text  # Return original if translation fails
