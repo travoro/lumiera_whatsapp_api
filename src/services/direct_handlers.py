@@ -409,10 +409,197 @@ async def handle_update_progress(
         return None
 
 
+async def handle_list_tasks(
+    user_id: str,
+    phone_number: str,
+    user_name: str,
+    language: str,
+    **kwargs
+) -> Dict[str, Any]:
+    """Handle list tasks intent with context-aware project selection.
+
+    Returns:
+        Dict with message, escalation, tools_called
+    """
+    log.info(f"🚀 FAST PATH: Handling list tasks for {user_id}")
+
+    try:
+        # Import user_context service
+        from src.services.user_context import user_context_service
+
+        # Check for current project in context
+        current_project_id = await user_context_service.get_context(user_id, 'current_project')
+
+        # Get user's projects
+        projects = await supabase_client.list_projects(user_id)
+
+        # Scenario 1: No projects available
+        if not projects:
+            message = get_translation(language, "no_projects")
+            return {
+                "message": message,
+                "escalation": False,
+                "tools_called": [],
+                "fast_path": True
+            }
+
+        # Base prompt structure by language
+        prompts = {
+            "fr": {
+                "header": "Voici vos tâches. 📋\n\n",
+                "project_context": "Pour le chantier **{project_name}** :\n\n",
+                "project_list": "Chantiers disponibles :\n",
+                "tasks_header": "",
+                "no_tasks": "Aucune tâche pour ce chantier.",
+                "footer": "\n\nDites-moi si vous souhaitez voir les tâches d'un autre chantier."
+            },
+            "en": {
+                "header": "Here are your tasks. 📋\n\n",
+                "project_context": "For the site **{project_name}** :\n\n",
+                "project_list": "Available sites:\n",
+                "tasks_header": "",
+                "no_tasks": "No tasks for this site.",
+                "footer": "\n\nLet me know if you want to see tasks for another site."
+            },
+            "es": {
+                "header": "Aquí están tus tareas. 📋\n\n",
+                "project_context": "Para la obra **{project_name}** :\n\n",
+                "project_list": "Obras disponibles:\n",
+                "tasks_header": "",
+                "no_tasks": "No hay tareas para esta obra.",
+                "footer": "\n\nDime si quieres ver las tareas de otra obra."
+            },
+            "pt": {
+                "header": "Aqui estão suas tarefas. 📋\n\n",
+                "project_context": "Para a obra **{project_name}** :\n\n",
+                "project_list": "Obras disponíveis:\n",
+                "tasks_header": "",
+                "no_tasks": "Não há tarefas para esta obra.",
+                "footer": "\n\nDiga-me se você quer ver as tarefas de outra obra."
+            },
+            "de": {
+                "header": "Hier sind Ihre Aufgaben. 📋\n\n",
+                "project_context": "Für die Baustelle **{project_name}** :\n\n",
+                "project_list": "Verfügbare Baustellen:\n",
+                "tasks_header": "",
+                "no_tasks": "Keine Aufgaben für diese Baustelle.",
+                "footer": "\n\nSagen Sie mir, wenn Sie Aufgaben für eine andere Baustelle sehen möchten."
+            },
+            "it": {
+                "header": "Ecco i tuoi compiti. 📋\n\n",
+                "project_context": "Per il cantiere **{project_name}** :\n\n",
+                "project_list": "Cantieri disponibili:\n",
+                "tasks_header": "",
+                "no_tasks": "Nessun compito per questo cantiere.",
+                "footer": "\n\nDimmi se vuoi vedere i compiti di un altro cantiere."
+            },
+            "ro": {
+                "header": "Iată sarcinile tale. 📋\n\n",
+                "project_context": "Pentru șantierul **{project_name}** :\n\n",
+                "project_list": "Șantiere disponibile:\n",
+                "tasks_header": "",
+                "no_tasks": "Nu există sarcini pentru acest șantier.",
+                "footer": "\n\nSpune-mi dacă vrei să vezi sarcinile unui alt șantier."
+            },
+            "pl": {
+                "header": "Oto Twoje zadania. 📋\n\n",
+                "project_context": "Dla placu budowy **{project_name}** :\n\n",
+                "project_list": "Dostępne place budowy:\n",
+                "tasks_header": "",
+                "no_tasks": "Brak zadań dla tego placu budowy.",
+                "footer": "\n\nPowiedz mi, jeśli chcesz zobaczyć zadania dla innego placu budowy."
+            },
+            "ar": {
+                "header": "إليك مهامك. 📋\n\n",
+                "project_context": "لموقع البناء **{project_name}** :\n\n",
+                "project_list": "مواقع البناء المتاحة:\n",
+                "tasks_header": "",
+                "no_tasks": "لا توجد مهام لهذا الموقع.",
+                "footer": "\n\nأخبرني إذا كنت تريد رؤية مهام موقع آخر."
+            }
+        }
+
+        # Get language prompts (fallback to English)
+        lang_prompts = prompts.get(language, prompts["en"])
+        message = lang_prompts["header"]
+
+        # Scenario 2: Has current project in context
+        if current_project_id:
+            # Find the current project
+            current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
+            project_name = current_project['name'] if current_project else projects[0]['name']
+            project_id = current_project['id'] if current_project else projects[0]['id']
+
+            message += lang_prompts["project_context"].format(project_name=project_name)
+
+            # Get tasks for this project
+            tasks = await supabase_client.list_tasks(user_id, project_id)
+
+            if not tasks:
+                message += lang_prompts["no_tasks"]
+            else:
+                message += lang_prompts["tasks_header"]
+                for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
+                    status = task.get('status', 'pending')
+                    progress = task.get('progress', 0)
+
+                    # Status emoji
+                    status_emoji = "⏳" if status == "pending" else "✅" if status == "completed" else "🔄"
+
+                    message += f"{i}. {status_emoji} {task['title']}"
+                    if progress > 0:
+                        message += f" ({progress}%)"
+                    message += "\n"
+
+            message += lang_prompts["footer"]
+
+        # Scenario 3: Has projects but no current project in context
+        else:
+            message += lang_prompts["project_list"]
+
+            for i, project in enumerate(projects[:5], 1):  # Limit to 5 projects
+                message += f"{i}. {project['name']}\n"
+
+            # Add prompt to select project
+            if language == "fr":
+                message += "\nDites-moi pour quel chantier vous souhaitez voir les tâches."
+            elif language == "en":
+                message += "\nTell me which site you want to see tasks for."
+            elif language == "es":
+                message += "\nDime para qué obra quieres ver las tareas."
+            elif language == "pt":
+                message += "\nDiga-me para qual obra você quer ver as tarefas."
+            elif language == "de":
+                message += "\nSagen Sie mir, für welche Baustelle Sie Aufgaben sehen möchten."
+            elif language == "it":
+                message += "\nDimmi per quale cantiere vuoi vedere i compiti."
+            elif language == "ro":
+                message += "\nSpune-mi pentru care șantier vrei să vezi sarcinile."
+            elif language == "pl":
+                message += "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć zadania."
+            elif language == "ar":
+                message += "\nأخبرني لأي موقع تريد رؤية المهام."
+            else:
+                message += "\nTell me which site you want to see tasks for."
+
+        return {
+            "message": message,
+            "escalation": False,
+            "tools_called": [],
+            "fast_path": True
+        }
+
+    except Exception as e:
+        log.error(f"Error in fast path list_tasks: {e}")
+        # Return None to trigger fallback to full agent
+        return None
+
+
 # Intent handler mapping
 INTENT_HANDLERS = {
     "greeting": handle_greeting,
     "list_projects": handle_list_projects,
+    "list_tasks": handle_list_tasks,
     "escalate": handle_escalation,
     "report_incident": handle_report_incident,
     "update_progress": handle_update_progress,
