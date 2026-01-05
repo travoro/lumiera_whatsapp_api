@@ -400,8 +400,9 @@ async def process_inbound_message(
         log.info(f"Intent: {intent_result['intent']} | Confidence: {confidence:.2%} | Requires tools: {intent_result['requires_tools']}")
 
         # 🚀 HYBRID ROUTING: Use fast path for high-confidence simple intents
-        CONFIDENCE_THRESHOLD = 0.90  # 90% confidence required for fast path
-        USE_FAST_PATH = True  # Feature flag
+        from src.config import settings
+        CONFIDENCE_THRESHOLD = settings.intent_confidence_threshold
+        USE_FAST_PATH = settings.enable_fast_path_handlers
 
         agent_result = None
         used_fast_path = False

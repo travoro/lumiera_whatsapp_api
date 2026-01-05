@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     response_timeout: int = 30
     max_concurrent_requests: int = 5
 
+    # Feature Flags & Intent Classification
+    enable_fast_path_handlers: bool = True
+    intent_confidence_threshold: float = 0.90
+    intent_classification_cache_ttl: int = 300  # 5 minutes in seconds
+
     # Media Storage
     media_storage_bucket: str = "whatsapp-media"
     max_file_size_mb: int = 10

@@ -7,6 +7,7 @@ from typing import Dict, Any
 from src.actions import tasks as task_actions
 from src.utils.whatsapp_formatter import get_translation
 from src.utils.handler_helpers import get_projects_with_context, format_project_list
+from src.utils.response_helpers import build_no_projects_response, get_selected_project
 from src.utils.logger import log
 
 
@@ -30,22 +31,15 @@ async def handle_list_tasks(
 
         # Scenario 1: No projects available
         if no_projects_msg:
-            return {
-                "message": no_projects_msg,
-                "escalation": False,
-                "tools_called": [],
-                "fast_path": True
-            }
+            return build_no_projects_response(language)
 
         # Use centralized translations
         message = get_translation(language, "list_tasks_header")
 
         # Scenario 2: Has current project in context
         if current_project_id:
-            # Find the current project
-            current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
-            project_name = current_project['name'] if current_project else projects[0]['name']
-            project_id = current_project['id'] if current_project else projects[0]['id']
+            # Get selected project or fallback
+            project, project_name, project_id = get_selected_project(projects, current_project_id)
 
             message += get_translation(language, "list_tasks_project_context").format(project_name=project_name)
 
@@ -112,22 +106,15 @@ async def handle_update_progress(
 
         # Scenario 1: No projects available
         if no_projects_msg:
-            return {
-                "message": no_projects_msg,
-                "escalation": False,
-                "tools_called": [],
-                "fast_path": True
-            }
+            return build_no_projects_response(language)
 
         # Use centralized translations
         message = get_translation(language, "update_progress_header")
 
         # Scenario 2: Has current project in context
         if current_project_id:
-            # Find the current project
-            current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
-            project_name = current_project['name'] if current_project else projects[0]['name']
-            project_id = current_project['id'] if current_project else projects[0]['id']
+            # Get selected project or fallback
+            project, project_name, project_id = get_selected_project(projects, current_project_id)
 
             message += get_translation(language, "update_progress_project_context").format(project_name=project_name)
 
