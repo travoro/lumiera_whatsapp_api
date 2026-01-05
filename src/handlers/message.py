@@ -56,14 +56,10 @@ async def handle_direct_action(
         # Use fast path handler for list_tasks
         log.info(f"📋 Calling list_tasks fast path handler for user {user_id}")
         from src.services.direct_handlers import handle_list_tasks
+        from src.integrations.supabase import supabase_client
 
-        # Get user name from database
-        try:
-            from src.integrations.supabase import supabase_client
-            user_data = supabase_client.get_user(user_id)
-            user_name = user_data.get('contact_name', '') if user_data else ''
-        except:
-            user_name = ''
+        # Get user name using centralized helper
+        user_name = supabase_client.get_user_name(user_id)
 
         result = await handle_list_tasks(
             user_id=user_id,
@@ -82,14 +78,10 @@ async def handle_direct_action(
         # Use fast path handler for list_documents
         log.info(f"📄 Calling list_documents fast path handler for user {user_id}")
         from src.services.direct_handlers import handle_list_documents
+        from src.integrations.supabase import supabase_client
 
-        # Get user name from database
-        try:
-            from src.integrations.supabase import supabase_client
-            user_data = supabase_client.get_user(user_id)
-            user_name = user_data.get('contact_name', '') if user_data else ''
-        except:
-            user_name = ''
+        # Get user name using centralized helper
+        user_name = supabase_client.get_user_name(user_id)
 
         result = await handle_list_documents(
             user_id=user_id,
@@ -121,14 +113,10 @@ async def handle_direct_action(
         # Use fast path handler for report_incident
         log.info(f"🚨 Calling report_incident fast path handler for user {user_id}")
         from src.services.direct_handlers import handle_report_incident
+        from src.integrations.supabase import supabase_client
 
-        # Get user name from database
-        try:
-            from src.integrations.supabase import supabase_client
-            user_data = supabase_client.get_user(user_id)
-            user_name = user_data.get('contact_name', '') if user_data else ''
-        except:
-            user_name = ''
+        # Get user name using centralized helper
+        user_name = supabase_client.get_user_name(user_id)
 
         result = await handle_report_incident(
             user_id=user_id,
@@ -147,14 +135,10 @@ async def handle_direct_action(
         # Use fast path handler for update_progress
         log.info(f"✅ Calling update_progress fast path handler for user {user_id}")
         from src.services.direct_handlers import handle_update_progress
+        from src.integrations.supabase import supabase_client
 
-        # Get user name from database
-        try:
-            from src.integrations.supabase import supabase_client
-            user_data = supabase_client.get_user(user_id)
-            user_name = user_data.get('contact_name', '') if user_data else ''
-        except:
-            user_name = ''
+        # Get user name using centralized helper
+        user_name = supabase_client.get_user_name(user_id)
 
         result = await handle_update_progress(
             user_id=user_id,

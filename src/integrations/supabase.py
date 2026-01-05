@@ -17,6 +17,49 @@ class SupabaseClient:
         )
         log.info("Supabase client initialized")
 
+    def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get subcontractor by ID (synchronous for compatibility).
+
+        Args:
+            user_id: Subcontractor ID (UUID)
+
+        Returns:
+            Subcontractor dict if found, None otherwise
+        """
+        try:
+            response = self.client.table("subcontractors").select("*").eq(
+                "id", user_id
+            ).execute()
+
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            log.error(f"Error getting subcontractor {user_id}: {e}")
+            return None
+
+    def get_user_name(self, user_id: str) -> str:
+        """Get subcontractor contact name (convenience method).
+
+        Args:
+            user_id: Subcontractor ID
+
+        Returns:
+            Contact name or empty string if not found
+        """
+        try:
+            user = self.get_user(user_id)
+            if user:
+                # Try different name fields in order of preference
+                return (user.get('contact_prenom') or
+                       user.get('contact_name') or
+                       user.get('raison_sociale') or
+                       '')
+            return ''
+        except Exception as e:
+            log.error(f"Error getting user name for {user_id}: {e}")
+            return ''
+
     async def get_user_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
         """Get subcontractor by WhatsApp phone number.
 
