@@ -7,6 +7,10 @@ from src.services.translation import translation_service
 from src.services.transcription import transcription_service
 from src.services.escalation import escalation_service
 from src.services.memory import memory_service
+from src.services.session import session_service
+from src.services.user_context import user_context_service
+from src.services.validation import validate_input
+from src.services.intent import intent_classifier
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client
 from src.utils.logger import log
@@ -121,17 +125,7 @@ async def process_inbound_message(
         # Detect language if not just French
         detected_language = await translation_service.detect_language(message_body)
 
-        # Save original message
-        await supabase_client.save_message(
-            user_id=user_id,
-            message_text=message_body,
-            original_language=detected_language,
-            direction="inbound",
-            message_sid=message_sid,
-            media_url=media_url,
-        )
-
-        # Translate to French if needed
+        # Translate to French if needed (do this before validation)
         if detected_language != "fr":
             message_in_french = await translation_service.translate_to_french(
                 message_body, detected_language
@@ -149,6 +143,48 @@ async def process_inbound_message(
             message_in_french = message_body
 
         log.info(f"Message in French: {message_in_french[:100]}...")
+
+        # === PHASE 2: VALIDATION, SESSION, INTENT, CONTEXT ===
+
+        # 1. Validate input for security
+        validation_result = await validate_input(message_in_french, user_id)
+        if not validation_result["is_valid"]:
+            error_msg = validation_result["message"]
+            log.warning(f"Invalid input from user {user_id}: {validation_result['reason']}")
+
+            # Translate and send error
+            if user_language != "fr":
+                error_msg = await translation_service.translate_from_french(error_msg, user_language)
+            twilio_client.send_message(from_number, error_msg)
+            return
+
+        # Use sanitized message
+        message_in_french = validation_result["sanitized"]
+
+        # 2. Get or create session
+        session = await session_service.get_or_create_session(user_id)
+        session_id = session['id'] if session else None
+        log.info(f"Using session {session_id} for user {user_id}")
+
+        # 3. Classify intent for analytics and potential routing
+        intent_result = await intent_classifier.classify(message_in_french, user_id)
+        log.info(f"Intent: {intent_result['intent']} (requires_tools: {intent_result['requires_tools']})")
+
+        # 4. Get user context for personalization
+        user_context_str = await user_context_service.get_context_for_agent(user_id)
+        if user_context_str:
+            log.info(f"Retrieved user context: {len(user_context_str)} chars")
+
+        # 5. Save inbound message with session tracking
+        await supabase_client.save_message(
+            user_id=user_id,
+            message_text=message_body,
+            original_language=detected_language,
+            direction="inbound",
+            message_sid=message_sid,
+            media_url=media_url,
+            session_id=session_id,
+        )
 
         # Retrieve conversation history for context
         full_conversation_history = await supabase_client.get_conversation_history(
@@ -172,7 +208,7 @@ async def process_inbound_message(
         else:
             log.info(f"Using {len(chat_history)} messages for context (no summary needed)")
 
-        # Process with agent (in French) with conversation history
+        # Process with agent (in French) with conversation history and context
         response_in_french = await lumiera_agent.process_message(
             user_id=user_id,
             phone_number=phone_number,
@@ -180,6 +216,7 @@ async def process_inbound_message(
             message_text=message_in_french,
             chat_history=chat_history,
             user_name=user_name,  # Pass official contact name from database
+            user_context=user_context_str,  # Pass user context for personalization
         )
 
         log.info(f"Agent response (French): {response_in_french[:100]}...")
@@ -192,12 +229,13 @@ async def process_inbound_message(
         else:
             response_text = response_in_french
 
-        # Save outbound message
+        # Save outbound message with session tracking
         await supabase_client.save_message(
             user_id=user_id,
             message_text=response_text,
             original_language=user_language,
             direction="outbound",
+            session_id=session_id,
         )
 
         # Send response via Twilio

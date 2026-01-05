@@ -85,10 +85,11 @@ class SupabaseClient:
         media_url: Optional[str] = None,
         message_type: str = "text",
         media_type: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> bool:
-        """Save message to database for audit trail."""
+        """Save message to database for audit trail with session tracking."""
         try:
-            self.client.table("messages").insert({
+            message_data = {
                 "subcontractor_id": user_id,
                 "content": message_text,
                 "language": original_language,
@@ -101,7 +102,13 @@ class SupabaseClient:
                 "source": "whatsapp",
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
-            }).execute()
+            }
+
+            # Add session_id if provided (from migrations v2)
+            if session_id:
+                message_data["session_id"] = session_id
+
+            self.client.table("messages").insert(message_data).execute()
             return True
         except Exception as e:
             log.error(f"Error saving message: {e}")

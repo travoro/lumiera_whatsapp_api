@@ -24,13 +24,12 @@ async def list_projects_tool(user_id: str) -> str:
     if not result["data"]:
         return "Aucun projet actif trouvé."
 
-    # Format projects for display
+    # Format projects for display (NO technical IDs shown to users)
     output = f"{result['message']}\n\n"
     for i, project in enumerate(result["data"], 1):
-        output += f"{i}. {project['name']}\n"
-        output += f"   ID: {project['id']}\n"
+        output += f"{i}. 🏗️ **{project['name']}**\n"
         if project.get('location'):
-            output += f"   Localisation: {project['location']}\n"
+            output += f"   📍 {project['location']}\n"
         output += f"   Statut: {project['status']}\n\n"
 
     return output
@@ -56,16 +55,15 @@ async def list_tasks_tool(user_id: str, project_id: str, status: Optional[str] =
     if not result["data"]:
         return "Aucune tâche trouvée pour ce projet."
 
-    # Format tasks for display
+    # Format tasks for display (NO technical IDs shown to users)
     output = f"{result['message']}\n\n"
     for i, task in enumerate(result["data"], 1):
-        output += f"{i}. {task['title']}\n"
-        output += f"   ID: {task['id']}\n"
+        output += f"{i}. 📝 **{task['title']}**\n"
         output += f"   Statut: {task['status']}\n"
         if task.get('priority'):
-            output += f"   Priorité: {task['priority']}\n"
+            output += f"   ⚡ Priorité: {task['priority']}\n"
         if task.get('due_date'):
-            output += f"   Date limite: {task['due_date']}\n"
+            output += f"   📅 Date limite: {task['due_date']}\n"
         output += "\n"
 
     return output
@@ -359,8 +357,8 @@ async def escalate_to_human_tool(
     )
 
     if escalation_id:
-        return "Votre demande a été escaladée à un administrateur. Vous serez contacté sous peu."
-    return "Erreur lors de l'escalade."
+        return "✅ Votre demande a été transmise à l'équipe administrative. Un membre de l'équipe vous contactera sous peu."
+    return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
 
 
 # List of all tools
