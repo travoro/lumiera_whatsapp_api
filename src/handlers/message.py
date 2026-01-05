@@ -398,8 +398,19 @@ async def process_inbound_message(
 
         # Ensure response_in_french is always a string (defensive check)
         if not isinstance(response_in_french, str):
-            log.error(f"Agent returned non-string response: {type(response_in_french)} - {response_in_french}")
-            response_in_french = str(response_in_french) if response_in_french else "Désolé, une erreur s'est produite."
+            log.warning(f"Agent returned non-string response: {type(response_in_french)}")
+
+            # Handle Claude API content blocks format: [{'text': '...', 'type': 'text', 'index': 0}]
+            if isinstance(response_in_french, list) and len(response_in_french) > 0:
+                if isinstance(response_in_french[0], dict) and 'text' in response_in_french[0]:
+                    response_in_french = response_in_french[0]['text']
+                    log.info("Extracted text from content blocks")
+                else:
+                    response_in_french = str(response_in_french)
+            elif response_in_french:
+                response_in_french = str(response_in_french)
+            else:
+                response_in_french = "Désolé, une erreur s'est produite."
 
         log.info(f"Agent response (French): {response_in_french[:100]}...")
         log.info(f"Agent escalation: {is_agent_escalation}")
