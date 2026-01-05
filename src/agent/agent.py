@@ -1,15 +1,13 @@
 """LangChain agent orchestrator with Claude."""
 import os
 from typing import Dict, Any
-from langchain_anthropic import ChatAnthropic
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from src.agent.tools import all_tools
+
+# === LangSmith Integration ===
+# CRITICAL: Set environment variables BEFORE importing LangChain modules
+# LangChain checks these during import, so they must be set first
 from src.config import settings
 from src.utils.logger import log
 
-# === LangSmith Integration ===
-# Enable LangSmith tracing for monitoring and debugging
 if settings.langchain_api_key:
     os.environ["LANGCHAIN_TRACING_V2"] = "true" if settings.langchain_tracing_v2 else "false"
     os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
@@ -18,6 +16,12 @@ if settings.langchain_api_key:
     log.info(f"LangSmith tracing enabled for project: {settings.langchain_project}")
 else:
     log.warning("LangSmith API key not configured - tracing disabled")
+
+# Import LangChain AFTER setting environment variables
+from langchain_anthropic import ChatAnthropic
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from src.agent.tools import all_tools
 
 
 # System prompt for the agent (in French since all internal logic is in French)
