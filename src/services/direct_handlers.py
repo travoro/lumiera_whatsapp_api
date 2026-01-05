@@ -409,6 +409,185 @@ async def handle_update_progress(
         return None
 
 
+async def handle_list_documents(
+    user_id: str,
+    phone_number: str,
+    user_name: str,
+    language: str,
+    **kwargs
+) -> Dict[str, Any]:
+    """Handle list documents intent with context-aware project selection.
+
+    Returns:
+        Dict with message, escalation, tools_called
+    """
+    log.info(f"🚀 FAST PATH: Handling list documents for {user_id}")
+
+    try:
+        # Import user_context service
+        from src.services.user_context import user_context_service
+
+        # Check for current project in context
+        current_project_id = await user_context_service.get_context(user_id, 'current_project')
+
+        # Get user's projects
+        projects = await supabase_client.list_projects(user_id)
+
+        # Scenario 1: No projects available
+        if not projects:
+            message = get_translation(language, "no_projects")
+            return {
+                "message": message,
+                "escalation": False,
+                "tools_called": [],
+                "fast_path": True
+            }
+
+        # Base prompt structure by language
+        prompts = {
+            "fr": {
+                "header": "Voici vos documents. 📄\n\n",
+                "project_context": "Pour le chantier **{project_name}** :\n\n",
+                "project_list": "Chantiers disponibles :\n",
+                "no_documents": "Aucun document disponible pour ce chantier.",
+                "footer": "\n\nDites-moi si vous souhaitez voir les documents d'un autre chantier."
+            },
+            "en": {
+                "header": "Here are your documents. 📄\n\n",
+                "project_context": "For the site **{project_name}** :\n\n",
+                "project_list": "Available sites:\n",
+                "no_documents": "No documents available for this site.",
+                "footer": "\n\nLet me know if you want to see documents for another site."
+            },
+            "es": {
+                "header": "Aquí están tus documentos. 📄\n\n",
+                "project_context": "Para la obra **{project_name}** :\n\n",
+                "project_list": "Obras disponibles:\n",
+                "no_documents": "No hay documentos disponibles para esta obra.",
+                "footer": "\n\nDime si quieres ver los documentos de otra obra."
+            },
+            "pt": {
+                "header": "Aqui estão seus documentos. 📄\n\n",
+                "project_context": "Para a obra **{project_name}** :\n\n",
+                "project_list": "Obras disponíveis:\n",
+                "no_documents": "Não há documentos disponíveis para esta obra.",
+                "footer": "\n\nDiga-me se você quer ver os documentos de outra obra."
+            },
+            "de": {
+                "header": "Hier sind Ihre Dokumente. 📄\n\n",
+                "project_context": "Für die Baustelle **{project_name}** :\n\n",
+                "project_list": "Verfügbare Baustellen:\n",
+                "no_documents": "Keine Dokumente für diese Baustelle verfügbar.",
+                "footer": "\n\nSagen Sie mir, wenn Sie Dokumente für eine andere Baustelle sehen möchten."
+            },
+            "it": {
+                "header": "Ecco i tuoi documenti. 📄\n\n",
+                "project_context": "Per il cantiere **{project_name}** :\n\n",
+                "project_list": "Cantieri disponibili:\n",
+                "no_documents": "Nessun documento disponibile per questo cantiere.",
+                "footer": "\n\nDimmi se vuoi vedere i documenti di un altro cantiere."
+            },
+            "ro": {
+                "header": "Iată documentele tale. 📄\n\n",
+                "project_context": "Pentru șantierul **{project_name}** :\n\n",
+                "project_list": "Șantiere disponibile:\n",
+                "no_documents": "Nu există documente disponibile pentru acest șantier.",
+                "footer": "\n\nSpune-mi dacă vrei să vezi documentele unui alt șantier."
+            },
+            "pl": {
+                "header": "Oto Twoje dokumenty. 📄\n\n",
+                "project_context": "Dla placu budowy **{project_name}** :\n\n",
+                "project_list": "Dostępne place budowy:\n",
+                "no_documents": "Brak dokumentów dla tego placu budowy.",
+                "footer": "\n\nPowiedz mi, jeśli chcesz zobaczyć dokumenty dla innego placu budowy."
+            },
+            "ar": {
+                "header": "إليك مستنداتك. 📄\n\n",
+                "project_context": "لموقع البناء **{project_name}** :\n\n",
+                "project_list": "مواقع البناء المتاحة:\n",
+                "no_documents": "لا توجد مستندات متاحة لهذا الموقع.",
+                "footer": "\n\nأخبرني إذا كنت تريد رؤية مستندات موقع آخر."
+            }
+        }
+
+        # Get language prompts (fallback to English)
+        lang_prompts = prompts.get(language, prompts["en"])
+        message = lang_prompts["header"]
+
+        # Scenario 2: Has current project in context
+        if current_project_id:
+            # Find the current project
+            current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
+            project_name = current_project['name'] if current_project else projects[0]['name']
+            project_id = current_project['id'] if current_project else projects[0]['id']
+
+            message += lang_prompts["project_context"].format(project_name=project_name)
+
+            # Get documents for this project
+            documents = await supabase_client.list_documents(user_id, project_id)
+
+            if not documents:
+                message += lang_prompts["no_documents"]
+            else:
+                for i, doc in enumerate(documents[:10], 1):  # Limit to 10 documents
+                    doc_type = doc.get('type', 'document')
+                    doc_name = doc.get('name', 'Untitled')
+
+                    # Document type emoji
+                    type_emoji = {
+                        'pdf': '📕',
+                        'image': '🖼️',
+                        'plan': '📐',
+                        'contract': '📋',
+                        'invoice': '🧾'
+                    }.get(doc_type, '📄')
+
+                    message += f"{i}. {type_emoji} {doc_name}\n"
+
+            message += lang_prompts["footer"]
+
+        # Scenario 3: Has projects but no current project in context
+        else:
+            message += lang_prompts["project_list"]
+
+            for i, project in enumerate(projects[:5], 1):  # Limit to 5 projects
+                message += f"{i}. {project['name']}\n"
+
+            # Add prompt to select project
+            if language == "fr":
+                message += "\nDites-moi pour quel chantier vous souhaitez voir les documents."
+            elif language == "en":
+                message += "\nTell me which site you want to see documents for."
+            elif language == "es":
+                message += "\nDime para qué obra quieres ver los documentos."
+            elif language == "pt":
+                message += "\nDiga-me para qual obra você quer ver os documentos."
+            elif language == "de":
+                message += "\nSagen Sie mir, für welche Baustelle Sie Dokumente sehen möchten."
+            elif language == "it":
+                message += "\nDimmi per quale cantiere vuoi vedere i documenti."
+            elif language == "ro":
+                message += "\nSpune-mi pentru care șantier vrei să vezi documentele."
+            elif language == "pl":
+                message += "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć dokumenty."
+            elif language == "ar":
+                message += "\nأخبرني لأي موقع تريد رؤية المستندات."
+            else:
+                message += "\nTell me which site you want to see documents for."
+
+        return {
+            "message": message,
+            "escalation": False,
+            "tools_called": [],
+            "fast_path": True
+        }
+
+    except Exception as e:
+        log.error(f"Error in fast path list_documents: {e}")
+        # Return None to trigger fallback to full agent
+        return None
+
+
 async def handle_list_tasks(
     user_id: str,
     phone_number: str,
@@ -600,6 +779,7 @@ INTENT_HANDLERS = {
     "greeting": handle_greeting,
     "list_projects": handle_list_projects,
     "list_tasks": handle_list_tasks,
+    "list_documents": handle_list_documents,
     "escalate": handle_escalation,
     "report_incident": handle_report_incident,
     "update_progress": handle_update_progress,

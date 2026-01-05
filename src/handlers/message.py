@@ -79,9 +79,30 @@ async def handle_direct_action(
             return None
 
     elif action == "view_documents":
-        # TODO: Implement list_documents function
-        log.info(f"📄 DEBUG: You are in the view_documents action for user {user_id}")
-        return "🔧 DEBUG: Action 'view_documents' - Function not yet implemented. This will show your project documents."
+        # Use fast path handler for list_documents
+        log.info(f"📄 Calling list_documents fast path handler for user {user_id}")
+        from src.services.direct_handlers import handle_list_documents
+
+        # Get user name from database
+        try:
+            from src.integrations.supabase import supabase_client
+            user_data = supabase_client.get_user(user_id)
+            user_name = user_data.get('contact_name', '') if user_data else ''
+        except:
+            user_name = ''
+
+        result = await handle_list_documents(
+            user_id=user_id,
+            phone_number=phone_number,
+            user_name=user_name,
+            language=language
+        )
+
+        if result:
+            return result.get("message")
+        else:
+            # Fallback to AI if fast path fails
+            return None
 
     elif action == "talk_team":
         # Escalate to human directly
