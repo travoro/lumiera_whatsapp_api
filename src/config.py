@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     intent_classification_cache_ttl: int = 300  # 5 minutes in seconds
 
     # Media Storage
-    media_storage_bucket: str = "whatsapp-media"
+    media_storage_bucket: str = "conversations"  # Supabase storage bucket for media files
     max_file_size_mb: int = 10
     allowed_media_types: str = "image/jpeg,image/png,image/gif,audio/ogg,audio/mpeg,audio/mp4"
 

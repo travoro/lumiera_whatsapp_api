@@ -189,20 +189,45 @@ class MessagePipeline:
             return Result.from_exception(e)
 
     async def _process_audio(self, ctx: MessageContext) -> Result[None]:
-        """Stage 4: Transcribe audio messages."""
+        """Stage 4: Transcribe and store audio messages.
+
+        This stage:
+        1. Downloads audio from source URL (e.g., Twilio)
+        2. Uploads to Supabase storage for permanent retention
+        3. Transcribes to text in original language
+        4. Updates ctx.message_body with transcription
+        5. Updates ctx.media_url to point to stored file
+        """
         try:
-            log.info(f"🎤 Processing audio message")
-            transcription = await transcription_service.transcribe_audio(
-                ctx.media_url,
-                target_language=ctx.user_language
+            if not (ctx.media_url and ctx.media_type and 'audio' in ctx.media_type):
+                return Result.ok(None)  # Skip if not audio
+
+            log.info(f"🎤 Processing audio message (transcribe + store)")
+
+            # Download, store, and transcribe audio
+            transcription, storage_url = await transcription_service.transcribe_and_store_audio(
+                audio_url=ctx.media_url,
+                user_id=ctx.user_id,
+                message_sid=ctx.message_sid or "unknown",
+                target_language=ctx.user_language,
+                content_type=ctx.media_type
             )
 
-            if transcription:
-                ctx.message_body = transcription
-                log.info(f"✅ Audio transcribed: {transcription[:50]}...")
-                return Result.ok(None)
-            else:
+            if not transcription:
                 raise IntegrationException(service="Whisper", operation="transcription")
+
+            # Update context with transcription
+            ctx.message_body = transcription
+            log.info(f"✅ Audio transcribed: {transcription[:50]}...")
+
+            # Update media URL to point to stored file (not Twilio URL)
+            if storage_url:
+                ctx.media_url = storage_url
+                log.info(f"✅ Audio stored: {storage_url}")
+            else:
+                log.warning("Audio transcribed but storage failed - using original URL")
+
+            return Result.ok(None)
 
         except Exception as e:
             return Result.from_exception(e)
