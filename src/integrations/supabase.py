@@ -18,17 +18,17 @@ class SupabaseClient:
         log.info("Supabase client initialized")
 
     async def get_user_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
-        """Get user by WhatsApp phone number."""
+        """Get subcontractor by WhatsApp phone number."""
         try:
-            response = self.client.table("users").select("*").eq(
-                "whatsapp_number", phone_number
+            response = self.client.table("subcontractors").select("*").eq(
+                "contact_telephone", phone_number
             ).execute()
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
             return None
         except Exception as e:
-            log.error(f"Error getting user by phone: {e}")
+            log.error(f"Error getting subcontractor by phone: {e}")
             return None
 
     async def create_or_update_user(
@@ -37,23 +37,23 @@ class SupabaseClient:
         language: str = "fr",
         **kwargs
     ) -> Optional[Dict[str, Any]]:
-        """Create or update user profile."""
+        """Create or update subcontractor profile."""
         try:
-            # Check if user exists
+            # Check if subcontractor exists
             existing_user = await self.get_user_by_phone(phone_number)
 
             if existing_user:
-                # Update existing user
-                response = self.client.table("users").update({
+                # Update existing subcontractor
+                response = self.client.table("subcontractors").update({
                     "language": language,
                     "updated_at": datetime.utcnow().isoformat(),
                     **kwargs
                 }).eq("id", existing_user["id"]).execute()
                 return response.data[0] if response.data else None
             else:
-                # Create new user
-                response = self.client.table("users").insert({
-                    "whatsapp_number": phone_number,
+                # Create new subcontractor
+                response = self.client.table("subcontractors").insert({
+                    "contact_telephone": phone_number,
                     "language": language,
                     "created_at": datetime.utcnow().isoformat(),
                     "updated_at": datetime.utcnow().isoformat(),
@@ -61,7 +61,7 @@ class SupabaseClient:
                 }).execute()
                 return response.data[0] if response.data else None
         except Exception as e:
-            log.error(f"Error creating/updating user: {e}")
+            log.error(f"Error creating/updating subcontractor: {e}")
             return None
 
     async def save_message(
@@ -72,17 +72,24 @@ class SupabaseClient:
         direction: str,  # 'inbound' or 'outbound'
         message_sid: Optional[str] = None,
         media_url: Optional[str] = None,
+        message_type: str = "text",
+        media_type: Optional[str] = None,
     ) -> bool:
         """Save message to database for audit trail."""
         try:
             self.client.table("messages").insert({
-                "user_id": user_id,
-                "message_text": message_text,
-                "original_language": original_language,
+                "subcontractor_id": user_id,
+                "content": message_text,
+                "language": original_language,
                 "direction": direction,
-                "message_sid": message_sid,
+                "twilio_sid": message_sid,
                 "media_url": media_url,
+                "message_type": message_type,
+                "media_type": media_type,
+                "status": "delivered",
+                "source": "whatsapp",
                 "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
             }).execute()
             return True
         except Exception as e:
@@ -96,20 +103,38 @@ class SupabaseClient:
         parameters: Dict[str, Any],
         result: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
+        action_type: str = "tool_call",
+        duration_ms: Optional[int] = None,
     ) -> bool:
-        """Log action execution for auditability."""
+        """Log action execution for auditability and project evolution tracking.
+
+        This is critical for understanding how the project evolved over time.
+
+        Args:
+            user_id: Subcontractor ID
+            action_name: Name of the action/tool
+            parameters: Input parameters
+            result: Result of the action
+            error: Error message if failed
+            action_type: Type of action (tool_call, api_request, etc.)
+            duration_ms: Duration in milliseconds
+        """
         try:
             self.client.table("action_logs").insert({
-                "user_id": user_id,
+                "subcontractor_id": user_id,
                 "action_name": action_name,
+                "action_type": action_type,
                 "parameters": parameters,
                 "result": result,
                 "error": error,
+                "duration_ms": duration_ms,
                 "created_at": datetime.utcnow().isoformat(),
             }).execute()
+            log.info(f"Action logged: {action_name} for user {user_id}")
             return True
         except Exception as e:
-            log.error(f"Error saving action log: {e}")
+            # Log warning but don't fail the main operation
+            log.warning(f"Could not save action log (table may not exist - run migrations): {e}")
             return False
 
     async def list_projects(self, user_id: str) -> List[Dict[str, Any]]:
@@ -144,7 +169,7 @@ class SupabaseClient:
         reason: str,
         context: Dict[str, Any],
     ) -> Optional[str]:
-        """Create escalation record for human handoff."""
+        """Create escalation record for human handoff (optional - table may not exist)."""
         try:
             response = self.client.table("escalations").insert({
                 "user_id": user_id,
@@ -158,7 +183,8 @@ class SupabaseClient:
                 return response.data[0]["id"]
             return None
         except Exception as e:
-            log.error(f"Error creating escalation: {e}")
+            # Table may not exist - just log warning
+            log.warning(f"Could not create escalation (table may not exist): {e}")
             return None
 
     async def update_escalation_status(
@@ -167,7 +193,7 @@ class SupabaseClient:
         status: str,
         resolution_note: Optional[str] = None,
     ) -> bool:
-        """Update escalation status."""
+        """Update escalation status (optional - table may not exist)."""
         try:
             update_data = {
                 "status": status,
@@ -181,11 +207,11 @@ class SupabaseClient:
             ).execute()
             return True
         except Exception as e:
-            log.error(f"Error updating escalation: {e}")
+            log.warning(f"Could not update escalation (table may not exist): {e}")
             return False
 
     async def get_active_escalation(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Check if user has an active escalation."""
+        """Check if user has an active escalation (optional - table may not exist)."""
         try:
             response = self.client.table("escalations").select("*").eq(
                 "user_id", user_id
@@ -195,8 +221,71 @@ class SupabaseClient:
                 return response.data[0]
             return None
         except Exception as e:
-            log.error(f"Error checking active escalation: {e}")
+            log.warning(f"Could not check active escalation (table may not exist): {e}")
             return None
+
+    async def get_conversation_history(
+        self,
+        user_id: str,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Get recent conversation history for a user.
+
+        Args:
+            user_id: The subcontractor ID
+            limit: Number of recent messages to retrieve (default 20)
+
+        Returns:
+            List of messages in chronological order (oldest first)
+        """
+        try:
+            response = self.client.table("messages").select(
+                "id, direction, content, language, created_at"
+            ).eq("subcontractor_id", user_id).order(
+                "created_at", desc=True
+            ).limit(limit).execute()
+
+            if response.data:
+                # Reverse to get chronological order (oldest first)
+                messages = list(reversed(response.data))
+                log.info(f"Retrieved {len(messages)} messages for user {user_id}")
+                return messages
+            return []
+        except Exception as e:
+            log.warning(f"Error retrieving conversation history: {e}")
+            return []
+
+    async def get_recent_context(
+        self,
+        user_id: str,
+        max_messages: int = 10,
+    ) -> str:
+        """Get recent conversation context as a formatted string.
+
+        Args:
+            user_id: The subcontractor ID
+            max_messages: Maximum number of recent messages to include
+
+        Returns:
+            Formatted conversation history string
+        """
+        try:
+            messages = await self.get_conversation_history(user_id, limit=max_messages)
+
+            if not messages:
+                return ""
+
+            # Format messages for context
+            context_lines = []
+            for msg in messages:
+                role = "User" if msg["direction"] == "inbound" else "Assistant"
+                content = msg["content"]
+                context_lines.append(f"{role}: {content}")
+
+            return "\n".join(context_lines)
+        except Exception as e:
+            log.warning(f"Error getting recent context: {e}")
+            return ""
 
     async def upload_media(
         self,

@@ -1,13 +1,37 @@
 """Message processing handler."""
 from typing import Optional, Dict, Any
 import httpx
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from src.agent.agent import lumiera_agent
 from src.services.translation import translation_service
 from src.services.transcription import transcription_service
 from src.services.escalation import escalation_service
+from src.services.memory import memory_service
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client
 from src.utils.logger import log
+
+
+def convert_messages_to_langchain(messages: list) -> list:
+    """Convert database messages to LangChain message format.
+
+    Args:
+        messages: List of message dicts from database
+
+    Returns:
+        List of LangChain messages (HumanMessage, AIMessage)
+    """
+    langchain_messages = []
+    for msg in messages:
+        content = msg.get("content", "")
+        direction = msg.get("direction", "")
+
+        if direction == "inbound":
+            langchain_messages.append(HumanMessage(content=content))
+        elif direction == "outbound":
+            langchain_messages.append(AIMessage(content=content))
+
+    return langchain_messages
 
 
 async def process_inbound_message(
@@ -108,12 +132,35 @@ async def process_inbound_message(
 
         log.info(f"Message in French: {message_in_french[:100]}...")
 
-        # Process with agent (in French)
+        # Retrieve conversation history for context
+        full_conversation_history = await supabase_client.get_conversation_history(
+            user_id=user_id,
+            limit=30  # Get more messages for potential summarization
+        )
+
+        # Optimize conversation history (summarize if too long)
+        recent_messages, older_summary = await memory_service.get_optimized_history(
+            messages=full_conversation_history,
+            recent_message_count=8  # Keep last 8 messages as-is
+        )
+
+        # Convert recent messages to LangChain format
+        chat_history = convert_messages_to_langchain(recent_messages)
+
+        # If there's a summary of older messages, prepend it as context
+        if older_summary:
+            chat_history.insert(0, SystemMessage(content=f"Contexte de la conversation précédente:\n{older_summary}"))
+            log.info(f"Using summarized context + {len(recent_messages)} recent messages")
+        else:
+            log.info(f"Using {len(chat_history)} messages for context (no summary needed)")
+
+        # Process with agent (in French) with conversation history
         response_in_french = await lumiera_agent.process_message(
             user_id=user_id,
             phone_number=from_number,
             language=user_language,
             message_text=message_in_french,
+            chat_history=chat_history,
         )
 
         log.info(f"Agent response (French): {response_in_french[:100]}...")

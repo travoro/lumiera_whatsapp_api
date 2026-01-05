@@ -22,4 +22,5 @@ mkdir -p logs
 
 # Run the application
 echo "Starting server on port ${PORT:-8000}..."
-python src/main.py
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+python -m uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}
