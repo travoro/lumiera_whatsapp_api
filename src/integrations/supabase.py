@@ -18,7 +18,18 @@ class SupabaseClient:
         log.info("Supabase client initialized")
 
     async def get_user_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
-        """Get subcontractor by WhatsApp phone number."""
+        """Get subcontractor by WhatsApp phone number.
+
+        IMPORTANT: This method ONLY looks up existing subcontractors.
+        Subcontractors can ONLY be created by admins in the backoffice.
+        Never auto-create subcontractors in the code.
+
+        Args:
+            phone_number: Phone number without 'whatsapp:' prefix (e.g., +33123456789)
+
+        Returns:
+            Subcontractor dict if found, None otherwise
+        """
         try:
             response = self.client.table("subcontractors").select("*").eq(
                 "contact_telephone", phone_number

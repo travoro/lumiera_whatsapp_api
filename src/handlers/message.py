@@ -55,14 +55,33 @@ async def process_inbound_message(
         phone_number = from_number.replace("whatsapp:", "").strip()
         log.info(f"Processing message from {phone_number} (original: {from_number})")
 
-        # Get or create user
+        # Get subcontractor (lookup only - never auto-create)
         user = await supabase_client.get_user_by_phone(phone_number)
 
         if not user:
-            # Subcontractor not found - they need to be registered first
-            log.error(f"Subcontractor not found for phone {phone_number}. Must be created in Supabase first.")
-            error_message = "Désolé, vous devez être enregistré pour utiliser ce service. Veuillez contacter l'administrateur."
+            # Subcontractor not found - only admins can create them in backoffice
+            log.warning(f"Unknown phone number: {phone_number}. Subcontractor not registered.")
+
+            # Detect language of incoming message to respond appropriately
+            detected_language = await translation_service.detect_language(message_body)
+
+            # Respond in their language with "I don't know you" message
+            error_messages = {
+                "en": "Sorry, I don't know you. Only registered subcontractors can use this service. Please contact your administrator to get registered.",
+                "fr": "Désolé, je ne vous connais pas. Seuls les sous-traitants enregistrés peuvent utiliser ce service. Veuillez contacter votre administrateur pour être enregistré.",
+                "es": "Lo siento, no te conozco. Solo los subcontratistas registrados pueden usar este servicio. Por favor contacta a tu administrador para registrarte.",
+                "pt": "Desculpe, não te conheço. Apenas subempreiteiros registados podem usar este serviço. Por favor contacta o teu administrador para te registares.",
+                "de": "Entschuldigung, ich kenne Sie nicht. Nur registrierte Subunternehmer können diesen Service nutzen. Bitte kontaktieren Sie Ihren Administrator zur Registrierung.",
+                "it": "Mi dispiace, non ti conosco. Solo i subappaltatori registrati possono utilizzare questo servizio. Contatta il tuo amministratore per registrarti.",
+                "ro": "Îmi pare rău, nu te cunosc. Doar subantreprenorii înregistrați pot folosi acest serviciu. Te rog contactează administratorul pentru a te înregistra.",
+                "pl": "Przepraszam, nie znam Cię. Tylko zarejestrowani podwykonawcy mogą korzystać z tej usługi. Skontaktuj się z administratorem, aby się zarejestrować.",
+                "ar": "عذراً، لا أعرفك. يمكن فقط للمقاولين المسجلين استخدام هذه الخدمة. يرجى الاتصال بالمسؤول للتسجيل.",
+            }
+
+            error_message = error_messages.get(detected_language, error_messages["en"])
             twilio_client.send_message(from_number, error_message)
+
+            log.info(f"Sent 'unknown user' message in {detected_language} to {phone_number}")
             return
 
         user_id = user["id"]
