@@ -144,20 +144,15 @@ async def handle_report_incident(
     log.info(f"🚀 FAST PATH: Handling report incident for {user_id}")
 
     try:
-        # Import user_context service
-        from src.services.user_context import user_context_service
+        # Use helper to get projects and context
+        from src.utils.handler_helpers import get_projects_with_context
 
-        # Check for current project in context
-        current_project_id = await user_context_service.get_context(user_id, 'current_project')
-
-        # Get user's projects
-        projects = await supabase_client.list_projects(user_id)
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, language)
 
         # Scenario 1: No projects available
-        if not projects:
-            message = get_translation(language, "no_projects")
+        if no_projects_msg:
             return {
-                "message": message,
+                "message": no_projects_msg,
                 "escalation": False,
                 "tools_called": [],
                 "fast_path": True
@@ -177,64 +172,41 @@ async def handle_report_incident(
 
         # Scenario 3: Has projects but no current project in context
         else:
-            # Remove the conditional part about current project
-            # Replace "si ce n'est pas le chantier {chantier_nom}" with list of projects
-            if language == "fr":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ Le chantier concerné\n\n"
-                base_msg += "Chantiers disponibles :\n"
-            elif language == "en":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ The concerned site\n\n"
-                base_msg += "Available sites:\n"
-            elif language == "es":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ La obra concernida\n\n"
-                base_msg += "Obras disponibles:\n"
-            elif language == "pt":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ A obra em questão\n\n"
-                base_msg += "Obras disponíveis:\n"
-            elif language == "de":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ Die betroffene Baustelle\n\n"
-                base_msg += "Verfügbare Baustellen:\n"
-            elif language == "it":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ Il cantiere interessato\n\n"
-                base_msg += "Cantieri disponibili:\n"
-            elif language == "ro":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ Șantierul în cauză\n\n"
-                base_msg += "Șantiere disponibile:\n"
-            elif language == "pl":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ Plac budowy\n\n"
-                base_msg += "Dostępne place budowy:\n"
-            elif language == "ar":
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ موقع البناء المعني\n\n"
-                base_msg += "مواقع البناء المتاحة:\n"
-            else:
-                base_msg = template.split("3. 🏗️")[0] + "3. 🏗️ The concerned site\n\n"
-                base_msg += "Available sites:\n"
+            # Use helper to format project list
+            from src.utils.handler_helpers import format_project_list
 
-            # Add project list
-            for i, project in enumerate(projects[:5], 1):  # Limit to 5 projects
-                base_msg += f"{i}. {project['name']}\n"
+            # Extract template header (everything before "3. 🏗️")
+            # Add project section header per language
+            project_section_headers = {
+                "fr": "3. 🏗️ Le chantier concerné\n\n",
+                "en": "3. 🏗️ The concerned site\n\n",
+                "es": "3. 🏗️ La obra concernida\n\n",
+                "pt": "3. 🏗️ A obra em questão\n\n",
+                "de": "3. 🏗️ Die betroffene Baustelle\n\n",
+                "it": "3. 🏗️ Il cantiere interessato\n\n",
+                "ro": "3. 🏗️ Șantierul în cauză\n\n",
+                "pl": "3. 🏗️ Plac budowy\n\n",
+                "ar": "3. 🏗️ موقع البناء المعني\n\n"
+            }
 
-            # Add closing
-            if language == "fr":
-                base_msg += "\nVous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas."
-            elif language == "en":
-                base_msg += "\nYou can send me the elements one by one, I'll guide you step by step."
-            elif language == "es":
-                base_msg += "\nPuedes enviarme los elementos uno por uno, te guiaré paso a paso."
-            elif language == "pt":
-                base_msg += "\nVocê pode me enviar os elementos um por um, vou guiá-lo passo a passo."
-            elif language == "de":
-                base_msg += "\nSie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt."
-            elif language == "it":
-                base_msg += "\nPuoi inviarmi gli elementi uno per uno, ti guiderò passo dopo passo."
-            elif language == "ro":
-                base_msg += "\nPoți să-mi trimiți elementele unul câte unul, te voi ghida pas cu pas."
-            elif language == "pl":
-                base_msg += "\nMożesz przesyłać mi elementy jeden po drugim, poprowadzę Cię krok po kroku."
-            elif language == "ar":
-                base_msg += "\nيمكنك إرسال العناصر واحدة تلو الأخرى، سأرشدك خطوة بخطوة."
-            else:
-                base_msg += "\nYou can send me the elements one by one, I'll guide you step by step."
+            # Build message with template header + project section + formatted list
+            base_msg = template.split("3. 🏗️")[0]
+            base_msg += project_section_headers.get(language, project_section_headers["en"])
+            base_msg += format_project_list(projects, language, max_items=5)
+
+            # Add closing prompt per language
+            closing_prompts = {
+                "fr": "\nVous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas.",
+                "en": "\nYou can send me the elements one by one, I'll guide you step by step.",
+                "es": "\nPuedes enviarme los elementos uno por uno, te guiaré paso a paso.",
+                "pt": "\nVocê pode me enviar os elementos um por um, vou guiá-lo passo a passo.",
+                "de": "\nSie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt.",
+                "it": "\nPuoi inviarmi gli elementi uno per uno, ti guiderò passo dopo passo.",
+                "ro": "\nPoți să-mi trimiți elementele unul câte unul, te voi ghida pas cu pas.",
+                "pl": "\nMożesz przesyłać mi elementy jeden po drugim, poprowadzę Cię krok po kroku.",
+                "ar": "\nيمكنك إرسال العناصر واحدة تلو الأخرى، سأرشدك خطوة بخطوة."
+            }
+            base_msg += closing_prompts.get(language, closing_prompts["en"])
 
             message = base_msg
 
@@ -266,20 +238,15 @@ async def handle_update_progress(
     log.info(f"🚀 FAST PATH: Handling update progress for {user_id}")
 
     try:
-        # Import user_context service
-        from src.services.user_context import user_context_service
+        # Use helper to get projects and context
+        from src.utils.handler_helpers import get_projects_with_context
 
-        # Check for current project in context
-        current_project_id = await user_context_service.get_context(user_id, 'current_project')
-
-        # Get user's projects
-        projects = await supabase_client.list_projects(user_id)
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, language)
 
         # Scenario 1: No projects available
-        if not projects:
-            message = get_translation(language, "no_projects")
+        if no_projects_msg:
             return {
-                "message": message,
+                "message": no_projects_msg,
                 "escalation": False,
                 "tools_called": [],
                 "fast_path": True
@@ -389,10 +356,9 @@ async def handle_update_progress(
 
         # Scenario 3: Has projects but no current project in context
         else:
-            message += lang_prompts["project_list"]
-
-            for i, project in enumerate(projects[:5], 1):  # Limit to 5 projects
-                message += f"{i}. {project['name']}\n"
+            # Use helper to format project list
+            from src.utils.handler_helpers import format_project_list
+            message += format_project_list(projects, language, max_items=5)
 
             message += lang_prompts["footer"]
 
@@ -424,20 +390,15 @@ async def handle_list_documents(
     log.info(f"🚀 FAST PATH: Handling list documents for {user_id}")
 
     try:
-        # Import user_context service
-        from src.services.user_context import user_context_service
+        # Use helper to get projects and context
+        from src.utils.handler_helpers import get_projects_with_context
 
-        # Check for current project in context
-        current_project_id = await user_context_service.get_context(user_id, 'current_project')
-
-        # Get user's projects
-        projects = await supabase_client.list_projects(user_id)
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, language)
 
         # Scenario 1: No projects available
-        if not projects:
-            message = get_translation(language, "no_projects")
+        if no_projects_msg:
             return {
-                "message": message,
+                "message": no_projects_msg,
                 "escalation": False,
                 "tools_called": [],
                 "fast_path": True
@@ -548,32 +509,23 @@ async def handle_list_documents(
 
         # Scenario 3: Has projects but no current project in context
         else:
-            message += lang_prompts["project_list"]
+            # Use helper to format project list
+            from src.utils.handler_helpers import format_project_list
+            message += format_project_list(projects, language, max_items=5)
 
-            for i, project in enumerate(projects[:5], 1):  # Limit to 5 projects
-                message += f"{i}. {project['name']}\n"
-
-            # Add prompt to select project
-            if language == "fr":
-                message += "\nDites-moi pour quel chantier vous souhaitez voir les documents."
-            elif language == "en":
-                message += "\nTell me which site you want to see documents for."
-            elif language == "es":
-                message += "\nDime para qué obra quieres ver los documentos."
-            elif language == "pt":
-                message += "\nDiga-me para qual obra você quer ver os documentos."
-            elif language == "de":
-                message += "\nSagen Sie mir, für welche Baustelle Sie Dokumente sehen möchten."
-            elif language == "it":
-                message += "\nDimmi per quale cantiere vuoi vedere i documenti."
-            elif language == "ro":
-                message += "\nSpune-mi pentru care șantier vrei să vezi documentele."
-            elif language == "pl":
-                message += "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć dokumenty."
-            elif language == "ar":
-                message += "\nأخبرني لأي موقع تريد رؤية المستندات."
-            else:
-                message += "\nTell me which site you want to see documents for."
+            # Add prompt to select project (in dict for cleaner code)
+            select_prompts = {
+                "fr": "\nDites-moi pour quel chantier vous souhaitez voir les documents.",
+                "en": "\nTell me which site you want to see documents for.",
+                "es": "\nDime para qué obra quieres ver los documentos.",
+                "pt": "\nDiga-me para qual obra você quer ver os documentos.",
+                "de": "\nSagen Sie mir, für welche Baustelle Sie Dokumente sehen möchten.",
+                "it": "\nDimmi per quale cantiere vuoi vedere i documenti.",
+                "ro": "\nSpune-mi pentru care șantier vrei să vezi documentele.",
+                "pl": "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć dokumenty.",
+                "ar": "\nأخبرني لأي موقع تريد رؤية المستندات."
+            }
+            message += select_prompts.get(language, select_prompts["en"])
 
         return {
             "message": message,
@@ -603,20 +555,15 @@ async def handle_list_tasks(
     log.info(f"🚀 FAST PATH: Handling list tasks for {user_id}")
 
     try:
-        # Import user_context service
-        from src.services.user_context import user_context_service
+        # Use helper to get projects and context
+        from src.utils.handler_helpers import get_projects_with_context
 
-        # Check for current project in context
-        current_project_id = await user_context_service.get_context(user_id, 'current_project')
-
-        # Get user's projects
-        projects = await supabase_client.list_projects(user_id)
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, language)
 
         # Scenario 1: No projects available
-        if not projects:
-            message = get_translation(language, "no_projects")
+        if no_projects_msg:
             return {
-                "message": message,
+                "message": no_projects_msg,
                 "escalation": False,
                 "tools_called": [],
                 "fast_path": True
@@ -734,32 +681,23 @@ async def handle_list_tasks(
 
         # Scenario 3: Has projects but no current project in context
         else:
-            message += lang_prompts["project_list"]
-
-            for i, project in enumerate(projects[:5], 1):  # Limit to 5 projects
-                message += f"{i}. {project['name']}\n"
+            # Use helper to format project list
+            from src.utils.handler_helpers import format_project_list
+            message += format_project_list(projects, language, max_items=5)
 
             # Add prompt to select project
-            if language == "fr":
-                message += "\nDites-moi pour quel chantier vous souhaitez voir les tâches."
-            elif language == "en":
-                message += "\nTell me which site you want to see tasks for."
-            elif language == "es":
-                message += "\nDime para qué obra quieres ver las tareas."
-            elif language == "pt":
-                message += "\nDiga-me para qual obra você quer ver as tarefas."
-            elif language == "de":
-                message += "\nSagen Sie mir, für welche Baustelle Sie Aufgaben sehen möchten."
-            elif language == "it":
-                message += "\nDimmi per quale cantiere vuoi vedere i compiti."
-            elif language == "ro":
-                message += "\nSpune-mi pentru care șantier vrei să vezi sarcinile."
-            elif language == "pl":
-                message += "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć zadania."
-            elif language == "ar":
-                message += "\nأخبرني لأي موقع تريد رؤية المهام."
-            else:
-                message += "\nTell me which site you want to see tasks for."
+            select_prompts = {
+                "fr": "\nDites-moi pour quel chantier vous souhaitez voir les tâches.",
+                "en": "\nTell me which site you want to see tasks for.",
+                "es": "\nDime para qué obra quieres ver las tareas.",
+                "pt": "\nDiga-me para qual obra você quer ver as tarefas.",
+                "de": "\nSagen Sie mir, für welche Baustelle Sie Aufgaben sehen möchten.",
+                "it": "\nDimmi per quale cantiere vuoi vedere i compiti.",
+                "ro": "\nSpune-mi pentru care șantier vrei să vezi sarcinile.",
+                "pl": "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć zadania.",
+                "ar": "\nأخبرني لأي موقع تريد رؤية المهام."
+            }
+            message += select_prompts.get(language, select_prompts["en"])
 
         return {
             "message": message,
