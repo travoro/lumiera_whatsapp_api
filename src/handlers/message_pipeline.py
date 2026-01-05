@@ -275,25 +275,40 @@ class MessagePipeline:
 
             # Use Whisper's detected language (more accurate than langdetect for audio)
             if whisper_detected_lang:
-                supported = ['fr', 'en', 'es', 'pt', 'ar', 'de', 'it', 'ro', 'pl']
+                # Map Whisper's language names to ISO 639-1 codes
+                whisper_to_iso = {
+                    'french': 'fr',
+                    'english': 'en',
+                    'spanish': 'es',
+                    'portuguese': 'pt',
+                    'arabic': 'ar',
+                    'german': 'de',
+                    'italian': 'it',
+                    'romanian': 'ro',
+                    'polish': 'pl'
+                }
 
-                if whisper_detected_lang in supported:
-                    if whisper_detected_lang != ctx.user_language:
+                # Convert Whisper's language name to ISO code
+                whisper_lang_lower = whisper_detected_lang.lower()
+                iso_lang = whisper_to_iso.get(whisper_lang_lower)
+
+                if iso_lang:
+                    if iso_lang != ctx.user_language:
                         log.info(
-                            f"🌍 Audio language detected by Whisper: {whisper_detected_lang} "
+                            f"🌍 Audio language detected by Whisper: {whisper_detected_lang} ({iso_lang}) "
                             f"(differs from profile: {ctx.user_language})"
                         )
 
                         # Update user profile language permanently
                         update_success = await supabase_client.update_user_language(
                             ctx.user_id,
-                            whisper_detected_lang
+                            iso_lang
                         )
 
                         if update_success:
                             log.info(
                                 f"✅ User profile language updated: "
-                                f"{ctx.user_language} → {whisper_detected_lang}"
+                                f"{ctx.user_language} → {iso_lang}"
                             )
                         else:
                             log.warning(
@@ -301,9 +316,9 @@ class MessagePipeline:
                             )
 
                         # Use detected language for this message
-                        ctx.user_language = whisper_detected_lang
+                        ctx.user_language = iso_lang
                     else:
-                        log.info(f"✅ Whisper detected language: {whisper_detected_lang} (matches profile)")
+                        log.info(f"✅ Whisper detected language: {whisper_detected_lang} ({iso_lang}) (matches profile)")
                 else:
                     log.warning(f"⚠️ Whisper detected unsupported language: {whisper_detected_lang}")
             else:
