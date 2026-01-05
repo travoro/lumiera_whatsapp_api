@@ -4,12 +4,16 @@ from typing import Optional
 from src.handlers.message import process_inbound_message
 from src.integrations.twilio import twilio_client
 from src.utils.logger import log
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/webhook/whatsapp")
+@limiter.limit("10/minute")  # Rate limit from config
 async def whatsapp_webhook(
     request: Request,
     From: str = Form(...),
@@ -21,6 +25,8 @@ async def whatsapp_webhook(
     ButtonText: Optional[str] = Form(None),     # Interactive list selection text
 ):
     """Handle incoming WhatsApp messages from Twilio.
+
+    Rate limited to 10 requests/minute to prevent DoS attacks and API cost exhaustion.
 
     Args:
         request: FastAPI request object
@@ -40,8 +46,11 @@ async def whatsapp_webhook(
         form_data = dict(await request.form())
         log.info(f"📥 Webhook received all params: {list(form_data.keys())}")
 
-        # Validate webhook signature if enabled
-        if request.app.state.config.verify_webhook_signature:
+        # Validate webhook signature (always required in production)
+        config = request.app.state.config
+        should_verify = config.verify_webhook_signature or config.is_production
+
+        if should_verify:
             url = str(request.url)
             params = form_data
             signature = request.headers.get("X-Twilio-Signature", "")
@@ -49,6 +58,8 @@ async def whatsapp_webhook(
             if not twilio_client.validate_webhook(url, params, signature):
                 log.warning(f"Invalid webhook signature from {From}")
                 raise HTTPException(status_code=403, detail="Invalid signature")
+        elif not config.is_production:
+            log.warning("⚠️  Webhook signature verification is DISABLED (development only)")
 
         # Check if this is an interactive list response
         is_interactive_response = ButtonPayload is not None

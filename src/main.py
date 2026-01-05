@@ -1,8 +1,11 @@
 """Main FastAPI application entry point for Lumiera WhatsApp Copilot."""
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from src.config import settings
 from src.handlers.webhook import router as webhook_router
@@ -18,6 +21,10 @@ if settings.enable_sentry and settings.sentry_dsn:
         traces_sample_rate=1.0 if settings.is_development else 0.1,
     )
     log.info("Sentry initialized")
+
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -55,8 +62,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Store config in app state
+# Store config and limiter in app state
 app.state.config = settings
+app.state.limiter = limiter
+
+# Add rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware
 app.add_middleware(
