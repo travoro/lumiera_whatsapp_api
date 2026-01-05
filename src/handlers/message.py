@@ -55,7 +55,7 @@ async def handle_direct_action(
     elif action == "view_tasks":
         # Use fast path handler for list_tasks
         log.info(f"📋 Calling list_tasks fast path handler for user {user_id}")
-        from src.services.direct_handlers import handle_list_tasks
+        from src.services.handlers import handle_list_tasks
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
@@ -77,7 +77,7 @@ async def handle_direct_action(
     elif action == "view_documents":
         # Use fast path handler for list_documents
         log.info(f"📄 Calling list_documents fast path handler for user {user_id}")
-        from src.services.direct_handlers import handle_list_documents
+        from src.services.handlers import handle_list_documents
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
@@ -112,7 +112,7 @@ async def handle_direct_action(
     elif action == "report_incident":
         # Use fast path handler for report_incident
         log.info(f"🚨 Calling report_incident fast path handler for user {user_id}")
-        from src.services.direct_handlers import handle_report_incident
+        from src.services.handlers import handle_report_incident
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
@@ -134,7 +134,7 @@ async def handle_direct_action(
     elif action == "update_progress":
         # Use fast path handler for update_progress
         log.info(f"✅ Calling update_progress fast path handler for user {user_id}")
-        from src.services.direct_handlers import handle_update_progress
+        from src.services.handlers import handle_update_progress
         from src.integrations.supabase import supabase_client
 
         # Get user name using centralized helper
@@ -410,7 +410,7 @@ async def process_inbound_message(
             log.info(f"🚀 HIGH CONFIDENCE ({confidence:.2%}) - Attempting fast path for: {intent}")
 
             # Import direct handlers
-            from src.services.direct_handlers import execute_direct_handler
+            from src.services.handlers import execute_direct_handler
 
             # Try direct execution
             agent_result = await execute_direct_handler(

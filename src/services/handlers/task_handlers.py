@@ -1,0 +1,165 @@
+"""Task-related intent handlers.
+
+These handlers execute directly without calling the main agent,
+providing fast responses for task operations.
+"""
+from typing import Dict, Any
+from src.actions import tasks as task_actions
+from src.utils.whatsapp_formatter import get_translation
+from src.utils.handler_helpers import get_projects_with_context, format_project_list
+from src.utils.logger import log
+
+
+async def handle_list_tasks(
+    user_id: str,
+    phone_number: str,
+    user_name: str,
+    language: str,
+    **kwargs
+) -> Dict[str, Any]:
+    """Handle list tasks intent with context-aware project selection.
+
+    Returns:
+        Dict with message, escalation, tools_called
+    """
+    log.info(f"🚀 FAST PATH: Handling list tasks for {user_id}")
+
+    try:
+        # Use helper to get projects and context
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, language)
+
+        # Scenario 1: No projects available
+        if no_projects_msg:
+            return {
+                "message": no_projects_msg,
+                "escalation": False,
+                "tools_called": [],
+                "fast_path": True
+            }
+
+        # Use centralized translations
+        message = get_translation(language, "list_tasks_header")
+
+        # Scenario 2: Has current project in context
+        if current_project_id:
+            # Find the current project
+            current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
+            project_name = current_project['name'] if current_project else projects[0]['name']
+            project_id = current_project['id'] if current_project else projects[0]['id']
+
+            message += get_translation(language, "list_tasks_project_context").format(project_name=project_name)
+
+            # Get tasks for this project using actions layer
+            task_result = await task_actions.list_tasks(user_id, project_id)
+
+            if not task_result["success"] or not task_result["data"]:
+                message += get_translation(language, "list_tasks_no_tasks")
+            else:
+                tasks = task_result["data"]
+                message += get_translation(language, "list_tasks_tasks_header")
+                for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
+                    status = task.get('status', 'pending')
+                    progress = task.get('progress', 0)
+
+                    # Status emoji
+                    status_emoji = "⏳" if status == "pending" else "✅" if status == "completed" else "🔄"
+
+                    message += f"{i}. {status_emoji} {task['title']}"
+                    if progress > 0:
+                        message += f" ({progress}%)"
+                    message += "\n"
+
+            message += get_translation(language, "list_tasks_footer")
+
+        # Scenario 3: Has projects but no current project in context
+        else:
+            # Use helper to format project list
+            message += format_project_list(projects, language, max_items=5)
+
+            # Add prompt to select project using centralized translation
+            message += get_translation(language, "list_tasks_select_project")
+
+        return {
+            "message": message,
+            "escalation": False,
+            "tools_called": [],
+            "fast_path": True
+        }
+
+    except Exception as e:
+        log.error(f"Error in fast path list_tasks: {e}")
+        # Return None to trigger fallback to full agent
+        return None
+
+
+async def handle_update_progress(
+    user_id: str,
+    phone_number: str,
+    user_name: str,
+    language: str,
+    **kwargs
+) -> Dict[str, Any]:
+    """Handle update progress intent with context-aware project and task selection.
+
+    Returns:
+        Dict with message, escalation, tools_called
+    """
+    log.info(f"🚀 FAST PATH: Handling update progress for {user_id}")
+
+    try:
+        # Use helper to get projects and context
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, language)
+
+        # Scenario 1: No projects available
+        if no_projects_msg:
+            return {
+                "message": no_projects_msg,
+                "escalation": False,
+                "tools_called": [],
+                "fast_path": True
+            }
+
+        # Use centralized translations
+        message = get_translation(language, "update_progress_header")
+
+        # Scenario 2: Has current project in context
+        if current_project_id:
+            # Find the current project
+            current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
+            project_name = current_project['name'] if current_project else projects[0]['name']
+            project_id = current_project['id'] if current_project else projects[0]['id']
+
+            message += get_translation(language, "update_progress_project_context").format(project_name=project_name)
+
+            # Get tasks for this project using actions layer
+            task_result = await task_actions.list_tasks(user_id, project_id)
+
+            if not task_result["success"] or not task_result["data"]:
+                message += get_translation(language, "update_progress_no_tasks")
+            else:
+                tasks = task_result["data"]
+                message += get_translation(language, "update_progress_tasks_header")
+                for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
+                    progress = task.get('progress', 0)
+                    message += f"{i}. {task['title']} ({progress}%)\n"
+
+            message += get_translation(language, "update_progress_footer")
+
+        # Scenario 3: Has projects but no current project in context
+        else:
+            # Use helper to format project list
+            message += format_project_list(projects, language, max_items=5)
+
+            message += get_translation(language, "update_progress_footer")
+
+        return {
+            "message": message,
+            "escalation": False,
+            "tools_called": [],
+            "fast_path": True
+        }
+
+    except Exception as e:
+        log.error(f"Error in fast path update_progress: {e}")
+        # Return None to trigger fallback to full agent
+        return None
