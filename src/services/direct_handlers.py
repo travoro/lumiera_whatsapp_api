@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client
 from src.services.escalation import escalation_service
+from src.services.translations import get_translation
 from src.utils.logger import log
 
 
@@ -24,15 +25,11 @@ async def handle_greeting(
     """
     log.info(f"🚀 FAST PATH: Handling greeting for {user_name}")
 
-    # Personalized greeting based on language
-    greetings = {
-        "fr": f"Bonjour{', ' + user_name if user_name else ''} ! 👋\n\nComment puis-je vous aider aujourd'hui ?\n\n1. 🏗️ Voir mes chantiers actifs\n2. 📋 Consulter mes tâches\n3. 🚨 Signaler un incident\n4. ✅ Mettre à jour ma progression\n5. 🗣️ Parler avec l'équipe\n\nQue souhaitez-vous faire ?",
-        "en": f"Hello{', ' + user_name if user_name else ''} ! 👋\n\nHow can I help you today?\n\n1. 🏗️ View my active projects\n2. 📋 Check my tasks\n3. 🚨 Report an incident\n4. ✅ Update my progress\n5. 🗣️ Talk to the team\n\nWhat would you like to do?",
-        "es": f"Hola{', ' + user_name if user_name else ''} ! 👋\n\n¿Cómo puedo ayudarte hoy?\n\n1. 🏗️ Ver mis proyectos activos\n2. 📋 Consultar mis tareas\n3. 🚨 Reportar un incidente\n4. ✅ Actualizar mi progreso\n5. 🗣️ Hablar con el equipo\n\n¿Qué te gustaría hacer?",
-        "ro": f"Bună{', ' + user_name if user_name else ''} ! 👋\n\nCum te pot ajuta astăzi?\n\n1. 🏗️ Vezi șantierele mele active\n2. 📋 Consultă sarcinile mele\n3. 🚨 Raportează un incident\n4. ✅ Actualizează progresul\n5. 🗣️ Vorbește cu echipa\n\nCe ai dori să faci?",
-    }
+    # Format name for greeting (with comma if provided)
+    name_part = f", {user_name}" if user_name else ""
 
-    message = greetings.get(language, greetings["fr"])
+    # Get translated greeting from centralized translations
+    message = get_translation("greeting", language, name=name_part)
 
     return {
         "message": message,
@@ -61,28 +58,15 @@ async def handle_list_projects(
         projects = await supabase_client.list_projects(user_id)
 
         if not projects:
-            messages = {
-                "fr": "Vous n'avez pas encore de chantiers actifs.",
-                "en": "You don't have any active projects yet.",
-                "es": "Aún no tienes proyectos activos.",
-                "ro": "Nu ai încă șantiere active.",
-            }
             return {
-                "message": messages.get(language, messages["fr"]),
+                "message": get_translation("no_projects", language),
                 "escalation": False,
                 "tools_called": ["list_projects_tool"],
                 "fast_path": True
             }
 
-        # Format projects list
-        messages = {
-            "fr": f"Vous avez {len(projects)} chantier(s) actif(s) :\n\n",
-            "en": f"You have {len(projects)} active project(s):\n\n",
-            "es": f"Tienes {len(projects)} proyecto(s) activo(s):\n\n",
-            "ro": f"Ai {len(projects)} șantier(e) activ(e):\n\n",
-        }
-
-        message = messages.get(language, messages["fr"])
+        # Format projects list with translation
+        message = get_translation("projects_list_header", language, count=len(projects))
 
         for i, project in enumerate(projects, 1):
             message += f"{i}. 🏗️ *{project['name']}*\n"
@@ -128,15 +112,8 @@ async def handle_escalation(
         )
 
         if escalation_id:
-            messages = {
-                "fr": "✅ Votre demande a été transmise à l'équipe administrative. Un membre de l'équipe vous contactera sous peu.",
-                "en": "✅ Your request has been forwarded to the admin team. A team member will contact you shortly.",
-                "es": "✅ Tu solicitud ha sido enviada al equipo administrativo. Un miembro del equipo te contactará pronto.",
-                "ro": "✅ Cererea ta a fost trimisă echipei administrative. Un membru al echipei te va contacta în curând.",
-            }
-
             return {
-                "message": messages.get(language, messages["fr"]),
+                "message": get_translation("escalation_success", language),
                 "escalation": True,
                 "tools_called": ["escalate_to_human_tool"],
                 "fast_path": True
@@ -164,14 +141,8 @@ async def handle_report_incident(
     """
     log.info(f"🚀 FAST PATH: Handling report incident for {user_id}")
 
-    messages = {
-        "fr": "Je vais vous aider à signaler un incident. 🚨\n\nPour créer un rapport d'incident, j'ai besoin de :\n\n1. 📸 *Au moins une photo* du problème\n2. 📝 *Une description* de ce qui s'est passé\n3. 🏗️ *Le chantier concerné*\n\nPouvez-vous m'envoyer une photo du problème ?",
-        "en": "I'll help you report an incident. 🚨\n\nTo create an incident report, I need:\n\n1. 📸 *At least one photo* of the problem\n2. 📝 *A description* of what happened\n3. 🏗️ *The project concerned*\n\nCan you send me a photo of the problem?",
-        "es": "Te ayudaré a reportar un incidente. 🚨\n\nPara crear un reporte de incidente, necesito:\n\n1. 📸 *Al menos una foto* del problema\n2. 📝 *Una descripción* de lo que pasó\n3. 🏗️ *El proyecto concernido*\n\n¿Puedes enviarme una foto del problema?",
-        "ro": "Te voi ajuta să raportezi un incident. 🚨\n\nPentru a crea un raport de incident, am nevoie de:\n\n1. 📸 *Cel puțin o fotografie* a problemei\n2. 📝 *O descriere* a ceea ce s-a întâmplat\n3. 🏗️ *Șantierul în cauză*\n\nPoți să-mi trimiți o fotografie a problemei?",
-    }
-
-    message = messages.get(language, messages["fr"])
+    # Get translated incident report message
+    message = get_translation("report_incident", language)
 
     return {
         "message": message,
