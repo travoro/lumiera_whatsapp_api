@@ -11,6 +11,10 @@ TRANSLATIONS = {
     "fr": {
         "greeting": "Bonjour {name}, comment puis-je vous aider aujourd'hui ?",
         "button": "Options",
+        "no_projects": "Vous n'avez pas encore de chantiers actifs.",
+        "projects_list_header": "Vous avez {count} chantier(s) actif(s) :\n\n",
+        "escalation_success": "✅ Votre demande a été transmise à l'équipe administrative. Un membre de l'équipe vous contactera sous peu.",
+        "report_incident": "Je vais vous aider à signaler un incident. 🚨\n\nPour créer un rapport d'incident, j'ai besoin de :\n\n1. 📸 *Au moins une photo* du problème\n2. 📝 *Une description* de ce qui s'est passé\n3. 🏗️ *Le chantier concerné*\n\nPouvez-vous m'envoyer une photo du problème ?",
         "menu_items": [
             {"title": "Voir mes chantiers", "id": "view_sites_fr", "description": "Projets actifs"},
             {"title": "Consulter mes taches", "id": "view_tasks_fr", "description": "Taches assignees"},
@@ -23,6 +27,10 @@ TRANSLATIONS = {
     "en": {
         "greeting": "Hello {name}, how can I help you today?",
         "button": "Options",
+        "no_projects": "You don't have any active projects yet.",
+        "projects_list_header": "You have {count} active project(s):\n\n",
+        "escalation_success": "✅ Your request has been forwarded to the admin team. A team member will contact you shortly.",
+        "report_incident": "I'll help you report an incident. 🚨\n\nTo create an incident report, I need:\n\n1. 📸 *At least one photo* of the problem\n2. 📝 *A description* of what happened\n3. 🏗️ *The project concerned*\n\nCan you send me a photo of the problem?",
         "menu_items": [
             {"title": "View my sites", "id": "view_sites_en", "description": "Active projects"},
             {"title": "Check my tasks", "id": "view_tasks_en", "description": "Assigned tasks"},
@@ -35,6 +43,10 @@ TRANSLATIONS = {
     "es": {
         "greeting": "Hola {name}, ¿cómo puedo ayudarte hoy?",
         "button": "Opciones",
+        "no_projects": "Aún no tienes proyectos activos.",
+        "projects_list_header": "Tienes {count} proyecto(s) activo(s):\n\n",
+        "escalation_success": "✅ Tu solicitud ha sido enviada al equipo administrativo. Un miembro del equipo te contactará pronto.",
+        "report_incident": "Te ayudaré a reportar un incidente. 🚨\n\nPara crear un reporte de incidente, necesito:\n\n1. 📸 *Al menos una foto* del problema\n2. 📝 *Una descripción* de lo que pasó\n3. 🏗️ *El proyecto concernido*\n\n¿Puedes enviarme una foto del problema?",
         "menu_items": [
             {"title": "Ver mis obras", "id": "view_sites_es", "description": "Proyectos activos"},
             {"title": "Ver mis tareas", "id": "view_tasks_es", "description": "Tareas asignadas"},
@@ -47,6 +59,10 @@ TRANSLATIONS = {
     "pt": {
         "greeting": "Olá {name}, como posso ajudá-lo hoje?",
         "button": "Opções",
+        "no_projects": "Você ainda não tem projetos ativos.",
+        "projects_list_header": "Você tem {count} projeto(s) ativo(s):\n\n",
+        "escalation_success": "✅ Sua solicitação foi encaminhada para a equipe administrativa. Um membro da equipe entrará em contato em breve.",
+        "report_incident": "Vou ajudá-lo a relatar um incidente. 🚨\n\nPara criar um relatório de incidente, preciso de:\n\n1. 📸 *Pelo menos uma foto* do problema\n2. 📝 *Uma descrição* do que aconteceu\n3. 🏗️ *O projeto em questão*\n\nVocê pode me enviar uma foto do problema?",
         "menu_items": [
             {"title": "Ver minhas obras", "id": "view_sites_pt", "description": "Projetos ativos"},
             {"title": "Ver minhas tarefas", "id": "view_tasks_pt", "description": "Tarefas atribuidas"},
@@ -59,6 +75,10 @@ TRANSLATIONS = {
     "de": {
         "greeting": "Hallo {name}, wie kann ich Ihnen heute helfen?",
         "button": "Optionen",
+        "no_projects": "Sie haben noch keine aktiven Projekte.",
+        "projects_list_header": "Sie haben {count} aktive(s) Projekt(e):\n\n",
+        "escalation_success": "✅ Ihre Anfrage wurde an das Admin-Team weitergeleitet. Ein Teammitglied wird sich in Kürze bei Ihnen melden.",
+        "report_incident": "Ich helfe Ihnen, einen Vorfall zu melden. 🚨\n\nUm einen Vorfallbericht zu erstellen, benötige ich:\n\n1. 📸 *Mindestens ein Foto* des Problems\n2. 📝 *Eine Beschreibung* dessen, was passiert ist\n3. 🏗️ *Das betroffene Projekt*\n\nKönnen Sie mir ein Foto des Problems senden?",
         "menu_items": [
             {"title": "Meine Baustellen", "id": "view_sites_de", "description": "Aktive Projekte"},
             {"title": "Meine Aufgaben", "id": "view_tasks_de", "description": "Zugewiesene Aufgaben"},
@@ -71,6 +91,10 @@ TRANSLATIONS = {
     "it": {
         "greeting": "Ciao {name}, come posso aiutarti oggi?",
         "button": "Opzioni",
+        "no_projects": "Non hai ancora progetti attivi.",
+        "projects_list_header": "Hai {count} progetto/i attivo/i:\n\n",
+        "escalation_success": "✅ La tua richiesta è stata inoltrata al team amministrativo. Un membro del team ti contatterà a breve.",
+        "report_incident": "Ti aiuterò a segnalare un incidente. 🚨\n\nPer creare un rapporto di incidente, ho bisogno di:\n\n1. 📸 *Almeno una foto* del problema\n2. 📝 *Una descrizione* di cosa è successo\n3. 🏗️ *Il progetto interessato*\n\nPuoi inviarmi una foto del problema?",
         "menu_items": [
             {"title": "Vedi cantieri", "id": "view_sites_it", "description": "Progetti attivi"},
             {"title": "Vedi compiti", "id": "view_tasks_it", "description": "Compiti assegnati"},
@@ -83,6 +107,10 @@ TRANSLATIONS = {
     "ro": {
         "greeting": "Bună {name}, cum te pot ajuta astăzi ?",
         "button": "Opțiuni",
+        "no_projects": "Nu ai încă șantiere active.",
+        "projects_list_header": "Ai {count} șantier(e) activ(e):\n\n",
+        "escalation_success": "✅ Cererea ta a fost trimisă echipei administrative. Un membru al echipei te va contacta în curând.",
+        "report_incident": "Te voi ajuta să raportezi un incident. 🚨\n\nPentru a crea un raport de incident, am nevoie de:\n\n1. 📸 *Cel puțin o fotografie* a problemei\n2. 📝 *O descriere* a ceea ce s-a întâmplat\n3. 🏗️ *Șantierul în cauză*\n\nPoți să-mi trimiți o fotografie a problemei?",
         "menu_items": [
             {"title": "Vezi santierele", "id": "view_sites_ro", "description": "Proiecte active"},
             {"title": "Vezi sarcinile", "id": "view_tasks_ro", "description": "Sarcini atribuite"},
@@ -95,6 +123,10 @@ TRANSLATIONS = {
     "pl": {
         "greeting": "Cześć {name}, jak mogę Ci pomóc dzisiaj?",
         "button": "Opcje",
+        "no_projects": "Nie masz jeszcze aktywnych projektów.",
+        "projects_list_header": "Masz {count} aktywny(ch) projekt(ów):\n\n",
+        "escalation_success": "✅ Twoje zgłoszenie zostało przekazane do zespołu administracyjnego. Członek zespołu skontaktuje się z Tobą wkrótce.",
+        "report_incident": "Pomogę Ci zgłosić incydent. 🚨\n\nAby utworzyć raport o incydencie, potrzebuję:\n\n1. 📸 *Co najmniej jedno zdjęcie* problemu\n2. 📝 *Opis* tego, co się stało\n3. 🏗️ *Projekt, którego to dotyczy*\n\nCzy możesz przesłać mi zdjęcie problemu?",
         "menu_items": [
             {"title": "Zobacz place budowy", "id": "view_sites_pl", "description": "Aktywne projekty"},
             {"title": "Zobacz zadania", "id": "view_tasks_pl", "description": "Przypisane zadania"},
@@ -107,6 +139,10 @@ TRANSLATIONS = {
     "ar": {
         "greeting": "مرحبا {name}، كيف يمكنني مساعدتك اليوم؟",
         "button": "خيارات",
+        "no_projects": "ليس لديك مشاريع نشطة بعد.",
+        "projects_list_header": "لديك {count} مشروع (مشاريع) نشط:\n\n",
+        "escalation_success": "✅ تم إرسال طلبك إلى الفريق الإداري. سيتصل بك أحد أعضاء الفريق قريبًا.",
+        "report_incident": "سأساعدك في الإبلاغ عن حادث. 🚨\n\nلإنشاء تقرير حادث، أحتاج إلى:\n\n1. 📸 *صورة واحدة على الأقل* للمشكلة\n2. 📝 *وصف* لما حدث\n3. 🏗️ *المشروع المعني*\n\nهل يمكنك إرسال صورة للمشكلة؟",
         "menu_items": [
             {"title": "عرض مواقعي", "id": "view_sites_ar", "description": "المشاريع النشطة"},
             {"title": "عرض مهامي", "id": "view_tasks_ar", "description": "المهام المعينة"},

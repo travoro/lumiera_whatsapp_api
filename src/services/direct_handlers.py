@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client
 from src.services.escalation import escalation_service
-from src.services.translations import get_translation
+from src.utils.whatsapp_formatter import get_translation
 from src.utils.logger import log
 
 
@@ -29,7 +29,8 @@ async def handle_greeting(
     name_part = f", {user_name}" if user_name else ""
 
     # Get translated greeting from centralized translations
-    message = get_translation("greeting", language, name=name_part)
+    greeting_template = get_translation(language, "greeting")
+    message = greeting_template.format(name=name_part) if greeting_template else f"Hello{name_part}!"
 
     return {
         "message": message,
@@ -59,14 +60,15 @@ async def handle_list_projects(
 
         if not projects:
             return {
-                "message": get_translation("no_projects", language),
+                "message": get_translation(language, "no_projects"),
                 "escalation": False,
                 "tools_called": ["list_projects_tool"],
                 "fast_path": True
             }
 
         # Format projects list with translation
-        message = get_translation("projects_list_header", language, count=len(projects))
+        header_template = get_translation(language, "projects_list_header")
+        message = header_template.format(count=len(projects)) if header_template else f"You have {len(projects)} projects:\n\n"
 
         for i, project in enumerate(projects, 1):
             message += f"{i}. 🏗️ *{project['name']}*\n"
@@ -113,7 +115,7 @@ async def handle_escalation(
 
         if escalation_id:
             return {
-                "message": get_translation("escalation_success", language),
+                "message": get_translation(language, "escalation_success"),
                 "escalation": True,
                 "tools_called": ["escalate_to_human_tool"],
                 "fast_path": True
@@ -142,7 +144,7 @@ async def handle_report_incident(
     log.info(f"🚀 FAST PATH: Handling report incident for {user_id}")
 
     # Get translated incident report message
-    message = get_translation("report_incident", language)
+    message = get_translation(language, "report_incident")
 
     return {
         "message": message,
