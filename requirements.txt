@@ -24,6 +24,9 @@ requests==2.32.3
 # OpenAI for Whisper transcription
 openai==1.57.2
 
+# Language Detection
+lingua-language-detector==2.1.1
+
 # Environment & Configuration
 python-dotenv==1.0.1
 

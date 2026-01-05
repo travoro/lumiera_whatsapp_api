@@ -200,12 +200,26 @@ class TranscriptionService:
 
             # IGNORE Whisper's language field - detect from transcribed text instead
             # Whisper transcribes correctly but language metadata is unreliable
+            # Use robust hybrid detection (keywords + lingua-py)
             detected_language = None
-            if transcribed_text and len(transcribed_text.strip()) > 5:
+            detection_method = 'none'
+            if transcribed_text and len(transcribed_text.strip()) > 2:
                 try:
-                    from langdetect import detect
-                    detected_language = detect(transcribed_text)
-                    log.info(f"✅ Language detected from transcribed text: '{detected_language}'")
+                    from src.services.language_detection import language_detection_service
+                    # Don't pass fallback - we'll handle that in the pipeline
+                    # This returns None if no confident detection
+                    detected_language, detection_method = language_detection_service.detect(
+                        transcribed_text,
+                        fallback_language='unknown'
+                    )
+                    if detected_language != 'unknown':
+                        log.info(
+                            f"✅ Language detected from transcribed text: '{detected_language}' "
+                            f"(method: {detection_method})"
+                        )
+                    else:
+                        log.warning(f"⚠️ No confident language detection")
+                        detected_language = None
                 except Exception as e:
                     log.warning(f"⚠️ Text language detection failed: {e}")
                     detected_language = None

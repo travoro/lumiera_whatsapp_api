@@ -187,20 +187,22 @@ class MessagePipeline:
             profile_language = ctx.user_language  # From user profile
             detected_language = profile_language  # Default to profile
 
-            # Try to detect language from message content
-            if ctx.message_body and len(ctx.message_body.strip()) > 5:
+            # Try to detect language from message content using robust hybrid detection
+            if ctx.message_body and len(ctx.message_body.strip()) > 2:
                 try:
-                    from langdetect import detect, LangDetectException
-                    detected_language = detect(ctx.message_body)
+                    from src.services.language_detection import language_detection_service
 
-                    # Map language codes (langdetect uses 'ro' for Romanian, etc.)
-                    # Validate against supported languages
-                    supported = ['fr', 'en', 'es', 'pt', 'ar', 'de', 'it', 'ro', 'pl']
-                    if detected_language in supported:
+                    detected_language, detection_method = language_detection_service.detect(
+                        ctx.message_body,
+                        fallback_language=profile_language
+                    )
+
+                    # Check if detection succeeded (not fallback)
+                    if detection_method != 'fallback':
                         if detected_language != profile_language:
                             log.info(
                                 f"🌍 Text language detected: {detected_language} "
-                                f"(differs from profile: {profile_language})"
+                                f"(method: {detection_method}, differs from profile: {profile_language})"
                             )
 
                             # Update user profile language permanently
@@ -222,15 +224,15 @@ class MessagePipeline:
                             # Use detected language for this message
                             ctx.user_language = detected_language
                         else:
-                            log.info(f"✅ Language: {detected_language} (matches profile)")
+                            log.info(
+                                f"✅ Language: {detected_language} (method: {detection_method}, matches profile)"
+                            )
                     else:
-                        log.warning(
-                            f"⚠️ Detected unsupported language: {detected_language}, "
-                            f"using profile: {profile_language}"
-                        )
+                        # Fallback method means no confident detection
+                        log.info(f"✅ Using profile language: {profile_language} (no confident detection)")
                         ctx.user_language = profile_language
 
-                except (LangDetectException, Exception) as e:
+                except Exception as e:
                     log.warning(f"⚠️ Language detection failed: {e}, using profile: {profile_language}")
                     ctx.user_language = profile_language
             else:
@@ -275,59 +277,39 @@ class MessagePipeline:
             log.info(f"🔍 TRACE: Language from transcription service: {whisper_detected_lang}")
             log.info(f"🔍 TRACE: Current context language (profile): {ctx.user_language}")
 
-            # Use detected language from transcribed text
+            # Use detected language from transcribed text (already ISO 639-1 code)
             if whisper_detected_lang:
-                # Map Whisper's language names to ISO 639-1 codes
-                whisper_to_iso = {
-                    'french': 'fr',
-                    'english': 'en',
-                    'spanish': 'es',
-                    'portuguese': 'pt',
-                    'arabic': 'ar',
-                    'german': 'de',
-                    'italian': 'it',
-                    'romanian': 'ro',
-                    'polish': 'pl'
-                }
+                if whisper_detected_lang != ctx.user_language:
+                    log.info(
+                        f"🌍 Audio language detected: {whisper_detected_lang} "
+                        f"(differs from profile: {ctx.user_language})"
+                    )
 
-                # Convert Whisper's language name to ISO code
-                whisper_lang_lower = whisper_detected_lang.lower()
-                iso_lang = whisper_to_iso.get(whisper_lang_lower)
+                    # Update user profile language permanently
+                    update_success = await supabase_client.update_user_language(
+                        ctx.user_id,
+                        whisper_detected_lang
+                    )
 
-                if iso_lang:
-                    if iso_lang != ctx.user_language:
+                    if update_success:
                         log.info(
-                            f"🌍 Audio language detected by Whisper: {whisper_detected_lang} ({iso_lang}) "
-                            f"(differs from profile: {ctx.user_language})"
+                            f"✅ User profile language updated: "
+                            f"{ctx.user_language} → {whisper_detected_lang}"
                         )
-
-                        # Update user profile language permanently
-                        update_success = await supabase_client.update_user_language(
-                            ctx.user_id,
-                            iso_lang
-                        )
-
-                        if update_success:
-                            log.info(
-                                f"✅ User profile language updated: "
-                                f"{ctx.user_language} → {iso_lang}"
-                            )
-                        else:
-                            log.warning(
-                                f"⚠️ Failed to update profile language for user {ctx.user_id}"
-                            )
-
-                        # Use detected language for this message
-                        ctx.user_language = iso_lang
-                        log.info(f"🔍 TRACE: Context language UPDATED to: {ctx.user_language}")
                     else:
-                        log.info(f"✅ Detected language: {whisper_detected_lang} ({iso_lang}) (matches profile)")
-                        log.info(f"🔍 TRACE: Context language UNCHANGED: {ctx.user_language}")
+                        log.warning(
+                            f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                        )
+
+                    # Use detected language for this message
+                    ctx.user_language = whisper_detected_lang
+                    log.info(f"🔍 TRACE: Context language UPDATED to: {ctx.user_language}")
                 else:
-                    log.warning(f"⚠️ Unsupported language detected: {whisper_detected_lang}")
-                    log.info(f"🔍 TRACE: Context language UNCHANGED (unsupported): {ctx.user_language}")
+                    log.info(f"✅ Detected language: {whisper_detected_lang} (matches profile)")
+                    log.info(f"🔍 TRACE: Context language UNCHANGED: {ctx.user_language}")
             else:
-                log.warning("⚠️ Whisper did not return detected language")
+                log.info("⚠️ No confident language detection from audio, keeping profile language")
+                log.info(f"🔍 TRACE: Context language UNCHANGED (no detection): {ctx.user_language}")
 
             # Update media URL to point to stored file (not Twilio URL)
             if storage_url:
