@@ -3,11 +3,12 @@ import os
 from typing import Dict, Any
 
 # === Agent Execution Context ===
-# This is used by tools to signal what happened during execution
-execution_context = {
-    "escalation_occurred": False,
-    "tools_called": [],
-}
+# Thread-safe execution context (replaces global mutable dict)
+from src.agent.execution_context import (
+    execution_context,  # Backward compatibility proxy
+    execution_context_scope,
+    get_execution_context
+)
 
 # === LangSmith Integration ===
 # CRITICAL: Set environment variables BEFORE importing LangChain modules
@@ -200,60 +201,57 @@ class LumieraAgent:
         Returns:
             The response text (in French, to be translated back)
         """
-        try:
-            # Reset execution context for this message
-            global execution_context
-            execution_context["escalation_occurred"] = False
-            execution_context["tools_called"] = []
+        # Use execution context scope for thread-safe execution tracking
+        with execution_context_scope() as ctx:
+            try:
+                # Add user context to the message
+                context_prefix = "[Contexte utilisateur]\n"
+                if user_name:
+                    context_prefix += f"Nom: {user_name}\n"
+                if language:
+                    context_prefix += f"Langue: {language}\n"
+                if user_context:
+                    context_prefix += f"Contexte additionnel:\n{user_context}\n"
+                context_prefix += "\n"
 
-            # Add user context to the message
-            context_prefix = "[Contexte utilisateur]\n"
-            if user_name:
-                context_prefix += f"Nom: {user_name}\n"
-            if language:
-                context_prefix += f"Langue: {language}\n"
-            if user_context:
-                context_prefix += f"Contexte additionnel:\n{user_context}\n"
-            context_prefix += "\n"
+                # Prepare agent input
+                agent_input = {
+                    "input": f"{context_prefix}{message_text}",
+                    "user_id": user_id,
+                    "phone_number": phone_number,
+                    "language": language,
+                }
 
-            # Prepare agent input
-            agent_input = {
-                "input": f"{context_prefix}{message_text}",
-                "user_id": user_id,
-                "phone_number": phone_number,
-                "language": language,
-            }
+                if chat_history:
+                    agent_input["chat_history"] = chat_history
 
-            if chat_history:
-                agent_input["chat_history"] = chat_history
+                # Run agent
+                result = await self.agent_executor.ainvoke(agent_input)
 
-            # Run agent
-            result = await self.agent_executor.ainvoke(agent_input)
+                # Extract output
+                output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
 
-            # Extract output
-            output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
+                # Get escalation flag from execution context (set by tools)
+                escalation_occurred = ctx.escalation_occurred
 
-            # Get escalation flag from execution context (set by tools)
-            escalation_occurred = execution_context["escalation_occurred"]
+                log.info(f"Agent processed message for user {user_id}")
+                log.info(f"Escalation occurred: {escalation_occurred}")
+                log.info(f"Tools called: {ctx.tools_called}")
 
-            log.info(f"Agent processed message for user {user_id}")
-            log.info(f"Escalation occurred: {escalation_occurred}")
-            log.info(f"Tools called: {execution_context['tools_called']}")
+                # Return structured data
+                return {
+                    "message": output,
+                    "escalation": escalation_occurred,
+                    "tools_called": ctx.tools_called
+                }
 
-            # Return structured data
-            return {
-                "message": output,
-                "escalation": escalation_occurred,
-                "tools_called": execution_context["tools_called"]
-            }
-
-        except Exception as e:
-            log.error(f"Error processing message: {e}")
-            return {
-                "message": "Désolé, une erreur s'est produite. Veuillez réessayer.",
-                "escalation": False,
-                "tools_called": []
-            }
+            except Exception as e:
+                log.error(f"Error processing message: {e}")
+                return {
+                    "message": "Désolé, une erreur s'est produite. Veuillez réessayer.",
+                    "escalation": False,
+                    "tools_called": []
+                }
 
 
 # Global agent instance

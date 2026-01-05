@@ -599,5 +599,21 @@ async def process_inbound_message(
                     error_msg, user_language
                 )
             twilio_client.send_message(from_number, error_msg)
-        except:
-            pass
+        except Exception as error_notification_failure:
+            # Critical: Failed to notify user of error
+            log.error(
+                f"CRITICAL: Failed to send error notification to user {from_number}. "
+                f"Original error: {str(e)[:200]}, "
+                f"Notification failure: {error_notification_failure}"
+            )
+            # Last resort: attempt to save to database for manual follow-up
+            try:
+                await supabase_client.save_message(
+                    user_id=user_id if 'user_id' in locals() else "unknown",
+                    message_text=f"CRITICAL ERROR - User not notified: {str(e)[:200]}",
+                    original_language="en",
+                    direction="outbound",
+                    need_human=True
+                )
+            except Exception as db_error:
+                log.error(f"CRITICAL: Database logging also failed: {db_error}")
