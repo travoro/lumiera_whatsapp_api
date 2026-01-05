@@ -27,8 +27,16 @@ class TranscriptionService:
             Audio file bytes or None if download fails
         """
         try:
+            # Check if this is a Twilio URL and add authentication
+            auth = None
+            if "api.twilio.com" in url:
+                # Twilio media URLs require basic auth
+                from src.config import settings
+                auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+                log.info("Downloading audio from Twilio with authentication")
+
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=30.0)
+                response = await client.get(url, auth=auth, timeout=30.0)
                 response.raise_for_status()
                 log.info(f"Downloaded audio file: {len(response.content)} bytes")
                 return response.content
