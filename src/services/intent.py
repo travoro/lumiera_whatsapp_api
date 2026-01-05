@@ -146,12 +146,12 @@ Example: greeting:95"""
             try:
                 from src.integrations.supabase import supabase_client
                 if user_id:
-                    supabase_client.client.table('intent_classifications').insert({
+                    await supabase_client.log_intent_classification({
                         'subcontractor_id': user_id,
                         'message_text': message[:500],  # Limit length
                         'classified_intent': intent,
                         'confidence': confidence  # Use actual confidence score
-                    }).execute()
+                    })
             except Exception as e:
                 log.warning(f"Failed to save intent classification: {e}")
 

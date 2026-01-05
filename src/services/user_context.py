@@ -55,13 +55,11 @@ class UserContextService:
                 data['expires_at'] = expires_at.isoformat()
 
             # Upsert (insert or update)
-            supabase_client.client.table('user_context').upsert(
-                data,
-                on_conflict='subcontractor_id,context_key'
-            ).execute()
+            success = await supabase_client.upsert_user_context(data, 'subcontractor_id,context_key')
 
-            log.info(f"Set context '{key}' = '{value}' for user {subcontractor_id}")
-            return True
+            if success:
+                log.info(f"Set context '{key}' = '{value}' for user {subcontractor_id}")
+            return success
 
         except Exception as e:
             log.error(f"Error setting user context: {e}")
@@ -82,15 +80,10 @@ class UserContextService:
             Context value or None
         """
         try:
-            response = supabase_client.client.table('user_context').select(
-                'context_value'
-            ).eq('subcontractor_id', subcontractor_id).eq(
-                'context_key', key
-            ).execute()
+            context = await supabase_client.get_user_context(subcontractor_id, key, 'context_value, expires_at')
 
-            if response.data and len(response.data) > 0:
+            if context:
                 # Check if expired
-                context = response.data[0]
                 if 'expires_at' in context and context['expires_at']:
                     expires_at = datetime.fromisoformat(context['expires_at'].replace('Z', '+00:00'))
                     if datetime.utcnow() > expires_at:
@@ -121,23 +114,16 @@ class UserContextService:
             Dict of context key-value pairs
         """
         try:
-            query = supabase_client.client.table('user_context').select('*').eq(
-                'subcontractor_id', subcontractor_id
-            )
+            contexts = await supabase_client.get_all_user_contexts(subcontractor_id, context_type)
 
-            if context_type:
-                query = query.eq('context_type', context_type)
-
-            response = query.execute()
-
-            if not response.data:
+            if not contexts:
                 return {}
 
             # Filter out expired contexts
             now = datetime.utcnow()
             context_dict = {}
 
-            for item in response.data:
+            for item in contexts:
                 # Check expiry
                 if item.get('expires_at'):
                     expires_at = datetime.fromisoformat(item['expires_at'].replace('Z', '+00:00'))
@@ -167,12 +153,11 @@ class UserContextService:
             True if successful
         """
         try:
-            supabase_client.client.table('user_context').delete().eq(
-                'subcontractor_id', subcontractor_id
-            ).eq('context_key', key).execute()
+            success = await supabase_client.delete_user_context(subcontractor_id, key)
 
-            log.info(f"Deleted context '{key}' for user {subcontractor_id}")
-            return True
+            if success:
+                log.info(f"Deleted context '{key}' for user {subcontractor_id}")
+            return success
 
         except Exception as e:
             log.error(f"Error deleting user context: {e}")
@@ -186,14 +171,11 @@ class UserContextService:
         """
         try:
             # Call PostgreSQL function
-            result = supabase_client.client.rpc('cleanup_expired_context').execute()
+            count = await supabase_client.cleanup_expired_context_rpc()
 
-            if result.data is not None:
-                count = result.data
+            if count > 0:
                 log.info(f"Cleaned up {count} expired contexts")
-                return count
-
-            return 0
+            return count
 
         except Exception as e:
             log.error(f"Error cleaning up expired contexts: {e}")

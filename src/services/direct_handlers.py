@@ -175,38 +175,11 @@ async def handle_report_incident(
             # Use helper to format project list
             from src.utils.handler_helpers import format_project_list
 
-            # Extract template header (everything before "3. 🏗️")
-            # Add project section header per language
-            project_section_headers = {
-                "fr": "3. 🏗️ Le chantier concerné\n\n",
-                "en": "3. 🏗️ The concerned site\n\n",
-                "es": "3. 🏗️ La obra concernida\n\n",
-                "pt": "3. 🏗️ A obra em questão\n\n",
-                "de": "3. 🏗️ Die betroffene Baustelle\n\n",
-                "it": "3. 🏗️ Il cantiere interessato\n\n",
-                "ro": "3. 🏗️ Șantierul în cauză\n\n",
-                "pl": "3. 🏗️ Plac budowy\n\n",
-                "ar": "3. 🏗️ موقع البناء المعني\n\n"
-            }
-
             # Build message with template header + project section + formatted list
             base_msg = template.split("3. 🏗️")[0]
-            base_msg += project_section_headers.get(language, project_section_headers["en"])
+            base_msg += get_translation(language, "report_incident_section_header")
             base_msg += format_project_list(projects, language, max_items=5)
-
-            # Add closing prompt per language
-            closing_prompts = {
-                "fr": "\nVous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas.",
-                "en": "\nYou can send me the elements one by one, I'll guide you step by step.",
-                "es": "\nPuedes enviarme los elementos uno por uno, te guiaré paso a paso.",
-                "pt": "\nVocê pode me enviar os elementos um por um, vou guiá-lo passo a passo.",
-                "de": "\nSie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt.",
-                "it": "\nPuoi inviarmi gli elementi uno per uno, ti guiderò passo dopo passo.",
-                "ro": "\nPoți să-mi trimiți elementele unul câte unul, te voi ghida pas cu pas.",
-                "pl": "\nMożesz przesyłać mi elementy jeden po drugim, poprowadzę Cię krok po kroku.",
-                "ar": "\nيمكنك إرسال العناصر واحدة تلو الأخرى، سأرشدك خطوة بخطوة."
-            }
-            base_msg += closing_prompts.get(language, closing_prompts["en"])
+            base_msg += get_translation(language, "report_incident_closing")
 
             message = base_msg
 
@@ -417,85 +390,8 @@ async def handle_list_tasks(
                 "fast_path": True
             }
 
-        # Base prompt structure by language
-        prompts = {
-            "fr": {
-                "header": "Voici vos tâches. 📋\n\n",
-                "project_context": "Pour le chantier **{project_name}** :\n\n",
-                "project_list": "Chantiers disponibles :\n",
-                "tasks_header": "",
-                "no_tasks": "Aucune tâche pour ce chantier.",
-                "footer": "\n\nDites-moi si vous souhaitez voir les tâches d'un autre chantier."
-            },
-            "en": {
-                "header": "Here are your tasks. 📋\n\n",
-                "project_context": "For the site **{project_name}** :\n\n",
-                "project_list": "Available sites:\n",
-                "tasks_header": "",
-                "no_tasks": "No tasks for this site.",
-                "footer": "\n\nLet me know if you want to see tasks for another site."
-            },
-            "es": {
-                "header": "Aquí están tus tareas. 📋\n\n",
-                "project_context": "Para la obra **{project_name}** :\n\n",
-                "project_list": "Obras disponibles:\n",
-                "tasks_header": "",
-                "no_tasks": "No hay tareas para esta obra.",
-                "footer": "\n\nDime si quieres ver las tareas de otra obra."
-            },
-            "pt": {
-                "header": "Aqui estão suas tarefas. 📋\n\n",
-                "project_context": "Para a obra **{project_name}** :\n\n",
-                "project_list": "Obras disponíveis:\n",
-                "tasks_header": "",
-                "no_tasks": "Não há tarefas para esta obra.",
-                "footer": "\n\nDiga-me se você quer ver as tarefas de outra obra."
-            },
-            "de": {
-                "header": "Hier sind Ihre Aufgaben. 📋\n\n",
-                "project_context": "Für die Baustelle **{project_name}** :\n\n",
-                "project_list": "Verfügbare Baustellen:\n",
-                "tasks_header": "",
-                "no_tasks": "Keine Aufgaben für diese Baustelle.",
-                "footer": "\n\nSagen Sie mir, wenn Sie Aufgaben für eine andere Baustelle sehen möchten."
-            },
-            "it": {
-                "header": "Ecco i tuoi compiti. 📋\n\n",
-                "project_context": "Per il cantiere **{project_name}** :\n\n",
-                "project_list": "Cantieri disponibili:\n",
-                "tasks_header": "",
-                "no_tasks": "Nessun compito per questo cantiere.",
-                "footer": "\n\nDimmi se vuoi vedere i compiti di un altro cantiere."
-            },
-            "ro": {
-                "header": "Iată sarcinile tale. 📋\n\n",
-                "project_context": "Pentru șantierul **{project_name}** :\n\n",
-                "project_list": "Șantiere disponibile:\n",
-                "tasks_header": "",
-                "no_tasks": "Nu există sarcini pentru acest șantier.",
-                "footer": "\n\nSpune-mi dacă vrei să vezi sarcinile unui alt șantier."
-            },
-            "pl": {
-                "header": "Oto Twoje zadania. 📋\n\n",
-                "project_context": "Dla placu budowy **{project_name}** :\n\n",
-                "project_list": "Dostępne place budowy:\n",
-                "tasks_header": "",
-                "no_tasks": "Brak zadań dla tego placu budowy.",
-                "footer": "\n\nPowiedz mi, jeśli chcesz zobaczyć zadania dla innego placu budowy."
-            },
-            "ar": {
-                "header": "إليك مهامك. 📋\n\n",
-                "project_context": "لموقع البناء **{project_name}** :\n\n",
-                "project_list": "مواقع البناء المتاحة:\n",
-                "tasks_header": "",
-                "no_tasks": "لا توجد مهام لهذا الموقع.",
-                "footer": "\n\nأخبرني إذا كنت تريد رؤية مهام موقع آخر."
-            }
-        }
-
-        # Get language prompts (fallback to English)
-        lang_prompts = prompts.get(language, prompts["en"])
-        message = lang_prompts["header"]
+        # Use centralized translations
+        message = get_translation(language, "list_tasks_header")
 
         # Scenario 2: Has current project in context
         if current_project_id:
@@ -504,17 +400,17 @@ async def handle_list_tasks(
             project_name = current_project['name'] if current_project else projects[0]['name']
             project_id = current_project['id'] if current_project else projects[0]['id']
 
-            message += lang_prompts["project_context"].format(project_name=project_name)
+            message += get_translation(language, "list_tasks_project_context").format(project_name=project_name)
 
             # Get tasks for this project using actions layer
             from src.actions import tasks as task_actions
             task_result = await task_actions.list_tasks(user_id, project_id)
 
             if not task_result["success"] or not task_result["data"]:
-                message += lang_prompts["no_tasks"]
+                message += get_translation(language, "list_tasks_no_tasks")
             else:
                 tasks = task_result["data"]
-                message += lang_prompts["tasks_header"]
+                message += get_translation(language, "list_tasks_tasks_header")
                 for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
                     status = task.get('status', 'pending')
                     progress = task.get('progress', 0)
@@ -527,7 +423,7 @@ async def handle_list_tasks(
                         message += f" ({progress}%)"
                     message += "\n"
 
-            message += lang_prompts["footer"]
+            message += get_translation(language, "list_tasks_footer")
 
         # Scenario 3: Has projects but no current project in context
         else:
@@ -535,19 +431,8 @@ async def handle_list_tasks(
             from src.utils.handler_helpers import format_project_list
             message += format_project_list(projects, language, max_items=5)
 
-            # Add prompt to select project
-            select_prompts = {
-                "fr": "\nDites-moi pour quel chantier vous souhaitez voir les tâches.",
-                "en": "\nTell me which site you want to see tasks for.",
-                "es": "\nDime para qué obra quieres ver las tareas.",
-                "pt": "\nDiga-me para qual obra você quer ver as tarefas.",
-                "de": "\nSagen Sie mir, für welche Baustelle Sie Aufgaben sehen möchten.",
-                "it": "\nDimmi per quale cantiere vuoi vedere i compiti.",
-                "ro": "\nSpune-mi pentru care șantier vrei să vezi sarcinile.",
-                "pl": "\nPowiedz mi, dla którego placu budowy chcesz zobaczyć zadania.",
-                "ar": "\nأخبرني لأي موقع تريد رؤية المهام."
-            }
-            message += select_prompts.get(language, select_prompts["en"])
+            # Add prompt to select project using centralized translation
+            message += get_translation(language, "list_tasks_select_project")
 
         return {
             "message": message,

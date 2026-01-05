@@ -194,27 +194,15 @@ class TemplateManager:
                 return cached_sid
 
             # Query database - try specific language first, then fallback to "all"
-            result = supabase_client.client.table("templates")\
-                .select("twilio_content_sid")\
-                .eq("template_name", template_name)\
-                .eq("language", language)\
-                .eq("is_active", True)\
-                .single()\
-                .execute()
+            result = await supabase_client.get_template(template_name, language, True)
 
-            if not result.data and language != "all":
+            if not result and language != "all":
                 # Fallback to universal template
                 log.info(f"Language-specific template not found, trying universal template")
-                result = supabase_client.client.table("templates")\
-                    .select("twilio_content_sid")\
-                    .eq("template_name", template_name)\
-                    .eq("language", "all")\
-                    .eq("is_active", True)\
-                    .single()\
-                    .execute()
+                result = await supabase_client.get_template(template_name, "all", True)
 
-            if result.data:
-                content_sid = result.data["twilio_content_sid"]
+            if result:
+                content_sid = result["twilio_content_sid"]
                 log.info(f"Retrieved template from database: {cache_key} (SID: {content_sid})")
 
                 # Cache it

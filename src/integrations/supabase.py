@@ -403,6 +403,295 @@ class SupabaseClient:
             log.error(f"Error uploading media: {e}")
             return None
 
+    # ==================== SESSION OPERATIONS ====================
+
+    async def get_or_create_session_rpc(self, subcontractor_id: str) -> Optional[str]:
+        """Call PostgreSQL RPC function to get or create session.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+
+        Returns:
+            Session ID if successful, None otherwise
+        """
+        try:
+            result = self.client.rpc(
+                'get_or_create_session',
+                {'p_subcontractor_id': subcontractor_id}
+            ).execute()
+            return result.data if result.data else None
+        except Exception as e:
+            log.error(f"Error calling get_or_create_session RPC: {e}")
+            return None
+
+    async def get_session_by_id(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get session details by ID.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Session dict if found, None otherwise
+        """
+        try:
+            response = self.client.table('conversation_sessions').select('*').eq(
+                'id', session_id
+            ).execute()
+
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            log.error(f"Error getting session {session_id}: {e}")
+            return None
+
+    async def create_session(self, subcontractor_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create a new conversation session.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+            data: Session data dict
+
+        Returns:
+            Created session dict if successful, None otherwise
+        """
+        try:
+            response = self.client.table('conversation_sessions').insert(data).execute()
+
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            log.error(f"Error creating session: {e}")
+            return None
+
+    async def update_session(self, session_id: str, data: Dict[str, Any]) -> bool:
+        """Update session data.
+
+        Args:
+            session_id: Session ID
+            data: Update data dict
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.client.table('conversation_sessions').update(data).eq('id', session_id).execute()
+            return True
+        except Exception as e:
+            log.error(f"Error updating session {session_id}: {e}")
+            return False
+
+    async def end_sessions_for_user(self, subcontractor_id: str, end_data: Dict[str, Any]) -> bool:
+        """End all active sessions for a user.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+            end_data: Data for ending sessions (status, ended_at, etc.)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.client.table('conversation_sessions').update(
+                end_data
+            ).eq('subcontractor_id', subcontractor_id).eq('status', 'active').execute()
+            return True
+        except Exception as e:
+            log.error(f"Error ending sessions for user {subcontractor_id}: {e}")
+            return False
+
+    async def generate_session_summary_rpc(self, session_id: str) -> Optional[str]:
+        """Call PostgreSQL RPC function to generate session summary.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Summary text if successful, None otherwise
+        """
+        try:
+            result = self.client.rpc(
+                'generate_session_summary',
+                {'p_session_id': session_id}
+            ).execute()
+            return result.data if result.data else None
+        except Exception as e:
+            log.error(f"Error calling generate_session_summary RPC: {e}")
+            return None
+
+    async def get_messages_by_session(self, session_id: str, fields: str = '*') -> List[Dict[str, Any]]:
+        """Get messages for a specific session.
+
+        Args:
+            session_id: Session ID
+            fields: Fields to select (default: '*')
+
+        Returns:
+            List of message dicts
+        """
+        try:
+            response = self.client.table('messages').select(fields).eq('session_id', session_id).execute()
+            return response.data if response.data else []
+        except Exception as e:
+            log.error(f"Error getting messages for session {session_id}: {e}")
+            return []
+
+    async def get_sessions_for_user(self, subcontractor_id: str) -> List[Dict[str, Any]]:
+        """Get all sessions for a user.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+
+        Returns:
+            List of session dicts
+        """
+        try:
+            response = self.client.table('conversation_sessions').select('*').eq(
+                'subcontractor_id', subcontractor_id
+            ).execute()
+            return response.data if response.data else []
+        except Exception as e:
+            log.error(f"Error getting sessions for user {subcontractor_id}: {e}")
+            return []
+
+    # ==================== USER CONTEXT OPERATIONS ====================
+
+    async def upsert_user_context(self, data: Dict[str, Any], on_conflict: str) -> bool:
+        """Upsert user context (insert or update).
+
+        Args:
+            data: Context data dict
+            on_conflict: Conflict resolution strategy
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.client.table('user_context').upsert(data, on_conflict=on_conflict).execute()
+            return True
+        except Exception as e:
+            log.error(f"Error upserting user context: {e}")
+            return False
+
+    async def get_user_context(self, subcontractor_id: str, key: str, fields: str = 'context_value') -> Optional[Dict[str, Any]]:
+        """Get specific user context.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+            key: Context key
+            fields: Fields to select (default: 'context_value')
+
+        Returns:
+            Context dict if found, None otherwise
+        """
+        try:
+            response = self.client.table('user_context').select(fields).eq(
+                'subcontractor_id', subcontractor_id
+            ).eq('context_key', key).execute()
+
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return None
+        except Exception as e:
+            log.error(f"Error getting user context: {e}")
+            return None
+
+    async def get_all_user_contexts(self, subcontractor_id: str, context_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all user contexts.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+            context_type: Optional filter by context type
+
+        Returns:
+            List of context dicts
+        """
+        try:
+            query = self.client.table('user_context').select('*').eq('subcontractor_id', subcontractor_id)
+
+            if context_type:
+                query = query.eq('context_type', context_type)
+
+            response = query.execute()
+            return response.data if response.data else []
+        except Exception as e:
+            log.error(f"Error getting all user contexts: {e}")
+            return []
+
+    async def delete_user_context(self, subcontractor_id: str, key: str) -> bool:
+        """Delete user context.
+
+        Args:
+            subcontractor_id: The subcontractor's ID
+            key: Context key
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.client.table('user_context').delete().eq(
+                'subcontractor_id', subcontractor_id
+            ).eq('context_key', key).execute()
+            return True
+        except Exception as e:
+            log.error(f"Error deleting user context: {e}")
+            return False
+
+    async def cleanup_expired_context_rpc(self) -> int:
+        """Call PostgreSQL RPC function to cleanup expired contexts.
+
+        Returns:
+            Number of contexts deleted
+        """
+        try:
+            result = self.client.rpc('cleanup_expired_context').execute()
+            return result.data if result.data is not None else 0
+        except Exception as e:
+            log.error(f"Error calling cleanup_expired_context RPC: {e}")
+            return 0
+
+    # ==================== TEMPLATE OPERATIONS ====================
+
+    async def get_template(self, template_name: str, language: str, is_active: bool = True) -> Optional[Dict[str, Any]]:
+        """Get template by name and language.
+
+        Args:
+            template_name: Template name
+            language: Language code
+            is_active: Filter by active status (default: True)
+
+        Returns:
+            Template dict if found, None otherwise
+        """
+        try:
+            response = self.client.table('templates').select('twilio_content_sid').eq(
+                'template_name', template_name
+            ).eq('language', language).eq('is_active', is_active).single().execute()
+
+            return response.data if response.data else None
+        except Exception as e:
+            log.warning(f"Template not found or error: {e}")
+            return None
+
+    # ==================== INTENT OPERATIONS ====================
+
+    async def log_intent_classification(self, data: Dict[str, Any]) -> bool:
+        """Log intent classification for analytics.
+
+        Args:
+            data: Classification data dict
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.client.table('intent_classifications').insert(data).execute()
+            return True
+        except Exception as e:
+            log.warning(f"Error logging intent classification: {e}")
+            return False
+
 
 # Global instance
 supabase_client = SupabaseClient()

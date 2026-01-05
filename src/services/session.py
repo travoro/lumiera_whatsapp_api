@@ -37,21 +37,13 @@ class SessionManagementService:
         """
         try:
             # Call PostgreSQL function to get or create session
-            result = supabase_client.client.rpc(
-                'get_or_create_session',
-                {'p_subcontractor_id': subcontractor_id}
-            ).execute()
+            session_id = await supabase_client.get_or_create_session_rpc(subcontractor_id)
 
-            if result.data:
-                session_id = result.data
-
+            if session_id:
                 # Get full session details
-                session_response = supabase_client.client.table('conversation_sessions').select('*').eq(
-                    'id', session_id
-                ).execute()
+                session = await supabase_client.get_session_by_id(session_id)
 
-                if session_response.data and len(session_response.data) > 0:
-                    session = session_response.data[0]
+                if session:
                     log.info(f"Session {session_id} active for user {subcontractor_id}")
                     return session
 
@@ -78,16 +70,15 @@ class SessionManagementService:
             await self._end_active_sessions(subcontractor_id)
 
             # Create new session
-            response = supabase_client.client.table('conversation_sessions').insert({
+            session = await supabase_client.create_session(subcontractor_id, {
                 'subcontractor_id': subcontractor_id,
                 'started_at': datetime.utcnow().isoformat(),
                 'last_message_at': datetime.utcnow().isoformat(),
                 'status': 'active',
                 'message_count': 0
-            }).execute()
+            })
 
-            if response.data and len(response.data) > 0:
-                session = response.data[0]
+            if session:
                 log.info(f"Created new session {session['id']} for user {subcontractor_id}")
                 return session
 
@@ -104,14 +95,15 @@ class SessionManagementService:
             subcontractor_id: The subcontractor's ID
         """
         try:
-            supabase_client.client.table('conversation_sessions').update({
+            success = await supabase_client.end_sessions_for_user(subcontractor_id, {
                 'status': 'ended',
                 'ended_at': datetime.utcnow().isoformat(),
                 'ended_reason': 'timeout',
                 'updated_at': datetime.utcnow().isoformat()
-            }).eq('subcontractor_id', subcontractor_id).eq('status', 'active').execute()
+            })
 
-            log.info(f"Ended active sessions for user {subcontractor_id}")
+            if success:
+                log.info(f"Ended active sessions for user {subcontractor_id}")
 
         except Exception as e:
             log.error(f"Error ending active sessions: {e}")
@@ -146,12 +138,11 @@ class SessionManagementService:
                 if summary:
                     update_data['session_summary'] = summary
 
-            supabase_client.client.table('conversation_sessions').update(
-                update_data
-            ).eq('id', session_id).execute()
+            success = await supabase_client.update_session(session_id, update_data)
 
-            log.info(f"Ended session {session_id}, reason: {reason}")
-            return True
+            if success:
+                log.info(f"Ended session {session_id}, reason: {reason}")
+            return success
 
         except Exception as e:
             log.error(f"Error ending session: {e}")
@@ -168,21 +159,16 @@ class SessionManagementService:
         """
         try:
             # Call PostgreSQL function
-            result = supabase_client.client.rpc(
-                'generate_session_summary',
-                {'p_session_id': session_id}
-            ).execute()
+            summary = await supabase_client.generate_session_summary_rpc(session_id)
 
-            if result.data:
-                return result.data
+            if summary:
+                return summary
 
             # Fallback: Simple summary
-            messages = supabase_client.client.table('messages').select(
-                'direction'
-            ).eq('session_id', session_id).execute()
+            messages = await supabase_client.get_messages_by_session(session_id, 'direction')
 
-            if messages.data:
-                count = len(messages.data)
+            if messages:
+                count = len(messages)
                 return f"Session with {count} messages exchanged"
 
             return None
@@ -201,13 +187,14 @@ class SessionManagementService:
             True if successful
         """
         try:
-            supabase_client.client.table('conversation_sessions').update({
+            success = await supabase_client.update_session(session_id, {
                 'status': 'escalated',
                 'updated_at': datetime.utcnow().isoformat()
-            }).eq('id', session_id).execute()
+            })
 
-            log.info(f"Session {session_id} escalated to human")
-            return True
+            if success:
+                log.info(f"Session {session_id} escalated to human")
+            return success
 
         except Exception as e:
             log.error(f"Error escalating session: {e}")
@@ -224,11 +211,9 @@ class SessionManagementService:
         """
         try:
             # Get all sessions
-            sessions = supabase_client.client.table('conversation_sessions').select(
-                '*'
-            ).eq('subcontractor_id', subcontractor_id).execute()
+            sessions = await supabase_client.get_sessions_for_user(subcontractor_id)
 
-            if not sessions.data:
+            if not sessions:
                 return {
                     'total_sessions': 0,
                     'active_sessions': 0,
@@ -237,11 +222,11 @@ class SessionManagementService:
                     'total_messages': 0
                 }
 
-            total = len(sessions.data)
-            active = len([s for s in sessions.data if s['status'] == 'active'])
-            ended = len([s for s in sessions.data if s['status'] == 'ended'])
-            escalated = len([s for s in sessions.data if s['status'] == 'escalated'])
-            total_messages = sum(s.get('message_count', 0) for s in sessions.data)
+            total = len(sessions)
+            active = len([s for s in sessions if s['status'] == 'active'])
+            ended = len([s for s in sessions if s['status'] == 'ended'])
+            escalated = len([s for s in sessions if s['status'] == 'escalated'])
+            total_messages = sum(s.get('message_count', 0) for s in sessions)
 
             return {
                 'total_sessions': total,
