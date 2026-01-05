@@ -1,13 +1,15 @@
-"""Robust language detection service combining keyword matching and ML detection."""
+"""Robust language detection service combining Claude AI and ML detection."""
 from typing import Optional, Tuple
 from lingua import Language, LanguageDetectorBuilder
+from anthropic import Anthropic
+from src.config import settings
 from src.utils.logger import log
 
 
 class LanguageDetectionService:
-    """Hybrid language detection using keywords and lingua-py."""
+    """Hybrid language detection using Claude AI, keywords, and lingua-py."""
 
-    # Common greetings and phrases for fast keyword matching
+    # Common greetings and phrases for fast keyword matching (fallback only)
     GREETING_KEYWORDS = {
         'es': ['hola', 'buenos días', 'buenas tardes', 'buenas noches', 'qué tal', 'cómo estás'],
         'fr': ['bonjour', 'bonsoir', 'salut', 'ça va', 'comment allez-vous'],
@@ -42,6 +44,7 @@ class LanguageDetectionService:
             min_confidence: Minimum confidence score for lingua detection (0.0 to 1.0)
         """
         self.min_confidence = min_confidence
+        self.client = Anthropic(api_key=settings.anthropic_api_key)
 
         # Build lingua detector with all supported languages
         self.detector = LanguageDetectorBuilder.from_languages(
@@ -57,10 +60,47 @@ class LanguageDetectionService:
             Language.CATALAN
         ).with_minimum_relative_distance(0.9).build()
 
-        log.info("Language detection service initialized with lingua-py")
+        log.info("Language detection service initialized with Claude AI + lingua-py")
+
+    async def detect_with_claude(self, text: str) -> Optional[str]:
+        """Detect language using Claude AI (most accurate method).
+
+        Args:
+            text: Text to detect language from
+
+        Returns:
+            ISO 639-1 language code or None if detection fails
+        """
+        try:
+            prompt = f"""Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., 'en', 'fr', 'es', 'ro', 'pt', 'de', 'it', 'ar').
+
+Text: {text}
+
+Language code:"""
+
+            message = self.client.messages.create(
+                model="claude-3-5-haiku-20241022",  # Fast and accurate
+                max_tokens=10,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            language_code = message.content[0].text.strip().lower()
+
+            # Validate it's a supported language
+            if language_code in settings.supported_languages_list:
+                log.info(f"🤖 Claude detected: {language_code}")
+                return language_code
+            else:
+                log.warning(f"⚠️ Claude returned unsupported language: {language_code}")
+                return None
+
+        except Exception as e:
+            log.error(f"Error in Claude language detection: {e}")
+            return None
 
     def detect_from_keywords(self, text: str) -> Optional[str]:
-        """Fast keyword-based detection for common greetings.
+        """Fast keyword-based detection for common greetings (FALLBACK ONLY).
 
         Args:
             text: Text to check for keywords
@@ -121,8 +161,56 @@ class LanguageDetectionService:
             log.error(f"Error in lingua-py detection: {e}")
             return None, 0.0
 
+    async def detect_async(self, text: str, fallback_language: str = 'fr') -> Tuple[str, str]:
+        """Detect language using hybrid approach with Claude AI (async).
+
+        Strategy:
+        1. Try Claude AI first (most accurate, especially for Romanian)
+        2. If Claude fails: Try lingua-py ML detection
+        3. If lingua fails: Try keyword matching (last resort)
+        4. If all fail: Use fallback language
+
+        Args:
+            text: Text to detect language from
+            fallback_language: Language to use if detection fails
+
+        Returns:
+            Tuple of (detected language, detection method)
+            Method can be: 'claude', 'lingua', 'keyword', 'fallback'
+        """
+        if not text or len(text.strip()) < 2:
+            log.info(f"✅ Text too short, using fallback: {fallback_language}")
+            return fallback_language, 'fallback'
+
+        text = text.strip()
+
+        # 1. Try Claude AI first (best for all languages including Romanian)
+        claude_lang = await self.detect_with_claude(text)
+        if claude_lang:
+            return claude_lang, 'claude'
+
+        # 2. Try lingua-py as fallback
+        lingua_lang, confidence = self.detect_with_lingua(text)
+        if lingua_lang:
+            return lingua_lang, 'lingua'
+
+        # 3. Try keyword matching as last resort (for very short greetings)
+        if len(text) < 30:
+            keyword_lang = self.detect_from_keywords(text)
+            if keyword_lang:
+                return keyword_lang, 'keyword'
+
+        # 4. Fallback to profile language
+        log.info(
+            f"⚠️ No confident detection, using fallback: {fallback_language}"
+        )
+        return fallback_language, 'fallback'
+
     def detect(self, text: str, fallback_language: str = 'fr') -> Tuple[str, str]:
-        """Detect language using hybrid approach.
+        """Detect language using hybrid approach (sync wrapper).
+
+        This is a synchronous wrapper for backward compatibility.
+        New code should use detect_async() instead.
 
         Strategy:
         1. For short text (< 30 chars): Try keyword matching first
@@ -143,16 +231,16 @@ class LanguageDetectionService:
 
         text = text.strip()
 
-        # For short text, try keyword matching first
+        # Try lingua-py first
+        lingua_lang, confidence = self.detect_with_lingua(text)
+        if lingua_lang:
+            return lingua_lang, 'lingua'
+
+        # Try keyword matching as fallback
         if len(text) < 30:
             keyword_lang = self.detect_from_keywords(text)
             if keyword_lang:
                 return keyword_lang, 'keyword'
-
-        # Try lingua-py for all text (including longer than 30 chars)
-        lingua_lang, confidence = self.detect_with_lingua(text)
-        if lingua_lang:
-            return lingua_lang, 'lingua'
 
         # Fallback to profile language
         log.info(
