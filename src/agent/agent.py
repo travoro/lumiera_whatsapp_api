@@ -2,6 +2,13 @@
 import os
 from typing import Dict, Any
 
+# === Agent Execution Context ===
+# This is used by tools to signal what happened during execution
+execution_context = {
+    "escalation_occurred": False,
+    "tools_called": [],
+}
+
 # === LangSmith Integration ===
 # CRITICAL: Set environment variables BEFORE importing LangChain modules
 # LangChain checks these during import, so they must be set first
@@ -103,6 +110,22 @@ Je peux vous mettre en contact avec quelqu'un qui pourra mieux vous aider."
 # SI TU NE PEUX PAS AIDER
 Proposer: "Souhaitez-vous parler avec un membre de l'équipe? Je peux vous mettre en contact."
 
+# 🧠 MÉMORISATION ET PERSONNALISATION
+1. ✅ TOUJOURS mémoriser les informations importantes avec remember_user_context_tool
+2. ✅ Mémoriser quand l'utilisateur mentionne:
+   - Son rôle/métier (ex: "Je suis électricien" → role: electricien)
+   - Ses préférences (ex: "Appelez-moi le matin" → preferred_contact_time: morning)
+   - Le projet en cours de discussion (ex: "Sur le chantier Rénovation Bureau" → current_project_name: Rénovation Bureau)
+   - Des faits utiles (taille équipe, outils préférés, problèmes fréquents)
+3. ✅ Utiliser le contexte existant pour personnaliser les réponses
+4. ⚠️ Ne PAS redemander des infos déjà mémorisées
+
+Types de contexte à mémoriser:
+- 'fact': Faits généraux (rôle, expérience, spécialités)
+- 'preference': Préférences utilisateur (horaires, communication)
+- 'state': État temporaire (projet actuel, tâche en cours)
+- 'entity': Entités nommées (projet favori, lieu fréquent)
+
 # RAPPELS FINAUX
 - Tu opères en français en interne (messages déjà traduits)
 - Ta réponse sera traduite dans la langue de l'utilisateur
@@ -178,6 +201,11 @@ class LumieraAgent:
             The response text (in French, to be translated back)
         """
         try:
+            # Reset execution context for this message
+            global execution_context
+            execution_context["escalation_occurred"] = False
+            execution_context["tools_called"] = []
+
             # Add user context to the message
             context_prefix = "[Contexte utilisateur]\n"
             if user_name:
@@ -205,33 +233,26 @@ class LumieraAgent:
             # Extract output
             output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
 
-            # Check if escalation tool was called by examining intermediate steps
-            intermediate_steps = result.get("intermediate_steps", [])
-            escalation_occurred = False
+            # Get escalation flag from execution context (set by tools)
+            escalation_occurred = execution_context["escalation_occurred"]
 
-            for step in intermediate_steps:
-                # Each step is (AgentAction, tool_result)
-                if len(step) >= 1:
-                    agent_action = step[0]
-                    # Check if the tool name is escalate_to_human_tool
-                    if hasattr(agent_action, 'tool') and 'escalate_to_human' in agent_action.tool.lower():
-                        escalation_occurred = True
-                        log.info(f"🚨 Escalation detected: escalate_to_human_tool was called")
-                        break
+            log.info(f"Agent processed message for user {user_id}")
+            log.info(f"Escalation occurred: {escalation_occurred}")
+            log.info(f"Tools called: {execution_context['tools_called']}")
 
-            log.info(f"Agent processed message for user {user_id}, escalation: {escalation_occurred}")
-
-            # Return both output and escalation flag
+            # Return structured data
             return {
-                "output": output,
-                "escalation_occurred": escalation_occurred
+                "message": output,
+                "escalation": escalation_occurred,
+                "tools_called": execution_context["tools_called"]
             }
 
         except Exception as e:
             log.error(f"Error processing message: {e}")
             return {
-                "output": "Désolé, une erreur s'est produite. Veuillez réessayer.",
-                "escalation_occurred": False
+                "message": "Désolé, une erreur s'est produite. Veuillez réessayer.",
+                "escalation": False,
+                "tools_called": []
             }
 
 

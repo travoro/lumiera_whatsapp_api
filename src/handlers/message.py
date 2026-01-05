@@ -385,17 +385,20 @@ async def process_inbound_message(
             user_context=user_context_str,  # Pass user context for personalization
         )
 
-        # Extract output and escalation flag from agent result
+        # Extract structured data from agent result
         if isinstance(agent_result, dict):
-            response_in_french = agent_result.get("output", "")
-            is_agent_escalation = agent_result.get("escalation_occurred", False)
+            response_in_french = agent_result.get("message", agent_result.get("output", ""))
+            is_agent_escalation = agent_result.get("escalation", agent_result.get("escalation_occurred", False))
+            tools_called = agent_result.get("tools_called", [])
         else:
             # Fallback for backward compatibility (if agent returns string)
             response_in_french = agent_result
             is_agent_escalation = False
+            tools_called = []
 
         log.info(f"Agent response (French): {response_in_french[:100]}...")
-        log.info(f"Agent escalation detected: {is_agent_escalation}")
+        log.info(f"Agent escalation: {is_agent_escalation}")
+        log.info(f"Tools called: {tools_called}")
 
         # Translate response back to user language
         if user_language != "fr":

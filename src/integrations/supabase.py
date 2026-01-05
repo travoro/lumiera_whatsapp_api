@@ -89,6 +89,7 @@ class SupabaseClient:
         is_escalation: bool = False,
         escalation_reason: Optional[str] = None,
         need_human: bool = False,
+        source: Optional[str] = None,
     ) -> bool:
         """Save message to database for audit trail with session tracking.
 
@@ -105,8 +106,13 @@ class SupabaseClient:
             is_escalation: Flag to mark this as an escalation
             escalation_reason: Reason for escalation if applicable
             need_human: Flag to indicate this message needs human attention (default: False)
+            source: Message source ('user', 'agent', 'whatsapp'). Auto-detected if not provided.
         """
         try:
+            # Auto-detect source if not provided
+            if source is None:
+                source = "user" if direction == "inbound" else "agent"
+
             message_data = {
                 "subcontractor_id": user_id,
                 "content": message_text,
@@ -117,7 +123,7 @@ class SupabaseClient:
                 "message_type": message_type,
                 "media_type": media_type,
                 "status": "delivered",
-                "source": "whatsapp",
+                "source": source,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
             }
