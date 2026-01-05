@@ -39,9 +39,13 @@ python-dateutil==2.9.0
 
 # Logging & Monitoring
 loguru==0.7.3
+langsmith==0.1.147
 
 # Error Tracking (Optional)
 sentry-sdk==2.19.2
+
+# Retry Logic
+tenacity==9.0.0
 
 # Rate Limiting
 slowapi==0.1.9

@@ -3,6 +3,7 @@ from typing import Optional
 from anthropic import Anthropic
 from src.config import settings
 from src.utils.logger import log
+from src.services.retry import retry_on_api_error, retry_on_rate_limit
 
 
 class TranslationService:
@@ -14,8 +15,9 @@ class TranslationService:
         self.default_language = settings.default_language
         log.info("Translation service initialized")
 
+    @retry_on_api_error(max_attempts=3)
     async def detect_language(self, text: str) -> str:
-        """Detect the language of input text."""
+        """Detect the language of input text with automatic retries."""
         try:
             prompt = f"""Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., 'en', 'fr', 'es', 'ar', 'pt', 'de', 'it').
 
@@ -40,12 +42,13 @@ Language code:"""
             log.error(f"Error detecting language: {e}")
             return self.default_language
 
+    @retry_on_api_error(max_attempts=3)
     async def translate_to_french(
         self,
         text: str,
         source_language: Optional[str] = None,
     ) -> str:
-        """Translate text from source language to French."""
+        """Translate text from source language to French with automatic retries."""
         # If already in French, return as-is
         if source_language == "fr":
             return text
@@ -69,12 +72,13 @@ French translation:"""
             log.error(f"Error translating to French: {e}")
             return text  # Return original if translation fails
 
+    @retry_on_api_error(max_attempts=3)
     async def translate_from_french(
         self,
         text: str,
         target_language: str,
     ) -> str:
-        """Translate text from French to target language."""
+        """Translate text from French to target language with automatic retries."""
         # If target is French, return as-is
         if target_language == "fr":
             return text

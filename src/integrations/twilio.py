@@ -4,6 +4,7 @@ from twilio.rest import Client
 from twilio.request_validator import RequestValidator
 from src.config import settings
 from src.utils.logger import log
+from src.services.retry import retry_on_network_error
 
 
 class TwilioClient:
@@ -19,13 +20,14 @@ class TwilioClient:
         self.validator = RequestValidator(settings.twilio_auth_token)
         log.info("Twilio client initialized")
 
+    @retry_on_network_error(max_attempts=3)
     def send_message(
         self,
         to: str,
         body: str,
         media_url: Optional[List[str]] = None,
     ) -> Optional[str]:
-        """Send WhatsApp message to user."""
+        """Send WhatsApp message to user with automatic retries on network errors."""
         try:
             # Ensure 'to' number is in WhatsApp format
             if not to.startswith("whatsapp:"):
