@@ -1,0 +1,19 @@
+[Unit]
+Description=Lumiera WhatsApp Copilot API
+After=network.target
+
+[Service]
+Type=simple
+User=ceeai
+Group=ceeai
+WorkingDirectory=/home/ceeai/whatsapp_api
+Environment="PATH=/home/ceeai/whatsapp_api/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/home/ceeai/whatsapp_api"
+ExecStart=/home/ceeai/whatsapp_api/venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ceeai/whatsapp_api/logs/server.log
+StandardError=append:/home/ceeai/whatsapp_api/logs/server.error.log
+
+[Install]
+WantedBy=multi-user.target
