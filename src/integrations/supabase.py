@@ -85,6 +85,38 @@ class SupabaseClient:
             log.error(f"Error getting subcontractor by phone: {e}")
             return None
 
+    async def update_user_language(self, user_id: str, language: str) -> bool:
+        """Update user's preferred language in profile.
+
+        This is called when language detection determines the user is speaking
+        a different language than their profile setting.
+
+        Args:
+            user_id: Subcontractor ID (UUID)
+            language: ISO 639-1 language code (e.g., 'fr', 'en', 'ro')
+
+        Returns:
+            True if update successful, False otherwise
+        """
+        try:
+            response = self.client.table("subcontractors").update({
+                "language": language
+            }).eq("id", user_id).execute()
+
+            if response.data and len(response.data) > 0:
+                log.info(
+                    f"🔄 Updated user language in profile: "
+                    f"user_id={user_id}, new_language={language}"
+                )
+                return True
+            else:
+                log.warning(f"Failed to update user language: user_id={user_id}")
+                return False
+
+        except Exception as e:
+            log.error(f"Error updating user language: {e}")
+            return False
+
     async def create_or_update_user(
         self,
         phone_number: str,

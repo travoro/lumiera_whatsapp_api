@@ -199,10 +199,27 @@ class MessagePipeline:
                     if detected_language in supported:
                         if detected_language != profile_language:
                             log.info(
-                                f"🌍 Language detected from message: {detected_language} "
-                                f"(profile: {profile_language})"
+                                f"🌍 Text language detected: {detected_language} "
+                                f"(differs from profile: {profile_language})"
                             )
-                            # Use detected language for this conversation
+
+                            # Update user profile language permanently
+                            update_success = await supabase_client.update_user_language(
+                                ctx.user_id,
+                                detected_language
+                            )
+
+                            if update_success:
+                                log.info(
+                                    f"✅ User profile language updated: "
+                                    f"{profile_language} → {detected_language}"
+                                )
+                            else:
+                                log.warning(
+                                    f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                                )
+
+                            # Use detected language for this message
                             ctx.user_language = detected_language
                         else:
                             log.info(f"✅ Language: {detected_language} (matches profile)")
@@ -266,8 +283,26 @@ class MessagePipeline:
                     if detected_lang in supported and detected_lang != ctx.user_language:
                         log.info(
                             f"🌍 Audio language detected: {detected_lang} "
-                            f"(overriding profile: {ctx.user_language})"
+                            f"(differs from profile: {ctx.user_language})"
                         )
+
+                        # Update user profile language permanently
+                        update_success = await supabase_client.update_user_language(
+                            ctx.user_id,
+                            detected_lang
+                        )
+
+                        if update_success:
+                            log.info(
+                                f"✅ User profile language updated: "
+                                f"{ctx.user_language} → {detected_lang}"
+                            )
+                        else:
+                            log.warning(
+                                f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                            )
+
+                        # Use detected language for this message
                         ctx.user_language = detected_lang
                 except (LangDetectException, Exception) as e:
                     log.debug(f"Could not detect audio language: {e}")
