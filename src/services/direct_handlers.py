@@ -341,12 +341,14 @@ async def handle_update_progress(
 
             message += lang_prompts["project_context"].format(project_name=project_name)
 
-            # Get tasks for this project
-            tasks = await supabase_client.list_tasks(user_id, project_id)
+            # Get tasks for this project using actions layer
+            from src.actions import tasks as task_actions
+            task_result = await task_actions.list_tasks(user_id, project_id)
 
-            if not tasks:
+            if not task_result["success"] or not task_result["data"]:
                 message += lang_prompts["no_tasks"]
             else:
+                tasks = task_result["data"]
                 message += lang_prompts["tasks_header"]
                 for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
                     progress = task.get('progress', 0)
@@ -484,12 +486,14 @@ async def handle_list_documents(
 
             message += lang_prompts["project_context"].format(project_name=project_name)
 
-            # Get documents for this project
-            documents = await supabase_client.list_documents(user_id, project_id)
+            # Get documents for this project using actions layer
+            from src.actions import documents as document_actions
+            doc_result = await document_actions.get_documents(user_id, project_id)
 
-            if not documents:
+            if not doc_result["success"] or not doc_result["data"]:
                 message += lang_prompts["no_documents"]
             else:
+                documents = doc_result["data"]
                 for i, doc in enumerate(documents[:10], 1):  # Limit to 10 documents
                     doc_type = doc.get('type', 'document')
                     doc_name = doc.get('name', 'Untitled')
@@ -658,12 +662,14 @@ async def handle_list_tasks(
 
             message += lang_prompts["project_context"].format(project_name=project_name)
 
-            # Get tasks for this project
-            tasks = await supabase_client.list_tasks(user_id, project_id)
+            # Get tasks for this project using actions layer
+            from src.actions import tasks as task_actions
+            task_result = await task_actions.list_tasks(user_id, project_id)
 
-            if not tasks:
+            if not task_result["success"] or not task_result["data"]:
                 message += lang_prompts["no_tasks"]
             else:
+                tasks = task_result["data"]
                 message += lang_prompts["tasks_header"]
                 for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
                     status = task.get('status', 'pending')
