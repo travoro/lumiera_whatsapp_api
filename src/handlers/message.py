@@ -86,6 +86,7 @@ async def process_inbound_message(
 
         user_id = user["id"]
         user_language = user.get("language", "fr")
+        user_name = user.get("contact_nom", "")  # Get official contact name
 
         # Check if user has active escalation
         is_blocked = await escalation_service.should_block_user(user_id)
@@ -178,6 +179,7 @@ async def process_inbound_message(
             language=user_language,
             message_text=message_in_french,
             chat_history=chat_history,
+            user_name=user_name,  # Pass official contact name from database
         )
 
         log.info(f"Agent response (French): {response_in_french[:100]}...")

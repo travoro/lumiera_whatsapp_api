@@ -93,6 +93,7 @@ class LumieraAgent:
         language: str,
         message_text: str,
         chat_history: list = None,
+        user_name: str = "",
     ) -> str:
         """Process a user message and return a response.
 
@@ -102,14 +103,20 @@ class LumieraAgent:
             language: The user's preferred language
             message_text: The message text (already translated to French)
             chat_history: Optional chat history for context
+            user_name: Official contact name from subcontractors table
 
         Returns:
             The response text (in French, to be translated back)
         """
         try:
+            # Add user context to the message
+            context_prefix = ""
+            if user_name:
+                context_prefix = f"[Contexte: L'utilisateur s'appelle {user_name}]\n\n"
+
             # Prepare agent input
             agent_input = {
-                "input": message_text,
+                "input": f"{context_prefix}{message_text}",
                 "user_id": user_id,
                 "phone_number": phone_number,
                 "language": language,
