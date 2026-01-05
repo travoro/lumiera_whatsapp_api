@@ -70,20 +70,8 @@ def format_project_list(
     Returns:
         Formatted string with numbered project list
     """
-    # Get header from translations if available
-    prompts = {
-        "fr": "Chantiers disponibles :\n",
-        "en": "Available sites:\n",
-        "es": "Obras disponibles:\n",
-        "pt": "Obras disponíveis:\n",
-        "de": "Verfügbare Baustellen:\n",
-        "it": "Cantieri disponibili:\n",
-        "ro": "Șantiere disponibile:\n",
-        "pl": "Dostępne place budowy:\n",
-        "ar": "مواقع البناء المتاحة:\n"
-    }
-    
-    header = prompts.get(language, prompts["en"])
+    # Get header from centralized translations
+    header = get_translation(language, "available_projects_header")
     message = header
     
     for i, project in enumerate(projects[:max_items], 1):
