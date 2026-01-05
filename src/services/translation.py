@@ -1,6 +1,7 @@
 """Translation service using Claude for high-quality contextual translation."""
 from typing import Optional
 from anthropic import Anthropic
+from langsmith import traceable
 from src.config import settings
 from src.utils.logger import log
 from src.services.retry import retry_on_api_error, retry_on_rate_limit
@@ -15,6 +16,11 @@ class TranslationService:
         self.default_language = settings.default_language
         log.info("Translation service initialized")
 
+    @traceable(
+        name="translation_detect_language",
+        run_type="llm",
+        metadata={"service": "translation", "operation": "detect_language", "model": "claude-3-5-haiku-20241022"}
+    )
     @retry_on_api_error(max_attempts=3)
     async def detect_language(self, text: str) -> str:
         """Detect the language of input text with automatic retries."""
@@ -42,6 +48,11 @@ Language code:"""
             log.error(f"Error detecting language: {e}")
             return self.default_language
 
+    @traceable(
+        name="translate_to_french",
+        run_type="llm",
+        metadata={"service": "translation", "operation": "to_french", "model": "claude-3-5-haiku-20241022"}
+    )
     @retry_on_api_error(max_attempts=3)
     async def translate_to_french(
         self,
@@ -72,6 +83,11 @@ French translation:"""
             log.error(f"Error translating to French: {e}")
             return text  # Return original if translation fails
 
+    @traceable(
+        name="translate_from_french",
+        run_type="llm",
+        metadata={"service": "translation", "operation": "from_french", "model": "claude-3-5-haiku-20241022"}
+    )
     @retry_on_api_error(max_attempts=3)
     async def translate_from_french(
         self,

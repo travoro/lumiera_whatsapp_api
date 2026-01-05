@@ -2,6 +2,7 @@
 from typing import Optional, Tuple
 from lingua import Language, LanguageDetectorBuilder
 from anthropic import Anthropic
+from langsmith import traceable
 from src.config import settings
 from src.utils.logger import log
 
@@ -62,6 +63,11 @@ class LanguageDetectionService:
 
         log.info("Language detection service initialized with Claude AI + lingua-py")
 
+    @traceable(
+        name="language_detection",
+        run_type="llm",
+        metadata={"service": "language_detection", "model": "claude-3-5-haiku-20241022"}
+    )
     async def detect_with_claude(self, text: str) -> Optional[str]:
         """Detect language using Claude AI (most accurate method).
 
