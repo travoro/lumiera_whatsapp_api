@@ -18,6 +18,11 @@ def detect_numbered_list(text: str, language: str = "fr") -> Optional[List[Dict[
     Returns:
         List of items with id, title, description or None if no list found
     """
+    # Defensive: ensure text is a string
+    if not isinstance(text, str):
+        log.warning(f"detect_numbered_list received non-string: {type(text)}")
+        return None
+
     lines = text.split('\n')
     items = []
     current_section = []
@@ -89,6 +94,11 @@ def extract_intro_and_list(text: str, language: str = "fr") -> Tuple[str, Option
     Returns:
         Tuple of (intro_text, list_items or None, outro_text)
     """
+    # Defensive: ensure text is a string
+    if not isinstance(text, str):
+        log.warning(f"extract_intro_and_list received non-string: {type(text)}")
+        return str(text) if text else "", None, ""
+
     lines = text.split('\n')
     intro_lines = []
     list_lines = []

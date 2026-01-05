@@ -396,6 +396,11 @@ async def process_inbound_message(
             is_agent_escalation = False
             tools_called = []
 
+        # Ensure response_in_french is always a string (defensive check)
+        if not isinstance(response_in_french, str):
+            log.error(f"Agent returned non-string response: {type(response_in_french)} - {response_in_french}")
+            response_in_french = str(response_in_french) if response_in_french else "Désolé, une erreur s'est produite."
+
         log.info(f"Agent response (French): {response_in_french[:100]}...")
         log.info(f"Agent escalation: {is_agent_escalation}")
         log.info(f"Tools called: {tools_called}")
