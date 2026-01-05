@@ -86,8 +86,24 @@ class SupabaseClient:
         message_type: str = "text",
         media_type: Optional[str] = None,
         session_id: Optional[str] = None,
+        is_escalation: bool = False,
+        escalation_reason: Optional[str] = None,
     ) -> bool:
-        """Save message to database for audit trail with session tracking."""
+        """Save message to database for audit trail with session tracking.
+
+        Args:
+            user_id: User ID
+            message_text: Message content
+            original_language: Language code
+            direction: 'inbound' or 'outbound'
+            message_sid: Twilio message SID
+            media_url: Media URL if present
+            message_type: Type of message (text, image, etc.)
+            media_type: MIME type of media
+            session_id: Conversation session ID
+            is_escalation: Flag to mark this as an escalation
+            escalation_reason: Reason for escalation if applicable
+        """
         try:
             message_data = {
                 "subcontractor_id": user_id,
@@ -107,6 +123,14 @@ class SupabaseClient:
             # Add session_id if provided (from migrations v2)
             if session_id:
                 message_data["session_id"] = session_id
+
+            # Add escalation metadata if applicable
+            if is_escalation:
+                message_data["metadata"] = {
+                    "is_escalation": True,
+                    "escalation_reason": escalation_reason,
+                    "escalation_timestamp": datetime.utcnow().isoformat()
+                }
 
             self.client.table("messages").insert(message_data).execute()
             return True
@@ -181,66 +205,31 @@ class SupabaseClient:
             log.error(f"Error getting project: {e}")
             return None
 
-    async def create_escalation(
-        self,
-        user_id: str,
-        reason: str,
-        context: Dict[str, Any],
-    ) -> Optional[str]:
-        """Create escalation record for human handoff (optional - table may not exist)."""
+    async def get_escalation_messages(self, user_id: str, limit: int = 10) -> list:
+        """Get recent escalation messages for a user.
+
+        Escalations are stored as messages with metadata.is_escalation = true.
+        No separate escalations table needed.
+        """
         try:
-            response = self.client.table("escalations").insert({
-                "user_id": user_id,
-                "reason": reason,
-                "context": context,
-                "status": "pending",
-                "created_at": datetime.utcnow().isoformat(),
-            }).execute()
+            response = self.client.table("messages").select("*").eq(
+                "subcontractor_id", user_id
+            ).order("created_at", desc=True).limit(limit * 2).execute()
 
-            if response.data and len(response.data) > 0:
-                return response.data[0]["id"]
-            return None
+            if not response.data:
+                return []
+
+            # Filter for escalation messages
+            escalations = [
+                msg for msg in response.data
+                if msg.get("metadata", {}).get("is_escalation", False)
+            ]
+
+            return escalations[:limit]
+
         except Exception as e:
-            # Table may not exist - just log warning
-            log.warning(f"Could not create escalation (table may not exist): {e}")
-            return None
-
-    async def update_escalation_status(
-        self,
-        escalation_id: str,
-        status: str,
-        resolution_note: Optional[str] = None,
-    ) -> bool:
-        """Update escalation status (optional - table may not exist)."""
-        try:
-            update_data = {
-                "status": status,
-                "updated_at": datetime.utcnow().isoformat(),
-            }
-            if resolution_note:
-                update_data["resolution_note"] = resolution_note
-
-            self.client.table("escalations").update(update_data).eq(
-                "id", escalation_id
-            ).execute()
-            return True
-        except Exception as e:
-            log.warning(f"Could not update escalation (table may not exist): {e}")
-            return False
-
-    async def get_active_escalation(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Check if user has an active escalation (optional - table may not exist)."""
-        try:
-            response = self.client.table("escalations").select("*").eq(
-                "user_id", user_id
-            ).eq("status", "pending").execute()
-
-            if response.data and len(response.data) > 0:
-                return response.data[0]
-            return None
-        except Exception as e:
-            log.warning(f"Could not check active escalation (table may not exist): {e}")
-            return None
+            log.error(f"Error getting escalation messages: {e}")
+            return []
 
     async def get_conversation_history(
         self,

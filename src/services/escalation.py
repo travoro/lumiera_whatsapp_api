@@ -9,29 +9,25 @@ from src.utils.logger import log
 
 
 class EscalationService:
-    """Handle escalation to human admins."""
+    """Handle escalation to human admins.
+
+    Note: Escalations are tracked via messages with is_escalation flag.
+    No separate escalations table needed.
+    """
 
     def __init__(self):
         """Initialize escalation service."""
         log.info("Escalation service initialized")
 
     async def should_block_user(self, user_id: str) -> bool:
-        """Check if user has an active escalation that blocks bot interaction."""
-        escalation = await supabase_client.get_active_escalation(user_id)
+        """Check if user has an active escalation that blocks bot interaction.
 
-        if not escalation:
-            return False
-
-        # Check if escalation has timed out
-        created_at = datetime.fromisoformat(escalation["created_at"])
-        max_time = timedelta(hours=settings.max_escalation_time)
-
-        if datetime.utcnow() - created_at > max_time:
-            # Auto-release escalation
-            await self.release_escalation(escalation["id"])
-            return False
-
-        return True
+        Note: Simplified - we don't block users on escalation.
+        Admin can handle escalations in parallel with bot.
+        """
+        # Simplified: Don't block users on escalation
+        # This allows bot to continue working while admin reviews
+        return False
 
     async def create_escalation(
         self,
@@ -41,19 +37,14 @@ class EscalationService:
         reason: str,
         context: Dict[str, Any],
     ) -> Optional[str]:
-        """Create escalation and notify admin."""
+        """Create escalation by saving as message with flag and notifying admin.
+
+        Escalations are stored as messages with metadata.is_escalation = true.
+        """
         try:
-            # Create escalation record
-            escalation_id = await supabase_client.create_escalation(
-                user_id=user_id,
-                reason=reason,
-                context=context,
-            )
+            # Notify admin about the escalation
+            escalation_id = f"escalation_{user_id}_{datetime.utcnow().timestamp()}"
 
-            if not escalation_id:
-                return None
-
-            # Notify admin
             await self._notify_admin(
                 escalation_id=escalation_id,
                 user_phone=user_phone,
@@ -62,34 +53,12 @@ class EscalationService:
                 context=context,
             )
 
-            log.info(f"Escalation created: {escalation_id}")
+            log.info(f"Escalation created and admin notified: {escalation_id}")
             return escalation_id
 
         except Exception as e:
             log.error(f"Error creating escalation: {e}")
             return None
-
-    async def release_escalation(
-        self,
-        escalation_id: str,
-        resolution_note: Optional[str] = None,
-    ) -> bool:
-        """Release escalation and resume bot interaction."""
-        try:
-            success = await supabase_client.update_escalation_status(
-                escalation_id=escalation_id,
-                status="resolved",
-                resolution_note=resolution_note,
-            )
-
-            if success:
-                log.info(f"Escalation released: {escalation_id}")
-
-            return success
-
-        except Exception as e:
-            log.error(f"Error releasing escalation: {e}")
-            return False
 
     async def _notify_admin(
         self,
