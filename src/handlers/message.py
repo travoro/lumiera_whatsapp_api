@@ -325,65 +325,114 @@ async def process_inbound_message(
 
         # 2. Session already created earlier (line 185)
 
-        # 3. Classify intent for analytics and potential routing
+        # 3. Classify intent for analytics and HYBRID ROUTING
         intent_result = await intent_classifier.classify(message_in_french, user_id)
-        log.info(f"Intent: {intent_result['intent']} (requires_tools: {intent_result['requires_tools']})")
+        confidence = intent_result.get('confidence', 0.0)
+        log.info(f"Intent: {intent_result['intent']} | Confidence: {confidence:.2%} | Requires tools: {intent_result['requires_tools']}")
 
-        # 4. Get user context for personalization
-        user_context_str = await user_context_service.get_context_for_agent(user_id)
-        if user_context_str:
-            log.info(f"Retrieved user context: {len(user_context_str)} chars")
+        # 🚀 HYBRID ROUTING: Use fast path for high-confidence simple intents
+        CONFIDENCE_THRESHOLD = 0.95  # 95% confidence required for fast path
+        USE_FAST_PATH = True  # Feature flag
 
-        # 5. Save inbound message with session tracking
-        await supabase_client.save_message(
-            user_id=user_id,
-            message_text=message_body,
-            original_language=detected_language,
-            direction="inbound",
-            message_sid=message_sid,
-            media_url=media_url,
-            session_id=session_id,
-        )
+        agent_result = None
+        used_fast_path = False
 
-        # Retrieve conversation history for context
-        full_conversation_history = await supabase_client.get_conversation_history(
-            user_id=user_id,
-            limit=30  # Get more messages for potential summarization
-        )
+        if USE_FAST_PATH and confidence >= CONFIDENCE_THRESHOLD:
+            intent = intent_result['intent']
+            log.info(f"🚀 HIGH CONFIDENCE ({confidence:.2%}) - Attempting fast path for: {intent}")
 
-        # Optimize conversation history (summarize if too long)
-        recent_messages, older_summary = await memory_service.get_optimized_history(
-            messages=full_conversation_history,
-            recent_message_count=15,  # Keep last 15 messages as-is (increased from 8)
-            user_id=user_id  # Pass user_id for caching
-        )
+            # Import direct handlers
+            from src.services.direct_handlers import execute_direct_handler
 
-        # Convert recent messages to LangChain format
-        chat_history = convert_messages_to_langchain(recent_messages)
+            # Try direct execution
+            agent_result = await execute_direct_handler(
+                intent=intent,
+                user_id=user_id,
+                phone_number=phone_number,
+                user_name=user_name,
+                language=user_language,
+                reason=message_in_french  # For escalation
+            )
 
-        # If there's a summary of older messages, prepend it as context
-        if older_summary:
-            chat_history.insert(0, SystemMessage(content=f"Contexte de la conversation précédente:\n{older_summary}"))
-            log.info(f"Using summarized context + {len(recent_messages)} recent messages")
+            if agent_result:
+                used_fast_path = True
+                log.info(f"✅ FAST PATH SUCCESS: {intent} executed directly (saved Opus call)")
+            else:
+                log.warning(f"⚠️ FAST PATH FAILED: Falling back to full agent for {intent}")
+
+        # If fast path not used or failed, use full agent
+        if not agent_result:
+            if confidence < CONFIDENCE_THRESHOLD:
+                log.info(f"⚙️ LOW CONFIDENCE ({confidence:.2%}) - Using full agent (Opus)")
+            else:
+                log.info(f"⚙️ FALLBACK - Using full agent (Opus)")
+
+            # 4. Get user context for personalization
+            user_context_str = await user_context_service.get_context_for_agent(user_id)
+            if user_context_str:
+                log.info(f"Retrieved user context: {len(user_context_str)} chars")
+
+            # 5. Save inbound message with session tracking
+            await supabase_client.save_message(
+                user_id=user_id,
+                message_text=message_body,
+                original_language=detected_language,
+                direction="inbound",
+                message_sid=message_sid,
+                media_url=media_url,
+                session_id=session_id,
+            )
+
+            # Retrieve conversation history for context
+            full_conversation_history = await supabase_client.get_conversation_history(
+                user_id=user_id,
+                limit=30  # Get more messages for potential summarization
+            )
+
+            # Optimize conversation history (summarize if too long)
+            recent_messages, older_summary = await memory_service.get_optimized_history(
+                messages=full_conversation_history,
+                recent_message_count=15,  # Keep last 15 messages as-is (increased from 8)
+                user_id=user_id  # Pass user_id for caching
+            )
+
+            # Convert recent messages to LangChain format
+            chat_history = convert_messages_to_langchain(recent_messages)
+
+            # If there's a summary of older messages, prepend it as context
+            if older_summary:
+                chat_history.insert(0, SystemMessage(content=f"Contexte de la conversation précédente:\n{older_summary}"))
+                log.info(f"Using summarized context + {len(recent_messages)} recent messages")
+            else:
+                log.info(f"Using {len(chat_history)} messages for context (no summary needed)")
+
+            # Add context if this is an interactive list response
+            if is_interactive_response:
+                context_msg = f"[CONTEXTE: L'utilisateur a sélectionné l'option '{button_payload}' depuis un menu interactif. Texte de l'option: '{button_text}']"
+                chat_history.insert(0, SystemMessage(content=context_msg))
+                log.info(f"Added interactive response context to chat history")
+
+            # Process with agent (in French) with conversation history and context
+            agent_result = await lumiera_agent.process_message(
+                user_id=user_id,
+                phone_number=phone_number,
+                language=user_language,
+                message_text=message_in_french,
+                chat_history=chat_history,
+                user_name=user_name,  # Pass official contact name from database
+                user_context=user_context_str,  # Pass user context for personalization
+            )
         else:
-            log.info(f"Using {len(chat_history)} messages for context (no summary needed)")
-
-        # Add context if this is an interactive list response
-        if is_interactive_response:
-            context_msg = f"[CONTEXTE: L'utilisateur a sélectionné l'option '{button_payload}' depuis un menu interactif. Texte de l'option: '{button_text}']"
-            chat_history.insert(0, SystemMessage(content=context_msg))
-            log.info(f"Added interactive response context to chat history")
-
-        # Process with agent (in French) with conversation history and context
-        agent_result = await lumiera_agent.process_message(
-            user_id=user_id,
-            phone_number=phone_number,
-            language=user_language,
-            message_text=message_in_french,
-            chat_history=chat_history,
-            user_name=user_name,  # Pass official contact name from database
-            user_context=user_context_str,  # Pass user context for personalization
-        )
+            # Fast path was successful - still save inbound message
+            await supabase_client.save_message(
+                user_id=user_id,
+                message_text=message_body,
+                original_language=detected_language,
+                direction="inbound",
+                message_sid=message_sid,
+                media_url=media_url,
+                session_id=session_id,
+            )
 
         # Extract structured data from agent result
         if isinstance(agent_result, dict):

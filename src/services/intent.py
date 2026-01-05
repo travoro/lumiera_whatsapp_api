@@ -51,17 +51,43 @@ class IntentClassifier:
         log.info("Intent classifier initialized with Claude Haiku")
 
     async def classify(self, message: str, user_id: str = None) -> Dict[str, Any]:
-        """Classify intent quickly with Claude Haiku.
+        """Classify intent quickly with Claude Haiku and confidence score.
 
         Args:
             message: User message to classify
             user_id: Optional user ID for logging
 
         Returns:
-            Dict with intent name and metadata
+            Dict with intent name, confidence score (0-1), and metadata
         """
         try:
-            prompt = f"""Classify this message into ONE intent:
+            # First, check for exact keyword matches (highest confidence)
+            message_lower = message.lower().strip()
+            confidence = 0.0
+
+            # Exact keyword matching for high confidence
+            for intent_name, intent_config in INTENTS.items():
+                keywords = intent_config.get("keywords", [])
+                for keyword in keywords:
+                    if keyword in message_lower:
+                        # Exact match = high confidence
+                        if message_lower == keyword or message_lower.startswith(keyword + " ") or message_lower.endswith(" " + keyword):
+                            confidence = 0.98
+                            log.info(f"🎯 Exact keyword match: '{keyword}' → {intent_name} (confidence: {confidence})")
+                            intent = intent_name
+                            break
+                        # Partial match = medium-high confidence
+                        elif len(message_lower.split()) <= 3:
+                            confidence = 0.90
+                            log.info(f"🎯 Strong keyword match: '{keyword}' → {intent_name} (confidence: {confidence})")
+                            intent = intent_name
+                            break
+                if confidence >= 0.90:
+                    break
+
+            # If no strong keyword match, use Claude Haiku for classification
+            if confidence < 0.90:
+                prompt = f"""Classify this message into ONE intent with confidence:
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (user wants to see their projects/chantiers)
 - list_tasks (user wants to see tasks/tâches)
@@ -71,21 +97,38 @@ class IntentClassifier:
 
 Message: {message}
 
-Return ONLY the intent name, nothing else."""
+Return ONLY the intent name and confidence (0-100) in format: intent:confidence
+Example: greeting:95"""
 
-            response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
-            intent = response.content.strip().lower()
+                response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
+                response_text = response.content.strip().lower()
+
+                # Parse response
+                if ":" in response_text:
+                    parts = response_text.split(":")
+                    intent = parts[0].strip()
+                    try:
+                        confidence = float(parts[1].strip()) / 100.0
+                    except:
+                        confidence = 0.75  # Default medium confidence
+                else:
+                    intent = response_text
+                    confidence = 0.75  # Default if no confidence provided
+
+                log.info(f"🤖 Haiku classification: {intent} (confidence: {confidence})")
 
             # Validate intent
             if intent not in INTENTS:
                 log.warning(f"Unknown intent '{intent}' returned, defaulting to 'general'")
                 intent = "general"
+                confidence = 0.5  # Low confidence for fallback
 
             # Get intent metadata
             intent_metadata = INTENTS[intent]
 
             result = {
                 "intent": intent,
+                "confidence": confidence,
                 "requires_tools": intent_metadata.get("requires_tools", True),
                 "tools": intent_metadata.get("tools", []),
                 "requires_confirmation": intent_metadata.get("requires_confirmation", False)
@@ -101,7 +144,7 @@ Return ONLY the intent name, nothing else."""
                         'subcontractor_id': user_id,
                         'message_text': message[:500],  # Limit length
                         'classified_intent': intent,
-                        'confidence': 0.9  # Haiku is generally reliable
+                        'confidence': confidence  # Use actual confidence score
                     }).execute()
             except Exception as e:
                 log.warning(f"Failed to save intent classification: {e}")
