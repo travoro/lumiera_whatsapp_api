@@ -53,9 +53,30 @@ async def handle_direct_action(
         return response
 
     elif action == "view_tasks":
-        # TODO: Implement list_tasks function
-        log.info(f"📋 DEBUG: You are in the view_tasks action for user {user_id}")
-        return "🔧 DEBUG: Action 'view_tasks' - Function not yet implemented. This will show your assigned tasks."
+        # Use fast path handler for list_tasks
+        log.info(f"📋 Calling list_tasks fast path handler for user {user_id}")
+        from src.services.direct_handlers import handle_list_tasks
+
+        # Get user name from database
+        try:
+            from src.integrations.supabase import supabase_client
+            user_data = supabase_client.get_user(user_id)
+            user_name = user_data.get('contact_name', '') if user_data else ''
+        except:
+            user_name = ''
+
+        result = await handle_list_tasks(
+            user_id=user_id,
+            phone_number=phone_number,
+            user_name=user_name,
+            language=language
+        )
+
+        if result:
+            return result.get("message")
+        else:
+            # Fallback to AI if fast path fails
+            return None
 
     elif action == "view_documents":
         # TODO: Implement list_documents function
@@ -73,17 +94,59 @@ async def handle_direct_action(
         })
         return response
 
-    # === AI CONVERSATION FLOW (Complex actions) ===
+    # === FAST PATH FOR COMPLEX ACTIONS ===
 
     elif action == "report_incident":
-        # AI will ask: which project? description? photos?
-        log.info(f"🚨 Action 'report_incident' needs AI conversation flow")
-        return None  # Fall back to AI agent
+        # Use fast path handler for report_incident
+        log.info(f"🚨 Calling report_incident fast path handler for user {user_id}")
+        from src.services.direct_handlers import handle_report_incident
+
+        # Get user name from database
+        try:
+            from src.integrations.supabase import supabase_client
+            user_data = supabase_client.get_user(user_id)
+            user_name = user_data.get('contact_name', '') if user_data else ''
+        except:
+            user_name = ''
+
+        result = await handle_report_incident(
+            user_id=user_id,
+            phone_number=phone_number,
+            user_name=user_name,
+            language=language
+        )
+
+        if result:
+            return result.get("message")
+        else:
+            # Fallback to AI if fast path fails
+            return None
 
     elif action == "update_progress":
-        # AI will ask: which project? which task? status? notes?
-        log.info(f"✅ Action 'update_progress' needs AI conversation flow")
-        return None  # Fall back to AI agent
+        # Use fast path handler for update_progress
+        log.info(f"✅ Calling update_progress fast path handler for user {user_id}")
+        from src.services.direct_handlers import handle_update_progress
+
+        # Get user name from database
+        try:
+            from src.integrations.supabase import supabase_client
+            user_data = supabase_client.get_user(user_id)
+            user_name = user_data.get('contact_name', '') if user_data else ''
+        except:
+            user_name = ''
+
+        result = await handle_update_progress(
+            user_id=user_id,
+            phone_number=phone_number,
+            user_name=user_name,
+            language=language
+        )
+
+        if result:
+            return result.get("message")
+        else:
+            # Fallback to AI if fast path fails
+            return None
 
     # Unknown action
     log.warning(f"⚠️ Unknown action: {action}")
