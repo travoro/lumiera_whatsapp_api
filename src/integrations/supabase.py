@@ -37,31 +37,31 @@ class SupabaseClient:
         language: str = "fr",
         **kwargs
     ) -> Optional[Dict[str, Any]]:
-        """Create or update subcontractor profile."""
+        """Update existing subcontractor profile (lookup only - no auto-create).
+
+        Note: Subcontractors must be created in advance with all required fields
+        (raison_sociale, forme_juridique, siren, siret, etc.).
+        This method only updates language preference.
+        """
         try:
             # Check if subcontractor exists
             existing_user = await self.get_user_by_phone(phone_number)
 
             if existing_user:
-                # Update existing subcontractor
+                # Update existing subcontractor's language
                 response = self.client.table("subcontractors").update({
                     "language": language,
                     "updated_at": datetime.utcnow().isoformat(),
                     **kwargs
                 }).eq("id", existing_user["id"]).execute()
-                return response.data[0] if response.data else None
+                log.info(f"Updated subcontractor {existing_user['id']} language to {language}")
+                return response.data[0] if response.data else existing_user
             else:
-                # Create new subcontractor
-                response = self.client.table("subcontractors").insert({
-                    "contact_telephone": phone_number,
-                    "language": language,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat(),
-                    **kwargs
-                }).execute()
-                return response.data[0] if response.data else None
+                # Subcontractor not found - cannot auto-create
+                log.warning(f"Subcontractor with phone {phone_number} not found. Create manually in Supabase first.")
+                return None
         except Exception as e:
-            log.error(f"Error creating/updating subcontractor: {e}")
+            log.error(f"Error updating subcontractor: {e}")
             return None
 
     async def save_message(

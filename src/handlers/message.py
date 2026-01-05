@@ -44,27 +44,25 @@ async def process_inbound_message(
     """Process an inbound WhatsApp message.
 
     Args:
-        from_number: The sender's WhatsApp number
+        from_number: The sender's WhatsApp number (format: whatsapp:+33123456789)
         message_body: The message text
         message_sid: Twilio message SID
         media_url: Optional media URL if message includes media
         media_content_type: Content type of media
     """
     try:
-        log.info(f"Processing message from {from_number}")
+        # Normalize phone number - remove 'whatsapp:' prefix if present
+        phone_number = from_number.replace("whatsapp:", "").strip()
+        log.info(f"Processing message from {phone_number} (original: {from_number})")
 
         # Get or create user
-        user = await supabase_client.get_user_by_phone(from_number)
+        user = await supabase_client.get_user_by_phone(phone_number)
 
         if not user:
-            # Create new user with default language
-            user = await supabase_client.create_or_update_user(
-                phone_number=from_number,
-                language="fr",
-            )
-
-        if not user:
-            log.error("Failed to create/get user")
+            # Subcontractor not found - they need to be registered first
+            log.error(f"Subcontractor not found for phone {phone_number}. Must be created in Supabase first.")
+            error_message = "Désolé, vous devez être enregistré pour utiliser ce service. Veuillez contacter l'administrateur."
+            twilio_client.send_message(from_number, error_message)
             return
 
         user_id = user["id"]
@@ -122,7 +120,7 @@ async def process_inbound_message(
             # Update user language if it changed
             if detected_language != user_language:
                 await supabase_client.create_or_update_user(
-                    phone_number=from_number,
+                    phone_number=phone_number,
                     language=detected_language,
                 )
                 user_language = detected_language
@@ -157,7 +155,7 @@ async def process_inbound_message(
         # Process with agent (in French) with conversation history
         response_in_french = await lumiera_agent.process_message(
             user_id=user_id,
-            phone_number=from_number,
+            phone_number=phone_number,
             language=user_language,
             message_text=message_in_french,
             chat_history=chat_history,
