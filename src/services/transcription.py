@@ -197,6 +197,13 @@ class TranscriptionService:
             transcribed_text = transcript.text if hasattr(transcript, 'text') else str(transcript)
             detected_language = transcript.language if hasattr(transcript, 'language') else None
 
+            # Log Whisper's full response for debugging
+            log.info(
+                f"🔍 Whisper response details: "
+                f"text='{transcribed_text[:50]}...', "
+                f"language={detected_language}"
+            )
+
             log.info(
                 f"✅ Audio processed: transcribed and stored "
                 f"(Whisper detected language: {detected_language})"
