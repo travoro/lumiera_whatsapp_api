@@ -193,46 +193,24 @@ class TranscriptionService:
             except:
                 pass
 
-            # Log RAW Whisper response
-            log.info(f"🔍 RAW Whisper response type: {type(transcript)}")
-            log.info(f"🔍 RAW Whisper response: {transcript}")
-
-            # Extract text and detected language from Whisper response
+            # Extract text from Whisper response
             transcribed_text = transcript.text if hasattr(transcript, 'text') else str(transcript)
-            whisper_language = transcript.language if hasattr(transcript, 'language') else None
 
-            # Log Whisper's full response for debugging
-            log.info(
-                f"🔍 Whisper response details: "
-                f"text='{transcribed_text[:50]}...', "
-                f"language={whisper_language}"
-            )
+            log.info(f"🔍 WHISPER RETURNED TEXT: '{transcribed_text}'")
 
-            # Fallback: Detect language from transcribed text if available
-            # This handles cases where Whisper transcribes correctly but misidentifies language
-            detected_language = whisper_language
+            # IGNORE Whisper's language field - detect from transcribed text instead
+            # Whisper transcribes correctly but language metadata is unreliable
+            detected_language = None
             if transcribed_text and len(transcribed_text.strip()) > 5:
                 try:
                     from langdetect import detect
-                    text_language = detect(transcribed_text)
-
-                    # If langdetect disagrees with Whisper, use langdetect (text is reliable)
-                    if text_language != whisper_language:
-                        log.info(
-                            f"🔄 Language override: Whisper said '{whisper_language}' but "
-                            f"transcribed text detected as '{text_language}' - using text-based detection"
-                        )
-                        detected_language = text_language
-                    else:
-                        log.info(f"✅ Language confirmed: Whisper and text detection agree on '{detected_language}'")
+                    detected_language = detect(transcribed_text)
+                    log.info(f"✅ Language detected from transcribed text: '{detected_language}'")
                 except Exception as e:
-                    log.warning(f"⚠️ Text language detection failed: {e}, using Whisper's: {whisper_language}")
-                    detected_language = whisper_language
+                    log.warning(f"⚠️ Text language detection failed: {e}")
+                    detected_language = None
 
-            log.info(
-                f"✅ Audio processed: transcribed and stored "
-                f"(Final detected language: {detected_language})"
-            )
+            log.info(f"📤 RETURNING: text='{transcribed_text[:50]}...', language={detected_language}")
 
             return transcribed_text, storage_url, detected_language
 

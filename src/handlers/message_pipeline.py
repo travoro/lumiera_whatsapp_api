@@ -272,8 +272,10 @@ class MessagePipeline:
             # Update context with transcription
             ctx.message_body = transcription
             log.info(f"✅ Audio transcribed: {transcription[:50]}...")
+            log.info(f"🔍 TRACE: Language from transcription service: {whisper_detected_lang}")
+            log.info(f"🔍 TRACE: Current context language (profile): {ctx.user_language}")
 
-            # Use Whisper's detected language (more accurate than langdetect for audio)
+            # Use detected language from transcribed text
             if whisper_detected_lang:
                 # Map Whisper's language names to ISO 639-1 codes
                 whisper_to_iso = {
@@ -317,10 +319,13 @@ class MessagePipeline:
 
                         # Use detected language for this message
                         ctx.user_language = iso_lang
+                        log.info(f"🔍 TRACE: Context language UPDATED to: {ctx.user_language}")
                     else:
-                        log.info(f"✅ Whisper detected language: {whisper_detected_lang} ({iso_lang}) (matches profile)")
+                        log.info(f"✅ Detected language: {whisper_detected_lang} ({iso_lang}) (matches profile)")
+                        log.info(f"🔍 TRACE: Context language UNCHANGED: {ctx.user_language}")
                 else:
-                    log.warning(f"⚠️ Whisper detected unsupported language: {whisper_detected_lang}")
+                    log.warning(f"⚠️ Unsupported language detected: {whisper_detected_lang}")
+                    log.info(f"🔍 TRACE: Context language UNCHANGED (unsupported): {ctx.user_language}")
             else:
                 log.warning("⚠️ Whisper did not return detected language")
 
