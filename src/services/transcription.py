@@ -180,6 +180,13 @@ class TranscriptionService:
             with open(temp_file_path, "wb") as f:
                 f.write(audio_data)
 
+            # Log what we're about to send to Whisper
+            log.info(f"📤 CALLING WHISPER API:")
+            log.info(f"   → model: {self.model}")
+            log.info(f"   → response_format: verbose_json")
+            log.info(f"   → target_language (received): {target_language}")
+            log.info(f"   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)")
+
             with open(temp_file_path, "rb") as audio_file:
                 # Use verbose_json to get detected language from Whisper
                 transcript = self.client.audio.transcriptions.create(
@@ -198,7 +205,13 @@ class TranscriptionService:
             # Extract text from Whisper response
             transcribed_text = transcript.text if hasattr(transcript, 'text') else str(transcript)
 
-            log.info(f"🔍 WHISPER RETURNED TEXT: '{transcribed_text}'")
+            # Log Whisper's response details
+            log.info(f"📥 WHISPER API RESPONSE:")
+            log.info(f"   → transcribed_text: '{transcribed_text}'")
+            if hasattr(transcript, 'language'):
+                log.info(f"   → Whisper detected language: {transcript.language}")
+            if hasattr(transcript, 'duration'):
+                log.info(f"   → audio duration: {transcript.duration}s")
 
             # IGNORE Whisper's language field - detect from transcribed text instead
             # Whisper transcribes correctly but language metadata is unreliable
