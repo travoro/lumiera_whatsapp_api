@@ -20,7 +20,26 @@ INTENTS = {
         "requires_confirmation": False
     },
     "escalate": {  # EASY ESCALATION - NO CONFIRMATION
-        "keywords": ["human", "person", "admin", "help", "stuck", "parler", "humano", "pessoa", "ayuda"],
+        "keywords": [
+            # English
+            "human", "person", "admin", "team", "contact", "speak", "talk", "help", "stuck",
+            # French
+            "humain", "personne", "administrateur", "équipe", "equipe", "contacter", "parler", "aide", "bloqué",
+            # Spanish
+            "humano", "persona", "administrador", "equipo", "contactar", "hablar", "ayuda", "atascado",
+            # Portuguese
+            "humano", "pessoa", "administrador", "equipe", "equipa", "contatar", "falar", "ajuda", "preso",
+            # German
+            "mensch", "person", "administrator", "team", "kontakt", "sprechen", "hilfe", "fest",
+            # Italian
+            "umano", "persona", "amministratore", "squadra", "contattare", "parlare", "aiuto", "bloccato",
+            # Romanian
+            "om", "persoană", "administrator", "echipă", "echipa", "contacta", "vorbi", "ajutor", "blocat",
+            # Polish
+            "człowiek", "osoba", "administrator", "zespół", "kontakt", "rozmawiać", "pomoc", "utknął",
+            # Arabic (transliterated)
+            "insan", "shakhṣ", "mudīr", "farīq", "ittiṣāl", "takallum", "musāʿada"
+        ],
         "tools": ["escalate_to_human_tool"],
         "requires_confirmation": False  # No confirmation needed!
     },
