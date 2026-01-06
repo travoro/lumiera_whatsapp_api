@@ -2,6 +2,9 @@
 
 These handlers execute directly without calling the main agent,
 providing fast responses for project, document, and incident operations.
+
+IMPORTANT: All handlers ALWAYS return French text. Translation to user language
+happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 """
 from typing import Dict, Any
 from src.integrations.supabase import supabase_client
@@ -31,14 +34,14 @@ async def handle_list_projects(
 
         if not projects:
             return {
-                "message": get_translation(language, "no_projects"),
+                "message": get_translation("fr", "no_projects"),
                 "escalation": False,
                 "tools_called": ["list_projects_tool"],
                 "fast_path": True
             }
 
-        # Format projects list with translation
-        header_template = get_translation(language, "projects_list_header")
+        # Format projects list with translation (ALWAYS French)
+        header_template = get_translation("fr", "projects_list_header")
         message = header_template.format(count=len(projects)) if header_template else f"You have {len(projects)} projects:\n\n"
 
         for i, project in enumerate(projects, 1):
@@ -87,8 +90,8 @@ async def handle_list_documents(
                 "fast_path": True
             }
 
-        # Use centralized translations
-        message = get_translation(language, "list_documents_header")
+        # Use centralized translations (ALWAYS French)
+        message = get_translation("fr", "list_documents_header")
 
         # Scenario 2: Has current project in context
         if current_project_id:
@@ -97,13 +100,13 @@ async def handle_list_documents(
             project_name = current_project['name'] if current_project else projects[0]['name']
             project_id = current_project['id'] if current_project else projects[0]['id']
 
-            message += get_translation(language, "list_documents_project_context").format(project_name=project_name)
+            message += get_translation("fr", "list_documents_project_context").format(project_name=project_name)
 
             # Get documents for this project using actions layer
             doc_result = await document_actions.get_documents(user_id, project_id)
 
             if not doc_result["success"] or not doc_result["data"]:
-                message += get_translation(language, "list_documents_no_documents")
+                message += get_translation("fr", "list_documents_no_documents")
             else:
                 documents = doc_result["data"]
                 for i, doc in enumerate(documents[:10], 1):  # Limit to 10 documents
@@ -121,15 +124,15 @@ async def handle_list_documents(
 
                     message += f"{i}. {type_emoji} {doc_name}\n"
 
-            message += get_translation(language, "list_documents_footer")
+            message += get_translation("fr", "list_documents_footer")
 
         # Scenario 3: Has projects but no current project in context
         else:
-            # Use helper to format project list
-            message += format_project_list(projects, language, max_items=5)
+            # Use helper to format project list (ALWAYS French)
+            message += format_project_list(projects, "fr", max_items=5)
 
-            # Add prompt to select project using centralized translation
-            message += get_translation(language, "list_documents_select_project")
+            # Add prompt to select project using centralized translation (ALWAYS French)
+            message += get_translation("fr", "list_documents_select_project")
 
         return {
             "message": message,
@@ -171,8 +174,8 @@ async def handle_report_incident(
                 "fast_path": True
             }
 
-        # Get base template
-        template = get_translation(language, "report_incident")
+        # Get base template (ALWAYS French)
+        template = get_translation("fr", "report_incident")
 
         # Scenario 2: Has projects and current project in context
         if current_project_id:
@@ -185,11 +188,11 @@ async def handle_report_incident(
 
         # Scenario 3: Has projects but no current project in context
         else:
-            # Build message with template header + project section + formatted list
+            # Build message with template header + project section + formatted list (ALWAYS French)
             base_msg = template.split("3. 🏗️")[0]
-            base_msg += get_translation(language, "report_incident_section_header")
-            base_msg += format_project_list(projects, language, max_items=5)
-            base_msg += get_translation(language, "report_incident_closing")
+            base_msg += get_translation("fr", "report_incident_section_header")
+            base_msg += format_project_list(projects, "fr", max_items=5)
+            base_msg += get_translation("fr", "report_incident_closing")
 
             message = base_msg
 

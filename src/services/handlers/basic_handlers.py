@@ -18,6 +18,9 @@ async def handle_greeting(
 ) -> Dict[str, Any]:
     """Handle greeting intent directly.
 
+    IMPORTANT: Always returns French text. Translation to user language
+    happens in the pipeline (message.py:272-278).
+
     Returns:
         Dict with message, escalation, tools_called
     """
@@ -26,9 +29,9 @@ async def handle_greeting(
     # Format name for greeting (with comma if provided)
     name_part = f", {user_name}" if user_name else ""
 
-    # Get translated greeting from centralized translations
-    greeting_template = get_translation(language, "greeting")
-    message = greeting_template.format(name=name_part) if greeting_template else f"Hello{name_part}!"
+    # ALWAYS return French - translation to user language happens in pipeline
+    greeting_template = get_translation("fr", "greeting")
+    message = greeting_template.format(name=name_part) if greeting_template else f"Bonjour{name_part}!"
 
     return {
         "message": message,
@@ -48,6 +51,9 @@ async def handle_escalation(
 ) -> Dict[str, Any]:
     """Handle escalation intent directly.
 
+    IMPORTANT: Always returns French text. Translation to user language
+    happens in the pipeline (message.py:272-278).
+
     Returns:
         Dict with message, escalation, tools_called
     """
@@ -63,8 +69,9 @@ async def handle_escalation(
         )
 
         if escalation_id:
+            # ALWAYS return French - translation to user language happens in pipeline
             return {
-                "message": get_translation(language, "escalation_success"),
+                "message": get_translation("fr", "escalation_success"),
                 "escalation": True,
                 "tools_called": ["escalate_to_human_tool"],
                 "fast_path": True

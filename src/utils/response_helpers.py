@@ -1,4 +1,8 @@
-"""Helper functions for building consistent response structures."""
+"""Helper functions for building consistent response structures.
+
+IMPORTANT: All helpers ALWAYS return French text. Translation to user language
+happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
+"""
 from typing import Dict, Any, List, Optional
 from src.utils.whatsapp_formatter import get_translation
 
@@ -13,7 +17,7 @@ def build_no_projects_response(language: str) -> Dict[str, Any]:
         Standard response dict
     """
     return {
-        "message": get_translation(language, "no_projects"),
+        "message": get_translation("fr", "no_projects"),
         "escalation": False,
         "tools_called": [],
         "fast_path": True
@@ -55,7 +59,7 @@ def build_error_response(
         Standard error response dict
     """
     return {
-        "message": get_translation(language, error_key),
+        "message": get_translation("fr", error_key),
         "escalation": False,
         "tools_called": [],
         "fast_path": True,

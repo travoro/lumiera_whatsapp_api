@@ -1,4 +1,8 @@
-"""Common helper functions for direct handlers."""
+"""Common helper functions for direct handlers.
+
+IMPORTANT: All helpers ALWAYS return French text. Translation to user language
+happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
+"""
 from typing import Tuple, List, Dict, Any, Optional
 from src.integrations.supabase import supabase_client
 from src.services.user_context import user_context_service
@@ -39,17 +43,17 @@ async def get_projects_with_context(
         # Get user's projects
         projects = await supabase_client.list_projects(user_id)
         
-        # If no projects, return error message
+        # If no projects, return error message (ALWAYS French)
         if not projects:
-            no_projects_msg = get_translation(language, "no_projects")
+            no_projects_msg = get_translation("fr", "no_projects")
             return ([], None, no_projects_msg)
-            
+
         return (projects, current_project_id, None)
-        
+
     except Exception as e:
         log.error(f"Error in get_projects_with_context for user {user_id}: {e}")
-        # Return empty results on error
-        no_projects_msg = get_translation(language, "no_projects")
+        # Return empty results on error (ALWAYS French)
+        no_projects_msg = get_translation("fr", "no_projects")
         return ([], None, no_projects_msg)
 
 
@@ -60,18 +64,21 @@ def format_project_list(
     header_key: str = "project_list"
 ) -> str:
     """Format a list of projects as numbered text.
-    
+
+    IMPORTANT: Always returns French text. Translation to user language
+    happens in the pipeline.
+
     Args:
         projects: List of project dicts with 'name' field
-        language: User's language code
+        language: User's language code (kept for compatibility, always uses "fr")
         max_items: Maximum number of projects to show
         header_key: Translation key for header (e.g. "project_list")
-        
+
     Returns:
-        Formatted string with numbered project list
+        Formatted string with numbered project list (ALWAYS in French)
     """
-    # Get header from centralized translations
-    header = get_translation(language, "available_projects_header")
+    # Get header from centralized translations (ALWAYS French)
+    header = get_translation("fr", "available_projects_header")
     message = header
     
     for i, project in enumerate(projects[:max_items], 1):
