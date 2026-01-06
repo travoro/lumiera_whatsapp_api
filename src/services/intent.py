@@ -1,12 +1,26 @@
 """Intent classification service for hybrid approach."""
 from typing import Optional, Dict, Any
+import re
 from langchain_anthropic import ChatAnthropic
 from src.config import settings
 from src.utils.logger import log
 
 INTENTS = {
     "greeting": {
-        "keywords": ["hello", "hi", "bonjour", "salut", "hola", "hey", "buenos dias", "bom dia"],
+        "keywords": [
+            # English
+            "hello", "hi", "hey",
+            # French
+            "bonjour", "salut",
+            # Spanish
+            "hola", "buenos dias",
+            # Portuguese
+            "bom dia",
+            # Arabic (transliterated and common phrases)
+            "allahu akbar", "salam", "as-salamu alaykum", "assalamu alaikum",
+            "marhaba", "ahlan", "sabah al-khayr", "sabah al khair",
+            "masa al-khayr", "masa al khair"
+        ],
         "requires_tools": False
     },
     "list_projects": {
@@ -74,21 +88,115 @@ class IntentClassifier:
         )
         log.info("Intent classifier initialized with Claude Haiku")
 
-    async def classify(self, message: str, user_id: str = None) -> Dict[str, Any]:
+    def _contains_numbered_list(self, text: str) -> bool:
+        """Check if text contains a numbered list (1. 2. 3. etc).
+
+        Args:
+            text: Text to check for numbered list
+
+        Returns:
+            True if text contains numbered list pattern
+        """
+        if not text:
+            return False
+        # Match patterns like "1.", "2)", "1 -", "1:", etc.
+        # Look for at least 2 numbered items
+        pattern = r'(?:^|\n)\s*[1-6][\.\)\:\-]\s+'
+        matches = re.findall(pattern, text, re.MULTILINE)
+        return len(matches) >= 2
+
+    def _map_menu_option_to_intent(self, option: int, menu_text: str) -> str:
+        """Map menu option number to intent based on menu content.
+
+        Args:
+            option: Selected option number (1-6)
+            menu_text: The menu text that was shown to user
+
+        Returns:
+            Intent name corresponding to the option
+        """
+        # Standard greeting menu mapping (matches agent.py:76-84)
+        # 1. 🏗️ Voir mes chantiers actifs
+        # 2. 📋 Consulter mes tâches
+        # 3. 🚨 Signaler un incident
+        # 4. ✅ Mettre à jour ma progression
+        # 5. 🗣️ Parler avec l'équipe
+        GREETING_MENU_MAP = {
+            1: "list_projects",
+            2: "list_tasks",
+            3: "report_incident",
+            4: "update_progress",
+            5: "escalate"
+        }
+
+        menu_lower = menu_text.lower() if menu_text else ""
+
+        # Check if it's the standard greeting menu
+        # Look for key phrases that identify it as the main menu
+        is_greeting_menu = (
+            ("chantier" in menu_lower or "projet" in menu_lower) and
+            ("tâche" in menu_lower or "task" in menu_lower) and
+            ("incident" in menu_lower or "problem" in menu_lower)
+        )
+
+        if is_greeting_menu:
+            intent = GREETING_MENU_MAP.get(option, "general")
+            log.info(f"🎯 Mapped greeting menu option {option} → {intent}")
+            return intent
+
+        # Project selection menu - numbers map to project indices
+        # In this case, return "general" and let the agent handle it with context
+        if "projet" in menu_lower or "chantier" in menu_lower:
+            log.info(f"📋 Project list menu detected - option {option} (routing to agent with context)")
+            return "general"
+
+        # Task selection menu
+        if "tâche" in menu_lower or "task" in menu_lower:
+            log.info(f"📋 Task list menu detected - option {option} (routing to agent with context)")
+            return "general"
+
+        # Default: route to general intent (agent will use conversation context)
+        log.info(f"❓ Unknown menu type - option {option} (routing to agent)")
+        return "general"
+
+    async def classify(self, message: str, user_id: str = None, last_bot_message: str = None) -> Dict[str, Any]:
         """Classify intent quickly with Claude Haiku and confidence score.
 
         Args:
             message: User message to classify
             user_id: Optional user ID for logging
+            last_bot_message: Optional last message sent by bot (for menu context)
 
         Returns:
             Dict with intent name, confidence score (0-1), and metadata
         """
         try:
-            # First, check for exact keyword matches (highest confidence)
             message_lower = message.lower().strip()
             confidence = 0.0
 
+            # PRIORITY 1: Check for numeric menu selection (highest priority)
+            # If user sends a single digit and the last bot message contained a menu,
+            # map the number directly to the corresponding intent
+            if message.strip().isdigit() and last_bot_message:
+                option_number = int(message.strip())
+                # Check if last message was a numbered menu
+                if self._contains_numbered_list(last_bot_message):
+                    intent = self._map_menu_option_to_intent(option_number, last_bot_message)
+                    log.info(f"🔢 Numeric menu selection detected: '{message}' from menu → {intent}")
+
+                    # Get intent metadata
+                    intent_metadata = INTENTS.get(intent, INTENTS["general"])
+
+                    return {
+                        "intent": intent,
+                        "confidence": 0.95,  # High confidence for direct menu selection
+                        "requires_tools": intent_metadata.get("requires_tools", True),
+                        "tools": intent_metadata.get("tools", []),
+                        "requires_confirmation": intent_metadata.get("requires_confirmation", False),
+                        "menu_selection": True  # Flag to indicate this was a menu selection
+                    }
+
+            # PRIORITY 2: Check for exact keyword matches (high confidence)
             # Exact keyword matching for high confidence
             for intent_name, intent_config in INTENTS.items():
                 keywords = intent_config.get("keywords", [])
