@@ -348,12 +348,11 @@ def get_translation(language: str, key: str, default_language: str = "en") -> An
 
 
 def safe_truncate(text: str, max_length: int) -> str:
-    """Safely truncate text to max length, removing emojis but keeping punctuation."""
-    # Remove emojis and problematic special characters, but KEEP common punctuation
-    # Keep: letters, numbers, spaces, hyphens, commas, periods, question marks, exclamation marks, colons, apostrophes
-    text_clean = re.sub(r'[^\w\s\-,.\?!:\'\u00C0-\u017F]', '', text).strip()
-    # Truncate to max length
-    return text_clean[:max_length] if text_clean else text[:max_length]
+    """Safely truncate text to max length, keeping emojis and punctuation."""
+    # Simply truncate to max length while preserving emojis
+    # Emojis are fully supported in WhatsApp interactive lists
+    truncated = text[:max_length].strip() if text else ""
+    return truncated
 
 
 def send_whatsapp_message_smart(
