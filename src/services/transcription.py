@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 import httpx
 import os
 from openai import OpenAI
+from langsmith import traceable
 from src.config import settings
 from src.utils.logger import log
 
@@ -137,6 +138,7 @@ class TranscriptionService:
             log.error(f"Error transcribing audio: {e}")
             return None
 
+    @traceable(name="whisper_transcribe_audio", tags=["whisper", "transcription"])
     async def transcribe_and_store_audio(
         self,
         audio_url: str,
