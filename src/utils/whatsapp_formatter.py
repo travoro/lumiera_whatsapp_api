@@ -2,7 +2,7 @@
 from typing import Dict, List, Optional, Any
 import re
 from src.integrations.twilio import twilio_client
-from src.services.template_manager import template_manager
+from src.services.dynamic_templates import dynamic_template_service
 from src.utils.logger import log
 
 
@@ -388,9 +388,9 @@ def send_whatsapp_message_smart(
     if ENABLE_INTERACTIVE and (interactive_data or is_greeting):
         msg_type = interactive_data.get("type") if interactive_data else None
 
-        # Handle greeting with universal template (has built-in menu)
+        # Handle greeting with dynamic interactive list
         if is_greeting:
-            log.info(f"✅ Processing greeting with universal template")
+            log.info(f"✅ Processing greeting with dynamic template (create-send-delete)")
 
             # Get language-specific content using robust translation system
             greeting_template = get_translation(language, "greeting", "en")
@@ -406,69 +406,48 @@ def send_whatsapp_message_smart(
                 greeting = "Hello, how can I help you today?"
 
             log.info(f"📝 Personalized greeting: {greeting[:50]}...")
+            log.info(f"📋 Menu items: {len(menu_items)} items")
 
-            # Build content variables with strict character limits
-            # Variable 1: Body text (max 1024 chars)
-            # Variable 2: Button text (max 20 chars)
-            # Variables 3-20: 6 items (title 24, id 200, description 72 each)
-            content_variables = {
-                "1": safe_truncate(greeting, 1024),
-                "2": safe_truncate(button_text, 20) if button_text else "Options",
-            }
+            # Convert menu items to dynamic template format
+            # Each item needs: "item" (≤24 chars), "description" (≤72 chars), "id"
+            formatted_items = []
+            if menu_items:
+                for menu_item in menu_items[:10]:  # Max 10 items for WhatsApp
+                    formatted_items.append({
+                        "item": safe_truncate(menu_item.get("title", ""), 24),
+                        "description": safe_truncate(menu_item.get("description", ""), 72),
+                        "id": menu_item.get("id", "")
+                    })
 
-            # Add 6 menu items with strict limits
-            if not menu_items:
-                menu_items = []
-
-            for idx in range(6):
-                if idx < len(menu_items):
-                    item = menu_items[idx]
-                    title = item.get("title", f"Option {idx+1}")
-                    item_id = item.get("id", f"option_{idx+1}")
-                    description = item.get("description", "")
-                else:
-                    # Pad with empty items if less than 6
-                    title = ""
-                    item_id = f"empty_{idx+1}"
-                    description = ""
-
-                # Calculate variable positions: 3,4,5 for item 0; 6,7,8 for item 1; etc.
-                var_base = (idx * 3) + 3
-
-                content_variables[str(var_base)] = safe_truncate(title, 24)
-                content_variables[str(var_base + 1)] = safe_truncate(item_id, 200)
-                content_variables[str(var_base + 2)] = safe_truncate(description, 72)
-
-            log.info(f"📝 Content variables prepared:")
-            log.info(f"   Body length: {len(content_variables['1'])} chars")
-            log.info(f"   Button: {content_variables['2']}")
-            log.info(f"   Items: {len([k for k in content_variables if k.isdigit() and int(k) >= 3]) // 3}")
-
-            # Get universal template from database
-            content_sid = template_manager.get_template_from_database("greeting_menu", "all")
-
-            if not content_sid:
-                log.error(f"❌ Universal template not found in database")
-                # Fallback to text
-                log.info("📱 Sending as regular text message")
+            if not formatted_items:
+                # Fallback if no menu items
+                log.warning("⚠️ No menu items available, falling back to text")
                 sid = twilio_client.send_message(to=to, body=text)
                 return sid
 
-            log.info(f"📋 Using universal template: {content_sid}")
+            # Use dynamic template service (create → send → delete)
+            log.info(f"🚀 Sending dynamic list picker with {len(formatted_items)} items")
 
-            # Send using content template
-            sid = twilio_client.send_message_with_content(
-                to=to,
-                content_sid=content_sid,
-                content_variables=content_variables
+            result = dynamic_template_service.send_list_picker(
+                to_number=to,
+                body_text=greeting,
+                button_text=safe_truncate(button_text, 20) if button_text else "Options",
+                items=formatted_items,
+                cleanup=True,  # Auto-delete after sending
+                language=language
             )
 
-            if sid:
-                log.info(f"✅ Sent greeting via template to {to}, SID: {sid}")
-                return sid
+            if result['success']:
+                log.info(f"✅ Sent greeting via dynamic template to {to}")
+                log.info(f"📊 Performance: {result['total_ms']:.0f}ms total")
+                log.info(f"   - Create: {result['create_ms']:.0f}ms")
+                log.info(f"   - Send: {result['send_ms']:.0f}ms")
+                log.info(f"   - Delete: {result['delete_ms']:.0f}ms")
+                return result['message_sid']
             else:
-                log.error(f"❌ Content template send FAILED, falling back to text")
+                log.error(f"❌ Dynamic template send FAILED: {result.get('error')}")
                 # Fallback to regular text
+                log.info("📱 Falling back to regular text message")
                 sid = twilio_client.send_message(to=to, body=text)
                 return sid
 
