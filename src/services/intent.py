@@ -84,7 +84,7 @@ class IntentClassifier:
             model="claude-3-5-haiku-20241022",
             api_key=settings.anthropic_api_key,
             temperature=0.1,
-            max_tokens=50
+            max_tokens=100  # Increased for menu context understanding
         )
         log.info("Intent classifier initialized with Claude Haiku")
 
@@ -100,64 +100,71 @@ class IntentClassifier:
         if not text:
             return False
         # Match patterns like "1.", "2)", "1 -", "1:", etc.
-        # Look for at least 2 numbered items
-        pattern = r'(?:^|\n)\s*[1-6][\.\)\:\-]\s+'
+        # Look for at least 2 numbered items (supporting 1-10 for dynamic menus)
+        pattern = r'(?:^|\n)\s*[1-9][\.\)\:\-]\s+|(?:^|\n)\s*10[\.\)\:\-]\s+'
         matches = re.findall(pattern, text, re.MULTILINE)
         return len(matches) >= 2
 
-    def _map_menu_option_to_intent(self, option: int, menu_text: str) -> str:
-        """Map menu option number to intent based on menu content.
+    async def _classify_menu_selection(self, option: int, menu_text: str) -> str:
+        """Use Haiku to intelligently classify menu selection based on context.
+
+        Instead of hardcoded mappings, we let Haiku understand the menu content
+        and determine what the user wants to do based on their selection.
 
         Args:
-            option: Selected option number (1-6)
-            menu_text: The menu text that was shown to user
+            option: Selected option number (1-9)
+            menu_text: The full menu text shown to user
 
         Returns:
-            Intent name corresponding to the option
+            Intent name based on Haiku's understanding of the menu
         """
-        # Standard greeting menu mapping (matches agent.py:76-84)
-        # 1. 🏗️ Voir mes chantiers actifs
-        # 2. 📋 Consulter mes tâches
-        # 3. 🚨 Signaler un incident
-        # 4. ✅ Mettre à jour ma progression
-        # 5. 🗣️ Parler avec l'équipe
-        GREETING_MENU_MAP = {
-            1: "list_projects",
-            2: "list_tasks",
-            3: "report_incident",
-            4: "update_progress",
-            5: "escalate"
-        }
+        # Truncate menu text if too long (keep first 500 chars for context)
+        menu_preview = menu_text[:500] if len(menu_text) > 500 else menu_text
 
-        menu_lower = menu_text.lower() if menu_text else ""
+        prompt = f"""The bot showed this menu to the user:
 
-        # Check if it's the standard greeting menu
-        # Look for key phrases that identify it as the main menu
-        is_greeting_menu = (
-            ("chantier" in menu_lower or "projet" in menu_lower) and
-            ("tâche" in menu_lower or "task" in menu_lower) and
-            ("incident" in menu_lower or "problem" in menu_lower)
-        )
+{menu_preview}
 
-        if is_greeting_menu:
-            intent = GREETING_MENU_MAP.get(option, "general")
-            log.info(f"🎯 Mapped greeting menu option {option} → {intent}")
+The user replied with: {option}
+
+Based on the menu content and the user's selection of option {option}, classify what the user wants to do:
+
+- greeting: User wants to see the main menu again
+- list_projects: User wants to see their projects/chantiers
+- list_tasks: User wants to see tasks/tâches
+- report_incident: User wants to report a problem/incident
+- update_progress: User wants to update task progress
+- escalate: User wants to talk to a human/team
+- general: The selection is for a specific item (project #3, task #2, etc.) - the agent needs full context
+
+Return ONLY the intent name and confidence (0-100) in format: intent:confidence
+Example: escalate:95
+
+IMPORTANT: If the user is selecting a specific item from a list (like "Project #3" or "Task #2"), return "general" so the agent can handle it with full conversation context."""
+
+        try:
+            response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
+            response_text = response.content.strip().lower()
+
+            # Parse response
+            if ":" in response_text:
+                parts = response_text.split(":")
+                intent = parts[0].strip()
+                try:
+                    confidence = float(parts[1].strip()) / 100.0
+                except:
+                    confidence = 0.90  # High confidence for menu selection
+            else:
+                intent = response_text.strip()
+                confidence = 0.90
+
+            log.info(f"🤖 Haiku classified menu option {option} → {intent} (confidence: {confidence})")
             return intent
 
-        # Project selection menu - numbers map to project indices
-        # In this case, return "general" and let the agent handle it with context
-        if "projet" in menu_lower or "chantier" in menu_lower:
-            log.info(f"📋 Project list menu detected - option {option} (routing to agent with context)")
+        except Exception as e:
+            log.error(f"Error in Haiku menu classification: {e}")
+            # Fallback: return general so agent can handle it
             return "general"
-
-        # Task selection menu
-        if "tâche" in menu_lower or "task" in menu_lower:
-            log.info(f"📋 Task list menu detected - option {option} (routing to agent with context)")
-            return "general"
-
-        # Default: route to general intent (agent will use conversation context)
-        log.info(f"❓ Unknown menu type - option {option} (routing to agent)")
-        return "general"
 
     async def classify(self, message: str, user_id: str = None, last_bot_message: str = None) -> Dict[str, Any]:
         """Classify intent quickly with Claude Haiku and confidence score.
@@ -176,20 +183,22 @@ class IntentClassifier:
 
             # PRIORITY 1: Check for numeric menu selection (highest priority)
             # If user sends a single digit and the last bot message contained a menu,
-            # map the number directly to the corresponding intent
+            # use Haiku to intelligently understand what the selection means
             if message.strip().isdigit() and last_bot_message:
                 option_number = int(message.strip())
                 # Check if last message was a numbered menu
                 if self._contains_numbered_list(last_bot_message):
-                    intent = self._map_menu_option_to_intent(option_number, last_bot_message)
-                    log.info(f"🔢 Numeric menu selection detected: '{message}' from menu → {intent}")
+                    log.info(f"🔢 Numeric menu selection detected: '{message}' - asking Haiku to classify with context")
+
+                    # Use Haiku to understand the menu and classify the intent
+                    intent = await self._classify_menu_selection(option_number, last_bot_message)
 
                     # Get intent metadata
                     intent_metadata = INTENTS.get(intent, INTENTS["general"])
 
                     return {
                         "intent": intent,
-                        "confidence": 0.95,  # High confidence for direct menu selection
+                        "confidence": 0.90,  # High confidence for Haiku with context
                         "requires_tools": intent_metadata.get("requires_tools", True),
                         "tools": intent_metadata.get("tools", []),
                         "requires_confirmation": intent_metadata.get("requires_confirmation", False),
