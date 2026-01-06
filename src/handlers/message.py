@@ -258,6 +258,7 @@ async def process_inbound_message(
         if action_match:
             action_id = action_match.group(1)
             log.info(f"🔘 Interactive action detected: {action_id}")
+            log.info(f"🌍 User language from profile: {user_language}")
 
             direct_response = await handle_direct_action(
                 action=action_id,
@@ -268,14 +269,18 @@ async def process_inbound_message(
 
             if direct_response:
                 log.info(f"✅ Direct action '{action_id}' executed successfully")
+                log.info(f"🔤 Handler response (French): {direct_response[:100]}...")
 
                 # Translate response if needed
                 if user_language != "fr":
+                    log.info(f"🔄 Translating from French to {user_language}")
                     response_text = await translation_service.translate_from_french(
                         direct_response, user_language
                     )
+                    log.info(f"✅ Translated response: {response_text[:100]}...")
                 else:
                     response_text = direct_response
+                    log.info(f"ℹ️ No translation needed (user language is French)")
 
                 # Check if escalation action
                 is_escalation_action = action_id == "talk_team"
