@@ -301,7 +301,8 @@ async def process_inbound_message(
                     original_language=user_language,
                     direction="outbound",
                     session_id=session_id,
-                    need_human=is_escalation_action,
+                    is_escalation=is_escalation_action,
+                    escalation_reason="User requested to talk to team via direct action" if is_escalation_action else None,
                 )
 
                 # Send response
@@ -422,7 +423,8 @@ async def process_inbound_message(
                     message_text=f"CRITICAL ERROR - User not notified: {str(e)[:200]}",
                     original_language="en",
                     direction="outbound",
-                    need_human=True
+                    is_escalation=True,
+                    escalation_reason="Critical error - user notification failed"
                 )
             except Exception as db_error:
                 log.error(f"CRITICAL: Database logging also failed: {db_error}")

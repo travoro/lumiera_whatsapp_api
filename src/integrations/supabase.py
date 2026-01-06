@@ -163,7 +163,7 @@ class SupabaseClient:
         session_id: Optional[str] = None,
         is_escalation: bool = False,
         escalation_reason: Optional[str] = None,
-        need_human: bool = False,
+        need_human: bool = False,  # DEPRECATED: Use is_escalation instead
         source: Optional[str] = None,
     ) -> bool:
         """Save message to database for audit trail with session tracking.
@@ -180,7 +180,7 @@ class SupabaseClient:
             session_id: Conversation session ID
             is_escalation: Flag to mark this as an escalation
             escalation_reason: Reason for escalation if applicable
-            need_human: Flag to indicate this message needs human attention (default: False)
+            need_human: DEPRECATED - Use is_escalation instead. Kept for backward compatibility.
             source: Message source ('user', 'agent', 'whatsapp'). Auto-detected if not provided.
         """
         try:
@@ -210,15 +210,16 @@ class SupabaseClient:
             # Add metadata if applicable
             metadata = {}
 
-            # Add escalation metadata if applicable
+            # BACKWARD COMPATIBILITY: Convert need_human to is_escalation
+            if need_human and not is_escalation:
+                log.warning("need_human parameter is deprecated. Converting to is_escalation=True")
+                is_escalation = True
+
+            # Add escalation metadata if applicable (standardized format)
             if is_escalation:
                 metadata["is_escalation"] = True
                 metadata["escalation_reason"] = escalation_reason
                 metadata["escalation_timestamp"] = datetime.utcnow().isoformat()
-
-            # Add need_human flag
-            if need_human:
-                metadata["need_human"] = True
 
             # Save metadata if any flags are set
             if metadata:

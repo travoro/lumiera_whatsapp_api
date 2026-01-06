@@ -365,7 +365,7 @@ async def escalate_to_human_tool(
         # Set flag to indicate escalation occurred
         execution_context["escalation_occurred"] = True
         execution_context["tools_called"].append("escalate_to_human_tool")
-        log.info("🚨 Escalation flag set: need_human will be True")
+        log.info("🚨 Escalation flag set: is_escalation will be True")
 
         # ALWAYS return French - translation to user language happens in pipeline
         from src.utils.whatsapp_formatter import get_translation
