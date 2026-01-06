@@ -383,6 +383,7 @@ This document explains key architectural and design decisions made in the Lumier
 ## Related Documentation
 
 - [Architectural Refactors](./ARCHITECTURAL_REFACTORS.md) - History of major refactorings
+- [Intent-Driven Formatting](./INTENT_DRIVEN_FORMATTING.md) - Why only certain intents use interactive lists
 - [Fast Path Rationale](../architecture/FAST_PATH_SYSTEM.md) - Why we built fast path
 - [Architecture Overview](../architecture/README.md) - System architecture
 - [Pipeline Architecture](../architecture/PIPELINE_ARCHITECTURE.md) - Pipeline design
@@ -390,5 +391,5 @@ This document explains key architectural and design decisions made in the Lumier
 
 ---
 
-**Last Updated**: 2026-01-05
-**Version**: 2.0.0
+**Last Updated**: 2026-01-06
+**Version**: 2.1.0

@@ -22,6 +22,7 @@ Understand how the system works:
 Learn why things are built the way they are:
 - **[Design Decisions Overview](./design-decisions/README.md)** - Key architectural decisions
 - **[Architectural Refactors](./design-decisions/ARCHITECTURAL_REFACTORS.md)** - History of major refactorings
+- **[Intent-Driven Formatting](./design-decisions/INTENT_DRIVEN_FORMATTING.md)** - Why only certain intents use interactive lists
 - **[Fast Path Rationale](./design-decisions/FAST_PATH_RATIONALE.md)** - Why we built the fast path system
 - **[Database Abstraction](./design-decisions/DATABASE_ABSTRACTION.md)** - Repository pattern adoption
 

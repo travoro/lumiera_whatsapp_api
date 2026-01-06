@@ -350,14 +350,39 @@ async def process_inbound_message(
             log.info(f"🌍 Using detected language: {detected_language} (profile: {user_language})")
         user_language = detected_language
 
-        # Interactive formatting
-        log.info(f"📱 Formatting response for interactive delivery")
-        message_text, interactive_data = format_for_interactive(response_text, user_language)
+        # Intent-driven response formatting
+        # Only format as interactive lists for specific intents where we expect structured data
+        INTERACTIVE_LIST_INTENTS = {"greeting", "list_projects", "list_tasks"}
 
-        # Use intent classification to detect greeting (not naive text matching)
+        # These intents have structured, limited-size outputs suitable for WhatsApp interactive lists (max 10 items):
+        # - greeting: Fixed menu (6 items)
+        # - list_projects: Typically 1-5 projects per subcontractor
+        # - list_tasks: Usually 5-10 tasks per project
+        #
+        # All other intents use plain text:
+        # - list_documents: Can be 20+ documents (exceeds WhatsApp limit, needs scrollable text)
+        # - escalate: Simple confirmation message
+        # - report_incident: Conversational guidance flow
+        # - update_progress: Conversational feedback
+        # - general: AI conversational response (may include suggestions, but not structured data)
+
+        if intent in INTERACTIVE_LIST_INTENTS:
+            log.info(f"📱 Intent '{intent}' expects structured data → Formatting as interactive list")
+            message_text, interactive_data = format_for_interactive(response_text, user_language)
+        else:
+            log.info(f"📱 Intent '{intent}' is conversational → Sending as plain text")
+            # Type safety: Agent may return list instead of string (LangChain quirk)
+            if isinstance(response_text, list):
+                log.info(f"📝 Agent returned list type, joining into string")
+                message_text = '\n'.join(str(item) for item in response_text)
+            else:
+                message_text = response_text
+            interactive_data = None
+
+        # Detect greeting for special handling (dynamic template with menu)
         is_greeting_intent = (intent == "greeting")
         if is_greeting_intent:
-            log.info(f"✅ Detected greeting intent (confidence: {confidence:.2%}), will use greeting template with menu")
+            log.info(f"✅ Greeting intent (confidence: {confidence:.2%}) → Will use dynamic template with menu")
 
         # Send response via Twilio
         send_whatsapp_message_smart(
