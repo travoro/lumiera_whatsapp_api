@@ -439,10 +439,7 @@ def send_whatsapp_message_smart(
 
             if result['success']:
                 log.info(f"✅ Sent greeting via dynamic template to {to}")
-                log.info(f"📊 Performance: {result['total_ms']:.0f}ms total")
-                log.info(f"   - Create: {result['create_ms']:.0f}ms")
-                log.info(f"   - Send: {result['send_ms']:.0f}ms")
-                log.info(f"   - Delete: {result['delete_ms']:.0f}ms")
+                log.info(f"📊 Performance: {result['total_ms']:.0f}ms (create → send → delete)")
                 return result['message_sid']
             else:
                 log.error(f"❌ Dynamic template send FAILED: {result.get('error')}")
