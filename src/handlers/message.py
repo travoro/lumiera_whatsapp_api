@@ -371,16 +371,8 @@ async def process_inbound_message(
             message_text, interactive_data = format_for_interactive(response_text, user_language)
         else:
             log.info(f"📱 Intent '{intent}' is conversational → Sending as plain text")
-            # Type safety: Agent may return list or dict instead of string (LangChain quirk)
-            if isinstance(response_text, list):
-                log.info(f"📝 Agent returned list type, joining into string")
-                message_text = '\n'.join(str(item) for item in response_text)
-            elif isinstance(response_text, dict):
-                # LangChain sometimes returns dict with 'text' field
-                log.info(f"📝 Agent returned dict type, extracting text field")
-                message_text = response_text.get('text', str(response_text))
-            else:
-                message_text = response_text
+            # Agent output is normalized to string in agent.py
+            message_text = response_text
             interactive_data = None
 
         # Detect greeting for special handling (dynamic template with menu)

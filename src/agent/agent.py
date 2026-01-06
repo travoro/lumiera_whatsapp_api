@@ -231,6 +231,28 @@ class LumieraAgent:
                 # Extract output
                 output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
 
+                # Normalize output to string (LangChain sometimes returns dict/list)
+                if isinstance(output, dict):
+                    # Extract 'text' field from dict: {'text': '...', 'type': 'text', 'index': 0}
+                    log.warning(f"Agent returned dict output, extracting text field")
+                    output = output.get('text', str(output))
+                elif isinstance(output, list):
+                    # List items might be dicts with 'text' field or plain strings
+                    log.warning(f"Agent returned list output ({len(output)} items), extracting text")
+                    extracted_items = []
+                    for item in output:
+                        if isinstance(item, dict):
+                            # Extract 'text' field from dict item
+                            extracted_items.append(item.get('text', str(item)))
+                        else:
+                            # Plain string or other type
+                            extracted_items.append(str(item))
+                    output = '\n'.join(extracted_items)
+                elif not isinstance(output, str):
+                    # Fallback: convert to string
+                    log.warning(f"Agent returned unexpected type {type(output)}, converting to string")
+                    output = str(output)
+
                 # Get escalation flag from execution context (set by tools)
                 escalation_occurred = ctx.escalation_occurred
 
@@ -238,7 +260,7 @@ class LumieraAgent:
                 log.info(f"Escalation occurred: {escalation_occurred}")
                 log.info(f"Tools called: {ctx.tools_called}")
 
-                # Return structured data
+                # Return structured data (output is guaranteed to be string now)
                 return {
                     "message": output,
                     "escalation": escalation_occurred,
