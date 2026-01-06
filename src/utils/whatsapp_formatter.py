@@ -408,12 +408,13 @@ def send_whatsapp_message_smart(
             log.info(f"📋 Menu items: {len(menu_items)} items")
 
             # Convert menu items to dynamic template format
-            # Each item needs: "item" (≤24 chars), "id"
+            # Each item needs: "item" (≤24 chars), "description" (empty), "id"
             formatted_items = []
             if menu_items:
                 for menu_item in menu_items[:10]:  # Max 10 items for WhatsApp
                     formatted_items.append({
                         "item": safe_truncate(menu_item.get("title", ""), 24),
+                        "description": "",  # Empty but required by Twilio
                         "id": menu_item.get("id", "")
                     })
 
