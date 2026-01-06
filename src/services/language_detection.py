@@ -40,14 +40,17 @@ Language code:"""
 
             # Validate it's a supported language
             if language_code in settings.supported_languages_list:
-                log.info(f"🤖 Claude detected: {language_code}")
+                log.info(f"🤖 Claude AI detected language: {language_code}")
                 return language_code
             else:
-                log.warning(f"⚠️ Claude returned unsupported language: {language_code}")
+                log.warning(
+                    f"⚠️ Claude returned unsupported language code: '{language_code}' "
+                    f"(supported: {', '.join(settings.supported_languages_list)})"
+                )
                 return None
 
         except Exception as e:
-            log.error(f"Error in Claude language detection: {e}")
+            log.error(f"❌ Claude language detection error: {str(e)}")
             return None
 
     async def detect_async(self, text: str, fallback_language: str = 'fr') -> Tuple[str, str]:
@@ -66,36 +69,48 @@ Language code:"""
             Method can be: 'claude' or 'fallback'
         """
         if not text or len(text.strip()) < 2:
-            log.info(f"✅ Text too short, using fallback: {fallback_language}")
+            log.info(f"⏩ Text too short for detection ({len(text)} chars) → Using fallback: {fallback_language}")
             return fallback_language, 'fallback'
 
         text = text.strip()
+        text_preview = text[:30] + "..." if len(text) > 30 else text
 
         # Try Claude AI
+        log.info(f"🔍 Claude AI analyzing: '{text_preview}'")
         claude_lang = await self.detect_with_claude(text)
         if claude_lang:
+            log.info(f"✅ Detection successful: {claude_lang} (method: claude)")
             return claude_lang, 'claude'
 
         # Fallback to profile language
-        log.warning(f"⚠️ Claude detection failed, using fallback: {fallback_language}")
+        log.warning(
+            f"⚠️ Claude detection failed for '{text_preview}' → Using fallback: {fallback_language}"
+        )
         return fallback_language, 'fallback'
 
     def detect(self, text: str, fallback_language: str = 'fr') -> Tuple[str, str]:
-        """Synchronous detect method (for backward compatibility).
+        """Deprecated: Use detect_async() instead.
 
-        Note: Claude AI detection is async only. This method returns the fallback language.
-        Use detect_async() for actual Claude-based detection.
+        This method is deprecated because Claude AI detection requires async operations.
+        Calling this method will raise a NotImplementedError to prevent silent fallback behavior.
 
         Args:
             text: Text to detect language from
             fallback_language: Language to use
 
         Returns:
-            Tuple of (fallback language, 'fallback')
+            Never returns - raises NotImplementedError
+
+        Raises:
+            NotImplementedError: Always raised to enforce use of detect_async()
         """
-        log.warning("⚠️ Sync detect() called - Claude detection requires async. Using fallback language.")
-        log.info("💡 Use detect_async() instead for Claude AI detection")
-        return fallback_language, 'fallback'
+        log.error("❌ Sync detect() called - This method is deprecated!")
+        log.error("💡 Use 'await language_detection_service.detect_async()' instead")
+        raise NotImplementedError(
+            "Synchronous detect() is deprecated. "
+            "Claude AI language detection requires async operations. "
+            "Use 'await detect_async()' instead."
+        )
 
 
 # Global instance

@@ -192,7 +192,11 @@ class MessagePipeline:
                 try:
                     from src.services.language_detection import language_detection_service
 
-                    detected_language, detection_method = language_detection_service.detect(
+                    # Log detection attempt with message preview
+                    message_preview = ctx.message_body[:50] + "..." if len(ctx.message_body) > 50 else ctx.message_body
+                    log.info(f"🔍 Detecting language for message: '{message_preview}' (profile: {profile_language})")
+
+                    detected_language, detection_method = await language_detection_service.detect_async(
                         ctx.message_body,
                         fallback_language=profile_language
                     )
@@ -201,8 +205,9 @@ class MessagePipeline:
                     if detection_method != 'fallback':
                         if detected_language != profile_language:
                             log.info(
-                                f"🌍 Text language detected: {detected_language} "
-                                f"(method: {detection_method}, differs from profile: {profile_language})"
+                                f"🌍 Language detected: {detected_language} "
+                                f"(method: {detection_method}, profile: {profile_language}) "
+                                f"→ Profile will be updated"
                             )
 
                             # Update user profile language permanently
@@ -225,18 +230,24 @@ class MessagePipeline:
                             ctx.user_language = detected_language
                         else:
                             log.info(
-                                f"✅ Language: {detected_language} (method: {detection_method}, matches profile)"
+                                f"✅ Language detected: {detected_language} "
+                                f"(method: {detection_method}) → Matches profile, no update needed"
                             )
                     else:
                         # Fallback method means no confident detection
-                        log.info(f"✅ Using profile language: {profile_language} (no confident detection)")
+                        log.info(
+                            f"⚠️ Language detection fallback: Using profile language {profile_language} "
+                            f"(method: {detection_method})"
+                        )
                         ctx.user_language = profile_language
 
                 except Exception as e:
-                    log.warning(f"⚠️ Language detection failed: {e}, using profile: {profile_language}")
+                    log.warning(
+                        f"❌ Language detection error: {e} → Using profile language: {profile_language}"
+                    )
                     ctx.user_language = profile_language
             else:
-                log.info(f"✅ Using profile language: {profile_language}")
+                log.info(f"⏩ Message too short for detection → Using profile language: {profile_language}")
 
             return Result.ok(None)
 
