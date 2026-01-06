@@ -367,7 +367,11 @@ async def escalate_to_human_tool(
         execution_context["tools_called"].append("escalate_to_human_tool")
         log.info("🚨 Escalation flag set: need_human will be True")
 
-        return "✅ Votre demande a été transmise à l'équipe administrative. Un membre de l'équipe vous contactera sous peu."
+        # Use translated message from TRANSLATIONS dictionary
+        from src.utils.whatsapp_formatter import get_translation
+        success_message = get_translation(language, "escalation_success", "en")
+        return success_message if success_message else "✅ Your request has been forwarded to the admin team. A team member will contact you shortly."
+
     return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
 
 
