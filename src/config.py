@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     default_language: str = "fr"
     supported_languages: str = "fr,en,es,pt,ar,de,it"
 
+    # Language Detection Policy
+    auto_update_user_language: bool = True  # Auto-update user profile language on detection
+    language_update_min_message_length: int = 10  # Minimum message length to trigger language update
+    language_greeting_exceptions: str = "bonjour,hello,hi,hola,ciao,salut,bună,buna"  # Don't update language for these greetings
+
     # Audio Transcription
     openai_api_key: str
     whisper_model: str = "whisper-1"
@@ -105,6 +110,11 @@ class Settings(BaseSettings):
     def allowed_media_types_list(self) -> List[str]:
         """Get list of allowed media types."""
         return [media.strip() for media in self.allowed_media_types.split(",")]
+
+    @property
+    def language_greeting_exceptions_list(self) -> List[str]:
+        """Get list of greeting exceptions (lowercase) that don't trigger language updates."""
+        return [greeting.strip().lower() for greeting in self.language_greeting_exceptions.split(",")]
 
     @property
     def is_production(self) -> bool:

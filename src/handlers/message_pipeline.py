@@ -204,29 +204,55 @@ class MessagePipeline:
                     # Check if detection succeeded (not fallback)
                     if detection_method != 'fallback':
                         if detected_language != profile_language:
-                            log.info(
-                                f"🌍 Language detected: {detected_language} "
-                                f"(method: {detection_method}, profile: {profile_language}) "
-                                f"→ Profile will be updated"
-                            )
+                            from src.config import settings
 
-                            # Update user profile language permanently
-                            update_success = await supabase_client.update_user_language(
-                                ctx.user_id,
-                                detected_language
-                            )
+                            # Check if we should update the profile based on policy
+                            should_update_profile = False
+                            update_blocked_reason = None
 
-                            if update_success:
-                                log.info(
-                                    f"✅ User profile language updated: "
-                                    f"{profile_language} → {detected_language}"
-                                )
+                            # Check greeting exception policy
+                            message_lower = ctx.message_body.strip().lower()
+                            is_greeting_exception = message_lower in settings.language_greeting_exceptions_list
+
+                            if is_greeting_exception:
+                                update_blocked_reason = f"greeting exception ('{message_lower}')"
+                            elif len(ctx.message_body.strip()) < settings.language_update_min_message_length:
+                                update_blocked_reason = f"message too short ({len(ctx.message_body.strip())} chars < {settings.language_update_min_message_length})"
+                            elif not settings.auto_update_user_language:
+                                update_blocked_reason = "auto-update disabled in settings"
                             else:
-                                log.warning(
-                                    f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                                should_update_profile = True
+
+                            if should_update_profile:
+                                log.info(
+                                    f"🌍 Language detected: {detected_language} "
+                                    f"(method: {detection_method}, profile: {profile_language}) "
+                                    f"→ Profile will be updated"
                                 )
 
-                            # Use detected language for this message
+                                # Update user profile language permanently
+                                update_success = await supabase_client.update_user_language(
+                                    ctx.user_id,
+                                    detected_language
+                                )
+
+                                if update_success:
+                                    log.info(
+                                        f"✅ User profile language updated: "
+                                        f"{profile_language} → {detected_language}"
+                                    )
+                                else:
+                                    log.warning(
+                                        f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                                    )
+                            else:
+                                log.info(
+                                    f"🌍 Language detected: {detected_language} "
+                                    f"(method: {detection_method}, profile: {profile_language}) "
+                                    f"→ Profile update BLOCKED: {update_blocked_reason}"
+                                )
+
+                            # Use detected language for this message regardless of profile update
                             ctx.user_language = detected_language
                         else:
                             log.info(
@@ -415,11 +441,42 @@ class MessagePipeline:
         """Stage 8: Translate response back to user language."""
         try:
             if ctx.user_language != "fr" and ctx.response_text:
-                ctx.response_text = await translation_service.translate_from_french(
-                    ctx.response_text,
-                    ctx.user_language
-                )
-                log.info(f"✅ Response translated to {ctx.user_language}")
+                # Validate agent responded in French (architectural requirement)
+                from src.services.language_detection import language_detection_service
+
+                # Only check if response is substantial enough
+                if len(ctx.response_text.strip()) > 10:
+                    detected_lang, method = await language_detection_service.detect_async(
+                        ctx.response_text,
+                        fallback_language="fr"
+                    )
+
+                    if detected_lang != "fr":
+                        log.warning(
+                            f"⚠️ Agent responded in {detected_lang} instead of French! "
+                            f"Response preview: {ctx.response_text[:100]}..."
+                        )
+                        # Translate from detected language instead
+                        ctx.response_text = await translation_service.translate(
+                            ctx.response_text,
+                            source_language=detected_lang,
+                            target_language=ctx.user_language
+                        )
+                        log.info(f"✅ Response translated from {detected_lang} to {ctx.user_language}")
+                    else:
+                        # Agent correctly responded in French
+                        ctx.response_text = await translation_service.translate_from_french(
+                            ctx.response_text,
+                            ctx.user_language
+                        )
+                        log.info(f"✅ Response translated from French to {ctx.user_language}")
+                else:
+                    # Short response, assume French and translate
+                    ctx.response_text = await translation_service.translate_from_french(
+                        ctx.response_text,
+                        ctx.user_language
+                    )
+                    log.info(f"✅ Response translated to {ctx.user_language}")
 
             return Result.ok(None)
 

@@ -205,11 +205,13 @@ class LumieraAgent:
         with execution_context_scope() as ctx:
             try:
                 # Add user context to the message
+                # NOTE: Language code is intentionally NOT included here to ensure
+                # agent always responds in French (internal processing language).
+                # Translation to user language happens in the pipeline after agent response.
                 context_prefix = "[Contexte utilisateur]\n"
                 if user_name:
                     context_prefix += f"Nom: {user_name}\n"
-                if language:
-                    context_prefix += f"Langue: {language}\n"
+                # Language code removed - agent must always respond in French
                 if user_context:
                     context_prefix += f"Contexte additionnel:\n{user_context}\n"
                 context_prefix += "\n"
