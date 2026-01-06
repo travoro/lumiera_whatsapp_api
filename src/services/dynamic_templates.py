@@ -71,7 +71,7 @@ class DynamicTemplateService:
             log.info(f"✅ Created {content_type} template: {content_sid} ({create_time:.0f}ms)")
 
             # Log to database
-            self.log_template_created(content_sid, content_type, friendly_name)
+            self.log_template_created(content_sid, content_type, friendly_name, language)
 
             return content_sid
 
@@ -194,7 +194,7 @@ class DynamicTemplateService:
         """
         try:
             # Get template info from database
-            result = supabase_client.client.table('whatsapp_templates').select('*').eq('content_sid', content_sid).execute()
+            result = supabase_client.client.table('templates').select('*').eq('twilio_content_sid', content_sid).execute()
 
             if result.data:
                 template_data = result.data[0]
@@ -205,7 +205,8 @@ class DynamicTemplateService:
                     'created_at': created_at,
                     'age_seconds': (datetime.now(created_at.tzinfo) - created_at).total_seconds(),
                     'template_type': template_data.get('template_type', 'unknown'),
-                    'friendly_name': template_data.get('friendly_name', 'unknown')
+                    'template_name': template_data.get('template_name', 'unknown'),
+                    'is_active': template_data.get('is_active', False)
                 }
 
             return {'content_sid': content_sid, 'found': False}
@@ -701,24 +702,28 @@ class DynamicTemplateService:
     # DATABASE INTEGRATION METHODS
     # ============================================================================
 
-    def log_template_created(self, content_sid: str, template_type: str, friendly_name: str) -> bool:
+    def log_template_created(self, content_sid: str, template_type: str, friendly_name: str, language: str = "en") -> bool:
         """Log template creation to database.
 
         Args:
             content_sid: Template Content SID
             template_type: Type of template
             friendly_name: Template friendly name
+            language: Language code
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            supabase_client.client.table('whatsapp_templates').insert({
-                'content_sid': content_sid,
+            supabase_client.client.table('templates').insert({
+                'template_name': friendly_name,
+                'language': language,
+                'twilio_content_sid': content_sid,
                 'template_type': template_type,
-                'friendly_name': friendly_name,
+                'description': f'Dynamic {template_type} template',
+                'is_active': True,
                 'created_at': datetime.utcnow().isoformat(),
-                'status': 'active'
+                'updated_at': datetime.utcnow().isoformat()
             }).execute()
 
             return True
@@ -739,15 +744,20 @@ class DynamicTemplateService:
             True if successful, False otherwise
         """
         try:
-            update_data = {
-                'deleted_at': datetime.utcnow().isoformat(),
-                'status': 'deleted' if success else 'deletion_failed'
-            }
-
-            if error:
-                update_data['error_message'] = error
-
-            supabase_client.client.table('whatsapp_templates').update(update_data).eq('content_sid', content_sid).execute()
+            if success:
+                # Mark as inactive instead of deleting
+                supabase_client.client.table('templates').update({
+                    'is_active': False,
+                    'updated_at': datetime.utcnow().isoformat(),
+                    'description': f'Deleted at {datetime.utcnow().isoformat()}'
+                }).eq('twilio_content_sid', content_sid).execute()
+            else:
+                # Log error in description
+                error_msg = f'Deletion failed: {error}' if error else 'Deletion failed'
+                supabase_client.client.table('templates').update({
+                    'description': error_msg,
+                    'updated_at': datetime.utcnow().isoformat()
+                }).eq('twilio_content_sid', content_sid).execute()
 
             return True
 
@@ -762,7 +772,8 @@ class DynamicTemplateService:
             List of templates pending deletion
         """
         try:
-            result = supabase_client.client.table('whatsapp_templates').select('*').eq('status', 'deletion_failed').execute()
+            # Get templates where description contains "Deletion failed"
+            result = supabase_client.client.table('templates').select('*').like('description', '%Deletion failed%').eq('is_active', True).execute()
 
             return result.data if result.data else []
 
@@ -785,7 +796,7 @@ class DynamicTemplateService:
         }
 
         for template in pending:
-            content_sid = template['content_sid']
+            content_sid = template['twilio_content_sid']
             if self.delete_template(content_sid):
                 stats['success'] += 1
             else:
@@ -884,8 +895,8 @@ class DynamicTemplateService:
             twilio_templates = self.client.content.v1.contents.list(limit=1000)
 
             # Get all templates from database
-            db_result = supabase_client.client.table('whatsapp_templates').select('content_sid').execute()
-            db_sids = {t['content_sid'] for t in (db_result.data or [])}
+            db_result = supabase_client.client.table('templates').select('twilio_content_sid').execute()
+            db_sids = {t['twilio_content_sid'] for t in (db_result.data or [])}
 
             # Find orphaned templates (in Twilio but not in DB)
             for template in twilio_templates:
@@ -914,7 +925,7 @@ class DynamicTemplateService:
             Age in seconds, None if not found
         """
         try:
-            result = supabase_client.client.table('whatsapp_templates').select('created_at').eq('content_sid', content_sid).execute()
+            result = supabase_client.client.table('templates').select('created_at').eq('twilio_content_sid', content_sid).execute()
 
             if result.data:
                 created_at = datetime.fromisoformat(result.data[0]['created_at'].replace('Z', '+00:00'))
@@ -945,13 +956,13 @@ class DynamicTemplateService:
         try:
             cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
 
-            result = supabase_client.client.table('whatsapp_templates').select('*').eq('status', 'active').lt('created_at', cutoff_time.isoformat()).execute()
+            result = supabase_client.client.table('templates').select('*').eq('is_active', True).lt('created_at', cutoff_time.isoformat()).execute()
 
             expired_templates = result.data or []
             stats['found'] = len(expired_templates)
 
             for template in expired_templates:
-                content_sid = template['content_sid']
+                content_sid = template['twilio_content_sid']
                 if self.delete_template(content_sid):
                     stats['deleted'] += 1
                 else:
@@ -1066,7 +1077,7 @@ class DynamicTemplateService:
     # ============================================================================
 
     def track_template_send(self, content_sid: str, message_sid: str, to_number: str) -> bool:
-        """Log template usage metrics.
+        """Log template usage metrics (updates template's updated_at).
 
         Args:
             content_sid: Template Content SID
@@ -1077,12 +1088,11 @@ class DynamicTemplateService:
             True if successful, False otherwise
         """
         try:
-            supabase_client.client.table('template_usage').insert({
-                'content_sid': content_sid,
-                'message_sid': message_sid,
-                'to_number': to_number,
-                'sent_at': datetime.utcnow().isoformat()
-            }).execute()
+            # Update template's updated_at to track last usage
+            supabase_client.client.table('templates').update({
+                'updated_at': datetime.utcnow().isoformat(),
+                'description': f'Last sent: {datetime.utcnow().isoformat()} to {to_number}'
+            }).eq('twilio_content_sid', content_sid).execute()
 
             return True
 
@@ -1102,13 +1112,13 @@ class DynamicTemplateService:
         }
 
     def calculate_average_lifecycle(self) -> Optional[float]:
-        """Calculate average time from create to delete.
+        """Calculate average time from create to update (last usage).
 
         Returns:
             Average lifecycle in seconds, None if no data
         """
         try:
-            result = supabase_client.client.table('whatsapp_templates').select('created_at, deleted_at').eq('status', 'deleted').execute()
+            result = supabase_client.client.table('templates').select('created_at, updated_at').eq('is_active', False).execute()
 
             if not result.data:
                 return None
@@ -1117,10 +1127,10 @@ class DynamicTemplateService:
             count = 0
 
             for template in result.data:
-                if template['created_at'] and template['deleted_at']:
+                if template['created_at'] and template['updated_at']:
                     created = datetime.fromisoformat(template['created_at'].replace('Z', '+00:00'))
-                    deleted = datetime.fromisoformat(template['deleted_at'].replace('Z', '+00:00'))
-                    lifecycle = (deleted - created).total_seconds()
+                    updated = datetime.fromisoformat(template['updated_at'].replace('Z', '+00:00'))
+                    lifecycle = (updated - created).total_seconds()
                     total_lifecycle += lifecycle
                     count += 1
 
@@ -1143,7 +1153,7 @@ class DynamicTemplateService:
             Monitoring result dict
         """
         try:
-            result = supabase_client.client.table('whatsapp_templates').select('content_sid').eq('status', 'active').execute()
+            result = supabase_client.client.table('templates').select('twilio_content_sid').eq('is_active', True).execute()
 
             active_count = len(result.data) if result.data else 0
 
