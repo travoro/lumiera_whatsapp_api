@@ -7,6 +7,8 @@ with full emoji support.
 from typing import Optional, List, Dict, Any, Tuple
 import time
 from datetime import datetime, timedelta
+import requests
+from requests.auth import HTTPBasicAuth
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 from src.config import settings
@@ -58,14 +60,28 @@ class DynamicTemplateService:
             friendly_name = f"dynamic_{content_type.split('/')[-1]}_{int(time.time() * 1000)}"
 
             create_start = time.time()
-            content = self.client.content.v1.contents.create(
-                friendly_name=friendly_name,
-                language=language,
-                types={content_type: content_data}
+
+            # Use direct HTTP API (Twilio SDK has issues with Content API in v9.9.0)
+            response = requests.post(
+                "https://content.twilio.com/v1/Content",
+                auth=HTTPBasicAuth(
+                    settings.twilio_account_sid,
+                    settings.twilio_auth_token
+                ),
+                json={
+                    "friendly_name": friendly_name,
+                    "language": language,
+                    "types": {content_type: content_data}
+                },
+                timeout=10
             )
+
             create_time = (time.time() - create_start) * 1000
 
-            content_sid = content.sid
+            if response.status_code != 201:
+                raise Exception(f"Create failed: {response.text}")
+
+            content_sid = response.json()['sid']
             self.stats['created'] += 1
 
             log.info(f"✅ Created {content_type} template: {content_sid} ({create_time:.0f}ms)")
@@ -132,28 +148,30 @@ class DynamicTemplateService:
         """
         try:
             delete_start = time.time()
-            self.client.content.v1.contents(content_sid).delete()
+
+            # Use direct HTTP API for consistency
+            response = requests.delete(
+                f"https://content.twilio.com/v1/Content/{content_sid}",
+                auth=HTTPBasicAuth(
+                    settings.twilio_account_sid,
+                    settings.twilio_auth_token
+                ),
+                timeout=10
+            )
             delete_time = (time.time() - delete_start) * 1000
 
-            self.stats['deleted'] += 1
-            log.info(f"✅ Deleted template: {content_sid} ({delete_time:.0f}ms)")
-
-            # Log to database
-            self.log_template_deleted(content_sid, success=True)
-
-            return True
-
-        except TwilioRestException as e:
-            if e.status == 404:
+            if response.status_code == 204:
+                self.stats['deleted'] += 1
+                log.info(f"✅ Deleted template: {content_sid} ({delete_time:.0f}ms)")
+                self.log_template_deleted(content_sid, success=True)
+                return True
+            elif response.status_code == 404:
                 # Template already deleted
                 log.info(f"ℹ️ Template {content_sid} already deleted")
                 self.log_template_deleted(content_sid, success=True)
                 return True
-
-            log.error(f"❌ Error deleting template {content_sid}: {e}")
-            self.stats['failed_deletions'] += 1
-            self.log_template_deleted(content_sid, success=False, error=str(e))
-            return False
+            else:
+                raise Exception(f"Delete failed: {response.status_code} - {response.text}")
 
         except Exception as e:
             log.error(f"❌ Error deleting template {content_sid}: {e}")
