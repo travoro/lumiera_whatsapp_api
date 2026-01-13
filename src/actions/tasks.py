@@ -2,12 +2,28 @@
 from typing import Dict, Any, Optional, List
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
+from src.services.project_context import project_context_service
 from src.utils.logger import log
 
 
-async def list_tasks(user_id: str, project_id: str, status: Optional[str] = None) -> Dict[str, Any]:
-    """List tasks for a specific project."""
+async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Optional[str] = None) -> Dict[str, Any]:
+    """List tasks for a specific project.
+
+    If project_id is not provided, uses the active project context from the user's profile.
+    If no active project is found, prompts the user to select a project.
+    """
     try:
+        # If no project_id provided, try to get from active project context
+        if not project_id:
+            project_id = await project_context_service.get_active_project(user_id)
+            if not project_id:
+                return {
+                    "success": False,
+                    "message": "Sur quel projet travaillez-vous actuellement ? Veuillez sélectionner un projet.",
+                    "requires_project_selection": True,
+                    "data": []
+                }
+
         # Get project details to retrieve PlanRadar project ID
         project = await supabase_client.get_project(project_id, user_id=user_id)
 
@@ -53,6 +69,14 @@ async def list_tasks(user_id: str, project_id: str, status: Optional[str] = None
                 "progress": attributes.get("progress", 0),
                 "sequential_id": attributes.get("sequential-id"),
             })
+
+        # Update active project context (set or touch activity)
+        project_name = project.get("nom")
+        await project_context_service.set_active_project(
+            user_id=user_id,
+            project_id=project_id,
+            project_name=project_name
+        )
 
         # Log action
         await supabase_client.save_action_log(

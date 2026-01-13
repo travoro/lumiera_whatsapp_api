@@ -156,12 +156,15 @@ async def list_projects_tool(user_id: str) -> str:
 
 
 @tool
-async def list_tasks_tool(user_id: str, project_id: str, status: Optional[str] = None) -> str:
+async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status: Optional[str] = None) -> str:
     """List tasks for a specific project.
+
+    If project_id is not provided, uses the user's active project context (current work project).
+    The active project is automatically remembered when the user selects a project and expires after 7 hours.
 
     Args:
         user_id: The ID of the user requesting tasks
-        project_id: The ID of the project
+        project_id: The ID of the project (optional - uses active project if not provided)
         status: Optional status filter (e.g., 'open', 'in_progress', 'completed')
 
     Returns:
