@@ -57,6 +57,39 @@ class MessageContext:
 class MessagePipeline:
     """Pipeline for processing inbound WhatsApp messages."""
 
+    def _normalize_language_code(self, language: str) -> str:
+        """Normalize language code to ISO 639-1 format.
+
+        Handles both ISO codes (fr, en, es) and full names (french, english, spanish).
+        """
+        if not language:
+            return "fr"
+
+        language = language.lower().strip()
+
+        # Map full language names to ISO codes
+        language_map = {
+            "french": "fr",
+            "english": "en",
+            "spanish": "es",
+            "portuguese": "pt",
+            "romanian": "ro",
+            "arabic": "ar",
+            "german": "de",
+            "italian": "it"
+        }
+
+        # If it's a full name, convert to ISO code
+        if language in language_map:
+            return language_map[language]
+
+        # If it's already an ISO code (2 chars), return as-is
+        if len(language) == 2:
+            return language
+
+        # Default to French
+        return "fr"
+
     async def process(
         self,
         from_number: str,
@@ -160,7 +193,9 @@ class MessagePipeline:
 
             ctx.user_id = user['id']
             ctx.user_name = user.get('contact_prenom') or user.get('contact_name', '')
-            ctx.user_language = user.get('language', 'fr')
+            # Normalize language code (handle both "fr" and "french" formats)
+            raw_language = user.get('language', 'fr')
+            ctx.user_language = self._normalize_language_code(raw_language)
 
             log.info(f"✅ User authenticated: {ctx.user_id} ({ctx.user_name})")
             return Result.ok(None)
