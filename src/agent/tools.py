@@ -8,6 +8,124 @@ from src.services.user_context import user_context_service
 from src.utils.logger import log
 
 
+def _normalize_language_input(language: str) -> str:
+    """Normalize language input to ISO 639-1 code.
+
+    Handles both ISO codes ('fr', 'en') and full language names ('french', 'english').
+    Case-insensitive and strips whitespace.
+
+    Args:
+        language: Language code or full name
+
+    Returns:
+        ISO 639-1 language code (e.g., 'fr', 'en', 'es')
+        Defaults to 'fr' if language is invalid or not recognized
+    """
+    if not language:
+        return "fr"
+
+    language = language.lower().strip()
+
+    # Map full language names to ISO codes
+    language_map = {
+        "french": "fr",
+        "français": "fr",
+        "francais": "fr",
+        "english": "en",
+        "anglais": "en",
+        "spanish": "es",
+        "español": "es",
+        "espanol": "es",
+        "espagnol": "es",
+        "portuguese": "pt",
+        "português": "pt",
+        "portugues": "pt",
+        "portugais": "pt",
+        "romanian": "ro",
+        "română": "ro",
+        "romana": "ro",
+        "roumain": "ro",
+        "arabic": "ar",
+        "arabe": "ar",
+        "german": "de",
+        "deutsch": "de",
+        "allemand": "de",
+        "italian": "it",
+        "italiano": "it",
+        "italien": "it",
+        "czech": "cs",
+        "čeština": "cs",
+        "cestina": "cs",
+        "tchèque": "cs",
+        "slovak": "sk",
+        "slovenčina": "sk",
+        "slovencina": "sk",
+        "slovaque": "sk",
+        "hungarian": "hu",
+        "magyar": "hu",
+        "hongrois": "hu",
+        "bulgarian": "bg",
+        "български": "bg",
+        "bulgare": "bg",
+        "serbian": "sr",
+        "српски": "sr",
+        "serbe": "sr",
+        "croatian": "hr",
+        "hrvatski": "hr",
+        "croate": "hr",
+        "slovenian": "sl",
+        "slovenščina": "sl",
+        "slovène": "sl",
+        "ukrainian": "uk",
+        "українська": "uk",
+        "ukrainien": "uk",
+        "russian": "ru",
+        "русский": "ru",
+        "russe": "ru",
+        "lithuanian": "lt",
+        "lietuvių": "lt",
+        "lituanien": "lt",
+        "latvian": "lv",
+        "latviešu": "lv",
+        "letton": "lv",
+        "estonian": "et",
+        "eesti": "et",
+        "estonien": "et",
+        "albanian": "sq",
+        "shqip": "sq",
+        "albanais": "sq",
+        "macedonian": "mk",
+        "македонски": "mk",
+        "macédonien": "mk",
+        "bosnian": "bs",
+        "bosanski": "bs",
+        "bosnien": "bs",
+        "polish": "pl",
+        "polski": "pl",
+        "polonais": "pl",
+    }
+
+    # Check if it's a full name that needs mapping
+    if language in language_map:
+        normalized = language_map[language]
+        log.info(f"🔄 Normalized language: '{language}' → '{normalized}'")
+        return normalized
+
+    # Check if it's already a valid ISO code (2 letters)
+    if len(language) == 2:
+        # Validate against supported languages
+        supported = ['fr', 'en', 'es', 'pt', 'ro', 'ar', 'de', 'it',
+                     'cs', 'sk', 'hu', 'bg', 'sr', 'hr', 'sl', 'uk',
+                     'ru', 'lt', 'lv', 'et', 'sq', 'mk', 'bs', 'pl']
+        if language in supported:
+            log.info(f"✅ Language already in ISO format: '{language}'")
+            return language
+
+    # Unknown language - default to French
+    log.warning(f"⚠️ Unknown language '{language}', defaulting to 'fr'")
+    return "fr"
+
+
 @tool
 async def list_projects_tool(user_id: str) -> str:
     """List all active construction projects (chantiers) for the user.
@@ -317,18 +435,22 @@ async def set_language_tool(user_id: str, phone_number: str, language: str) -> s
     Args:
         user_id: The ID of the user
         phone_number: The user's WhatsApp phone number
-        language: The new language code (e.g., 'en', 'fr', 'es')
+        language: The new language code (e.g., 'en', 'fr', 'es') or full name (e.g., 'english', 'french')
 
     Returns:
         Success or error message
     """
+    # Normalize language input to ISO 639-1 code
+    # Handles both ISO codes ("fr", "en") and full names ("french", "english")
+    normalized_language = _normalize_language_input(language)
+
     result = await supabase_client.create_or_update_user(
         phone_number=phone_number,
-        language=language,
+        language=normalized_language,
     )
 
     if result:
-        return f"Langue modifiée en: {language}"
+        return f"Langue modifiée en: {normalized_language}"
     return "Erreur lors du changement de langue."
 
 
