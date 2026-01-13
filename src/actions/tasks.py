@@ -31,9 +31,11 @@ async def list_tasks(user_id: str, project_id: str, status: Optional[str] = None
         tasks = await planradar_client.list_tasks(planradar_project_id, status)
 
         if not tasks:
+            project_name = project.get("nom", "ce projet")
             return {
                 "success": True,
-                "message": "Aucune tâche trouvée pour ce projet.",
+                "message": f"Le projet '{project_name}' n'a actuellement aucune tâche active. "
+                          f"Il n'y a pas encore de tâches assignées ou toutes les tâches ont été complétées.",
                 "data": []
             }
 

@@ -173,7 +173,8 @@ async def list_tasks_tool(user_id: str, project_id: str, status: Optional[str] =
         return result["message"]
 
     if not result["data"]:
-        return "Aucune tâche trouvée pour ce projet."
+        # Return detailed message so agent can provide helpful response
+        return result["message"]
 
     # Format tasks for display (NO technical IDs shown to users)
     output = f"{result['message']}\n\n"
