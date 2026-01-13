@@ -36,11 +36,10 @@ async def handle_list_tasks(
         if no_projects_msg:
             return build_no_projects_response(language)
 
-        # Use centralized translations
-        message = get_translation("fr", "list_tasks_header")
-
         # Scenario 2: Has current project in context
         if current_project_id:
+            # Use header for showing tasks
+            message = get_translation("fr", "list_tasks_header")
             # Get selected project or fallback
             project, project_name, project_id = get_selected_project(projects, current_project_id)
 
@@ -70,6 +69,9 @@ async def handle_list_tasks(
 
         # Scenario 3: Has projects but no current project in context
         else:
+            # Use header for asking which project
+            message = get_translation("fr", "list_tasks_select_header")
+
             # Use helper to format project list
             message += format_project_list(projects, language, max_items=5)
 

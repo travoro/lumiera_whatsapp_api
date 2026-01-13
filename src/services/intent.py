@@ -251,11 +251,17 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
                 prompt = f"""Classify this message into ONE intent with confidence:
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (user wants to see their projects/chantiers)
-- list_tasks (user wants to see tasks/tâches)
+- list_tasks (user wants to see tasks/tâches for a project)
 - report_incident (user wants to report a problem/incident)
 - update_progress (user wants to update task progress/progression)
 - escalate (user wants to speak with human/admin/help)
-- general (anything else - questions, clarifications, etc.)
+- general (anything else - questions, clarifications, specific selections from lists, answers to bot questions)
+
+IMPORTANT CONTEXT RULES:
+- If the bot just asked a question and user is answering it → general
+- If user is selecting from a list the bot showed → general
+- If user mentions a project name after bot asked "which project" → general (let agent handle with full context)
+- If bot is in middle of a conversation flow → general (agent needs full context)
 {context_section}
 Current message: {message}
 
