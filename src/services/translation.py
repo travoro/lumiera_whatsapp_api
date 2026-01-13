@@ -75,8 +75,9 @@ French translation:"""
         target_language: str,
     ) -> str:
         """Translate text from French to target language with automatic retries."""
-        # If target is French, return as-is
+        # If target is French, return as-is (skip translation)
         if target_language == "fr":
+            log.debug(f"Skipping translation - target language is already French")
             return text
 
         try:

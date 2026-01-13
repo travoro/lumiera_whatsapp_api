@@ -495,18 +495,24 @@ class MessagePipeline:
                         log.info(f"✅ Response translated from {detected_lang} to {ctx.user_language}")
                     else:
                         # Agent correctly responded in French
+                        if ctx.user_language != "fr":
+                            ctx.response_text = await translation_service.translate_from_french(
+                                ctx.response_text,
+                                ctx.user_language
+                            )
+                            log.info(f"✅ Response translated from French to {ctx.user_language}")
+                        else:
+                            log.debug(f"ℹ️ No translation needed - user language is French")
+                else:
+                    # Short response, assume French and translate
+                    if ctx.user_language != "fr":
                         ctx.response_text = await translation_service.translate_from_french(
                             ctx.response_text,
                             ctx.user_language
                         )
-                        log.info(f"✅ Response translated from French to {ctx.user_language}")
-                else:
-                    # Short response, assume French and translate
-                    ctx.response_text = await translation_service.translate_from_french(
-                        ctx.response_text,
-                        ctx.user_language
-                    )
-                    log.info(f"✅ Response translated to {ctx.user_language}")
+                        log.info(f"✅ Response translated to {ctx.user_language}")
+                    else:
+                        log.debug(f"ℹ️ No translation needed - user language is French")
 
             return Result.ok(None)
 
