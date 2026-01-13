@@ -449,12 +449,33 @@ class MessagePipeline:
 
             # Fallback to full agent
             log.info(f"⚙️ Using full agent (Opus)")
+
+            # Load chat history for agent context
+            chat_history = []
+            try:
+                from langchain_core.messages import HumanMessage, AIMessage
+                messages = await supabase_client.get_messages_by_session(
+                    ctx.session_id,
+                    fields='content,direction,created_at'
+                )
+                # Convert to LangChain message format (last 10 messages for context)
+                for msg in messages[-10:]:
+                    if msg.get('direction') == 'inbound':
+                        chat_history.append(HumanMessage(content=msg.get('content', '')))
+                    elif msg.get('direction') == 'outbound':
+                        chat_history.append(AIMessage(content=msg.get('content', '')))
+                log.info(f"📜 Loaded {len(chat_history)} messages for agent context")
+            except Exception as e:
+                log.warning(f"Could not load chat history for agent: {e}")
+                chat_history = []
+
             agent_result = await lumiera_agent.process_message(
                 user_id=ctx.user_id,
                 phone_number=ctx.from_number,
                 user_name=ctx.user_name,
                 language=ctx.user_language,
-                message_text=ctx.message_in_french
+                message_text=ctx.message_in_french,
+                chat_history=chat_history
             )
 
             ctx.response_text = agent_result.get("message")

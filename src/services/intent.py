@@ -100,10 +100,10 @@ class IntentClassifier:
         if not text:
             return False
         # Match patterns like "1.", "2)", "1 -", "1:", etc.
-        # Look for at least 2 numbered items (supporting 1-10 for dynamic menus)
+        # Look for at least 1 numbered item (supporting 1-10 for dynamic menus)
         pattern = r'(?:^|\n)\s*[1-9][\.\)\:\-]\s+|(?:^|\n)\s*10[\.\)\:\-]\s+'
         matches = re.findall(pattern, text, re.MULTILINE)
-        return len(matches) >= 2
+        return len(matches) >= 1
 
     async def _classify_menu_selection(self, option: int, menu_text: str) -> str:
         """Use Haiku to intelligently classify menu selection based on context.
