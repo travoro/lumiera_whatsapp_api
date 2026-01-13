@@ -14,7 +14,8 @@ class PlanRadarClient:
         self.api_key = settings.planradar_api_key
         self.account_id = settings.planradar_account_id
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "X-PlanRadar-API-Key": self.api_key,
+            "Accept": "application/json",
             "Content-Type": "application/json",
         }
         log.info("PlanRadar client initialized")
@@ -58,13 +59,14 @@ class PlanRadarClient:
         Returns:
             List of tasks/tickets for the project
         """
-        # Construct endpoint with project_id in path: /projects/{project_id}/tickets
-        endpoint = f"projects/{project_id}/tickets"
+        # PlanRadar v2 API requires customer_id in path
+        endpoint = f"{self.account_id}/projects/{project_id}/tickets"
         params = {}
         if status:
             params["status"] = status
 
         result = await self._request("GET", endpoint, params=params)
+        # PlanRadar uses JSON:API format with nested "data" array
         return result.get("data", []) if result else []
 
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -107,13 +109,14 @@ class PlanRadarClient:
         Returns:
             List of documents for the project
         """
-        # Construct endpoint with project_id in path: /projects/{project_id}/documents
-        endpoint = f"projects/{project_id}/documents"
+        # PlanRadar v2 API requires customer_id in path
+        endpoint = f"{self.account_id}/projects/{project_id}/documents"
         params = {}
         if folder_id:
             params["folder_id"] = folder_id
 
         result = await self._request("GET", endpoint, params=params)
+        # PlanRadar uses JSON:API format with nested "data" array
         return result.get("data", []) if result else []
 
     async def add_task_comment(
@@ -153,8 +156,8 @@ class PlanRadarClient:
         Returns:
             The created ticket/incident ID
         """
-        # Construct endpoint with project_id in path: /projects/{project_id}/tickets
-        endpoint = f"projects/{project_id}/tickets"
+        # PlanRadar v2 API requires customer_id in path
+        endpoint = f"{self.account_id}/projects/{project_id}/tickets"
         data = {
             "title": title,
             "description": description,
@@ -165,6 +168,7 @@ class PlanRadarClient:
             data["location"] = location
 
         result = await self._request("POST", endpoint, data=data)
+        # PlanRadar uses JSON:API format with nested "data" object
         if result and result.get("data"):
             return result["data"].get("id")
         return None

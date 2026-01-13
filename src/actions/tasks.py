@@ -38,14 +38,18 @@ async def list_tasks(user_id: str, project_id: str, status: Optional[str] = None
             }
 
         # Format tasks for display
+        # PlanRadar uses JSON:API format with attributes nested
         formatted_tasks = []
         for task in tasks:
+            attributes = task.get("attributes", {})
             formatted_tasks.append({
                 "id": task.get("id"),
-                "title": task.get("title"),
-                "status": task.get("status"),
-                "priority": task.get("priority"),
-                "due_date": task.get("due_date"),
+                "title": attributes.get("subject", "Sans titre"),
+                "status": attributes.get("status-id", "unknown"),
+                "priority": attributes.get("priority", "normal"),
+                "due_date": attributes.get("due-date"),
+                "progress": attributes.get("progress", 0),
+                "sequential_id": attributes.get("sequential-id"),
             })
 
         # Log action
