@@ -29,10 +29,10 @@ async def list_projects_tool(user_id: str) -> str:
     # Format projects for display (NO technical IDs shown to users)
     output = f"{result['message']}\n\n"
     for i, project in enumerate(result["data"], 1):
-        output += f"{i}. 🏗️ **{project['nom']}**\n"
+        output += f"{i}. 🏗️ {project['nom']}\n"
         if project.get('location'):
             output += f"   📍 {project['location']}\n"
-        output += f"   Statut: {project['status']}\n\n"
+        output += "\n"
 
     return output
 

@@ -44,10 +44,10 @@ async def handle_list_projects(
         message = get_plural_translation("fr", "projects_list_header", len(projects))
 
         for i, project in enumerate(projects, 1):
-            message += f"{i}. 🏗️ *{project['nom']}*\n"
+            message += f"{i}. 🏗️ {project['nom']}\n"
             if project.get('location'):
                 message += f"   📍 {project['location']}\n"
-            message += f"   Statut: {project['status']}\n\n"
+            message += "\n"
 
         return {
             "message": message,
