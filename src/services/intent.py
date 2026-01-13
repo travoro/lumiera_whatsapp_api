@@ -205,7 +205,7 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
 
                     return {
                         "intent": intent,
-                        "confidence": 0.90,  # High confidence for Haiku with context
+                        "confidence": 0.95,  # Very high confidence for menu selection with context
                         "requires_tools": intent_metadata.get("requires_tools", True),
                         "tools": intent_metadata.get("tools", []),
                         "requires_confirmation": intent_metadata.get("requires_confirmation", False),
@@ -258,10 +258,11 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
 - general (anything else - questions, clarifications, complex requests)
 
 IMPORTANT CONTEXT RULES:
-- If bot asked "which project/chantier for tasks" and user answers with project name → list_tasks (user still wants tasks)
-- If bot is showing task list and user is selecting a specific task → general (needs full context)
-- If bot asked question about incident/progress and user answering → keep same intent as conversation topic
-- For simple project name after bot asked about tasks → list_tasks (fast path can handle it)
+- If bot asked "which project/chantier for tasks" and user answers with project name → list_tasks:90 (user still wants tasks)
+- If bot is showing task list and user is selecting a specific task → general:85 (needs full context)
+- If bot asked question about incident/progress and user answering → keep same intent as conversation topic with high confidence (85-90)
+- For simple project name after bot asked about tasks → list_tasks:90 (fast path can handle it)
+- When user is clearly answering a bot question, return HIGHER confidence (85-95) to enable fast path
 {context_section}
 Current message: {message}
 
