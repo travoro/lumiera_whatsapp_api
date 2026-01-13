@@ -166,13 +166,20 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
             # Fallback: return general so agent can handle it
             return "general"
 
-    async def classify(self, message: str, user_id: str = None, last_bot_message: str = None) -> Dict[str, Any]:
+    async def classify(
+        self,
+        message: str,
+        user_id: str = None,
+        last_bot_message: str = None,
+        conversation_history: list = None
+    ) -> Dict[str, Any]:
         """Classify intent quickly with Claude Haiku and confidence score.
 
         Args:
             message: User message to classify
             user_id: Optional user ID for logging
             last_bot_message: Optional last message sent by bot (for menu context)
+            conversation_history: Optional list of recent messages (last 3) for context
 
         Returns:
             Dict with intent name, confidence score (0-1), and metadata
@@ -228,6 +235,19 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
 
             # If no strong keyword match, use Claude Haiku for classification
             if confidence < 0.90:
+                # Build conversation context if available
+                context_section = ""
+                if conversation_history and len(conversation_history) > 0:
+                    context_section = "\n\nRecent conversation history:\n"
+                    for msg in conversation_history:
+                        direction = msg.get('direction', '')
+                        content = msg.get('content', '')[:100]  # Limit to 100 chars
+                        if direction == 'inbound':
+                            context_section += f"User: {content}\n"
+                        elif direction == 'outbound':
+                            context_section += f"Bot: {content}\n"
+                    context_section += "\n"
+
                 prompt = f"""Classify this message into ONE intent with confidence:
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (user wants to see their projects/chantiers)
@@ -236,8 +256,8 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
 - update_progress (user wants to update task progress/progression)
 - escalate (user wants to speak with human/admin/help)
 - general (anything else - questions, clarifications, etc.)
-
-Message: {message}
+{context_section}
+Current message: {message}
 
 Return ONLY the intent name and confidence (0-100) in format: intent:confidence
 Example: greeting:95"""

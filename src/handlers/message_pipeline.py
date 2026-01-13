@@ -35,6 +35,7 @@ class MessageContext:
     session_id: Optional[str] = None
     message_in_french: Optional[str] = None
     last_bot_message: Optional[str] = None  # Last message sent by bot (for menu context)
+    recent_messages: list = field(default_factory=list)  # Last 3 messages for intent context
     intent: Optional[str] = None
     confidence: Optional[float] = None
     response_text: Optional[str] = None
@@ -204,36 +205,45 @@ class MessagePipeline:
             return Result.from_exception(e)
 
     async def _manage_session(self, ctx: MessageContext) -> Result[None]:
-        """Stage 2: Get or create conversation session and load last bot message."""
+        """Stage 2: Get or create conversation session and load conversation context."""
         try:
             session = await session_service.get_or_create_session(ctx.user_id)
             if session:
                 ctx.session_id = session['id']
                 log.info(f"✅ Session: {ctx.session_id}")
 
-                # Load last bot message for menu context (used by intent classifier)
+                # Load conversation context for intent classification
                 try:
                     messages = await supabase_client.get_messages_by_session(
                         ctx.session_id,
                         fields='content,direction,created_at'
                     )
-                    # Find the last outbound message (from bot to user)
+
+                    # Sort messages by created_at (oldest to newest)
+                    sorted_messages = sorted(
+                        messages,
+                        key=lambda x: x.get('created_at', '')
+                    )
+
+                    # Get last 3 messages for intent context
+                    if sorted_messages:
+                        ctx.recent_messages = sorted_messages[-3:]
+                        log.info(f"📜 Loaded {len(ctx.recent_messages)} recent messages for intent context")
+
+                    # Find the last outbound message (from bot to user) for menu context
                     outbound_messages = [
-                        msg for msg in messages
+                        msg for msg in sorted_messages
                         if msg.get('direction') == 'outbound'
                     ]
                     if outbound_messages:
-                        # Sort by created_at to get the most recent
-                        outbound_messages.sort(
-                            key=lambda x: x.get('created_at', ''),
-                            reverse=True
-                        )
-                        ctx.last_bot_message = outbound_messages[0].get('content')
-                        log.info(f"📜 Loaded last bot message for menu context: '{ctx.last_bot_message[:50]}...' " if ctx.last_bot_message and len(ctx.last_bot_message) > 50 else f"📜 Loaded last bot message: '{ctx.last_bot_message}'")
+                        ctx.last_bot_message = outbound_messages[-1].get('content')
+                        log.info(f"📜 Last bot message: '{ctx.last_bot_message[:50]}...' " if ctx.last_bot_message and len(ctx.last_bot_message) > 50 else f"📜 Last bot message: '{ctx.last_bot_message}'")
+
                 except Exception as e:
-                    # Don't fail the pipeline if we can't load the last message
-                    log.warning(f"Could not load last bot message: {e}")
+                    # Don't fail the pipeline if we can't load messages
+                    log.warning(f"Could not load conversation context: {e}")
                     ctx.last_bot_message = None
+                    ctx.recent_messages = []
 
                 return Result.ok(None)
             else:
@@ -439,12 +449,13 @@ class MessagePipeline:
             return Result.from_exception(e)
 
     async def _classify_intent(self, ctx: MessageContext) -> Result[None]:
-        """Stage 6: Classify user intent with menu context awareness."""
+        """Stage 6: Classify user intent with conversation context."""
         try:
             intent_result = await intent_classifier.classify(
                 ctx.message_in_french,
                 ctx.user_id,
-                last_bot_message=ctx.last_bot_message  # Pass for menu context
+                last_bot_message=ctx.last_bot_message,  # Pass for menu context
+                conversation_history=ctx.recent_messages  # Pass last 3 messages for better context
             )
             ctx.intent = intent_result['intent']
             ctx.confidence = intent_result.get('confidence', 0.0)
