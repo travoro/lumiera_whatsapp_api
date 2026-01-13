@@ -483,7 +483,8 @@ class MessagePipeline:
                     user_id=ctx.user_id,
                     phone_number=ctx.from_number,
                     user_name=ctx.user_name,
-                    language=ctx.user_language
+                    language=ctx.user_language,
+                    message_text=ctx.message_in_french  # Pass message for project name extraction
                 )
 
                 if result:

@@ -19,9 +19,13 @@ async def handle_list_tasks(
     phone_number: str,
     user_name: str,
     language: str,
+    message_text: str = "",
     **kwargs
 ) -> Dict[str, Any]:
     """Handle list tasks intent with context-aware project selection.
+
+    Args:
+        message_text: User's message text for extracting project name if mentioned
 
     Returns:
         Dict with message, escalation, tools_called
@@ -36,12 +40,27 @@ async def handle_list_tasks(
         if no_projects_msg:
             return build_no_projects_response(language)
 
-        # Scenario 2: Has current project in context
-        if current_project_id:
+        # Scenario 2: Extract project name from message if mentioned
+        # User might say "taches pour Champigny" or just "champigny"
+        mentioned_project_id = None
+        if message_text and not current_project_id:
+            message_lower = message_text.lower()
+            for project in projects:
+                project_name = project.get('nom', '').lower()
+                if project_name and project_name in message_lower:
+                    mentioned_project_id = project.get('id')
+                    log.info(f"📍 Extracted project from message: {project.get('nom')}")
+                    break
+
+        # Use mentioned project if found, otherwise use active context
+        selected_project_id = mentioned_project_id or current_project_id
+
+        # Scenario 3: Has selected project (from message or context)
+        if selected_project_id:
             # Use header for showing tasks
             message = get_translation("fr", "list_tasks_header")
             # Get selected project or fallback
-            project, project_name, project_id = get_selected_project(projects, current_project_id)
+            project, project_name, project_id = get_selected_project(projects, selected_project_id)
 
             message += get_translation("fr", "list_tasks_project_context").format(project_name=project_name)
 
@@ -67,7 +86,7 @@ async def handle_list_tasks(
 
             message += get_translation("fr", "list_tasks_footer")
 
-        # Scenario 3: Has projects but no current project in context
+        # Scenario 4: Has projects but no selection (ask which project)
         else:
             # Use header for asking which project
             message = get_translation("fr", "list_tasks_select_header")
@@ -96,9 +115,13 @@ async def handle_update_progress(
     phone_number: str,
     user_name: str,
     language: str,
+    message_text: str = "",
     **kwargs
 ) -> Dict[str, Any]:
     """Handle update progress intent with context-aware project and task selection.
+
+    Args:
+        message_text: User's message text for extracting project name if mentioned
 
     Returns:
         Dict with message, escalation, tools_called
@@ -113,13 +136,27 @@ async def handle_update_progress(
         if no_projects_msg:
             return build_no_projects_response(language)
 
+        # Scenario 2: Extract project name from message if mentioned
+        mentioned_project_id = None
+        if message_text and not current_project_id:
+            message_lower = message_text.lower()
+            for project in projects:
+                project_name = project.get('nom', '').lower()
+                if project_name and project_name in message_lower:
+                    mentioned_project_id = project.get('id')
+                    log.info(f"📍 Extracted project from message: {project.get('nom')}")
+                    break
+
+        # Use mentioned project if found, otherwise use active context
+        selected_project_id = mentioned_project_id or current_project_id
+
         # Use centralized translations
         message = get_translation("fr", "update_progress_header")
 
-        # Scenario 2: Has current project in context
-        if current_project_id:
+        # Scenario 3: Has selected project (from message or context)
+        if selected_project_id:
             # Get selected project or fallback
-            project, project_name, project_id = get_selected_project(projects, current_project_id)
+            project, project_name, project_id = get_selected_project(projects, selected_project_id)
 
             message += get_translation("fr", "update_progress_project_context").format(project_name=project_name)
 
@@ -137,7 +174,7 @@ async def handle_update_progress(
 
             message += get_translation("fr", "update_progress_footer")
 
-        # Scenario 3: Has projects but no current project in context
+        # Scenario 4: Has projects but no selection (ask which project)
         else:
             # Use helper to format project list
             message += format_project_list(projects, language, max_items=5)
