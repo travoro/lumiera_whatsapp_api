@@ -12,7 +12,10 @@ TRANSLATIONS = {
         "greeting": "Bonjour {name}, comment puis-je vous aider aujourd'hui ?",
         "button": "Options",
         "no_projects": "Vous n'avez pas encore de chantiers actifs.",
-        "projects_list_header": "Vous avez {count} chantier(s) actif(s) :\n\n",
+        "projects_list_header_singular": "Vous avez 1 chantier actif :\n\n",
+        "projects_list_header_plural": "Vous avez {count} chantiers actifs :\n\n",
+        "projects_found_singular": "1 projet actif trouvé.",
+        "projects_found_plural": "{count} projets actifs trouvés.",
         "escalation_success": "✅ Votre demande a été transmise à l'équipe administrative. Un membre de l'équipe vous contactera sous peu.",
         "report_incident": "Je vais vous aider à signaler un incident. 🚨\n\nPour créer un rapport d'incident, j'ai besoin de :\n1. 📸 Au moins une photo du problème\n2. 📝 Une description écrite ou audio de ce qui s'est passé\n3. 🏗️ Le chantier concerné, si ce n'est pas le chantier {chantier_nom}\n\nVous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas.",
         "menu_items": [
@@ -47,7 +50,10 @@ TRANSLATIONS = {
         "greeting": "Hello {name}, how can I help you today?",
         "button": "Options",
         "no_projects": "You don't have any active projects yet.",
-        "projects_list_header": "You have {count} active project(s):\n\n",
+        "projects_list_header_singular": "You have 1 active project:\n\n",
+        "projects_list_header_plural": "You have {count} active projects:\n\n",
+        "projects_found_singular": "1 active project found.",
+        "projects_found_plural": "{count} active projects found.",
         "escalation_success": "✅ Your request has been forwarded to the admin team. A team member will contact you shortly.",
         "report_incident": "I'll help you report an incident. 🚨\n\nTo create an incident report, I need:\n1. 📸 At least one photo of the problem\n2. 📝 A written or audio description of what happened\n3. 🏗️ The concerned site, if it's not the site {chantier_nom}\n\nYou can send me the elements one by one, I'll guide you step by step.",
         "menu_items": [
@@ -82,7 +88,10 @@ TRANSLATIONS = {
         "greeting": "Hola {name}, ¿cómo puedo ayudarte hoy?",
         "button": "Opciones",
         "no_projects": "Aún no tienes proyectos activos.",
-        "projects_list_header": "Tienes {count} proyecto(s) activo(s):\n\n",
+        "projects_list_header_singular": "Tienes 1 proyecto activo:\n\n",
+        "projects_list_header_plural": "Tienes {count} proyectos activos:\n\n",
+        "projects_found_singular": "1 proyecto activo encontrado.",
+        "projects_found_plural": "{count} proyectos activos encontrados.",
         "escalation_success": "✅ Tu solicitud ha sido enviada al equipo administrativo. Un miembro del equipo te contactará pronto.",
         "report_incident": "Te ayudaré a reportar un incidente. 🚨\n\nPara crear un reporte de incidente, necesito:\n1. 📸 Al menos una foto del problema\n2. 📝 Una descripción escrita o de audio de lo que pasó\n3. 🏗️ La obra concernida, si no es la obra {chantier_nom}\n\nPuedes enviarme los elementos uno por uno, te guiaré paso a paso.",
         "menu_items": [
@@ -117,7 +126,10 @@ TRANSLATIONS = {
         "greeting": "Olá {name}, como posso ajudá-lo hoje?",
         "button": "Opções",
         "no_projects": "Você ainda não tem projetos ativos.",
-        "projects_list_header": "Você tem {count} projeto(s) ativo(s):\n\n",
+        "projects_list_header_singular": "Você tem 1 projeto ativo:\n\n",
+        "projects_list_header_plural": "Você tem {count} projetos ativos:\n\n",
+        "projects_found_singular": "1 projeto ativo encontrado.",
+        "projects_found_plural": "{count} projetos ativos encontrados.",
         "escalation_success": "✅ Sua solicitação foi encaminhada para a equipe administrativa. Um membro da equipe entrará em contato em breve.",
         "report_incident": "Vou ajudá-lo a relatar um incidente. 🚨\n\nPara criar um relatório de incidente, preciso de:\n1. 📸 Pelo menos uma foto do problema\n2. 📝 Uma descrição escrita ou em áudio do que aconteceu\n3. 🏗️ A obra em questão, se não for a obra {chantier_nom}\n\nVocê pode me enviar os elementos um por um, vou guiá-lo passo a passo.",
         "menu_items": [
@@ -152,7 +164,10 @@ TRANSLATIONS = {
         "greeting": "Hallo {name}, wie kann ich Ihnen heute helfen?",
         "button": "Optionen",
         "no_projects": "Sie haben noch keine aktiven Projekte.",
-        "projects_list_header": "Sie haben {count} aktive(s) Projekt(e):\n\n",
+        "projects_list_header_singular": "Sie haben 1 aktives Projekt:\n\n",
+        "projects_list_header_plural": "Sie haben {count} aktive Projekte:\n\n",
+        "projects_found_singular": "1 aktives Projekt gefunden.",
+        "projects_found_plural": "{count} aktive Projekte gefunden.",
         "escalation_success": "✅ Ihre Anfrage wurde an das Admin-Team weitergeleitet. Ein Teammitglied wird sich in Kürze bei Ihnen melden.",
         "report_incident": "Ich helfe Ihnen, einen Vorfall zu melden. 🚨\n\nUm einen Vorfallbericht zu erstellen, benötige ich:\n1. 📸 Mindestens ein Foto des Problems\n2. 📝 Eine schriftliche oder Audio-Beschreibung dessen, was passiert ist\n3. 🏗️ Die betroffene Baustelle, falls es sich nicht um die Baustelle {chantier_nom} handelt\n\nSie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt.",
         "menu_items": [
@@ -187,7 +202,10 @@ TRANSLATIONS = {
         "greeting": "Ciao {name}, come posso aiutarti oggi?",
         "button": "Opzioni",
         "no_projects": "Non hai ancora progetti attivi.",
-        "projects_list_header": "Hai {count} progetto/i attivo/i:\n\n",
+        "projects_list_header_singular": "Hai 1 progetto attivo:\n\n",
+        "projects_list_header_plural": "Hai {count} progetti attivi:\n\n",
+        "projects_found_singular": "1 progetto attivo trovato.",
+        "projects_found_plural": "{count} progetti attivi trovati.",
         "escalation_success": "✅ La tua richiesta è stata inoltrata al team amministrativo. Un membro del team ti contatterà a breve.",
         "report_incident": "Ti aiuterò a segnalare un incidente. 🚨\n\nPer creare un rapporto di incidente, ho bisogno di:\n1. 📸 Almeno una foto del problema\n2. 📝 Una descrizione scritta o audio di cosa è successo\n3. 🏗️ Il cantiere interessato, se non è il cantiere {chantier_nom}\n\nPuoi inviarmi gli elementi uno per uno, ti guiderò passo dopo passo.",
         "menu_items": [
@@ -222,7 +240,10 @@ TRANSLATIONS = {
         "greeting": "Bună {name}, cum te pot ajuta astăzi ?",
         "button": "Opțiuni",
         "no_projects": "Nu ai încă șantiere active.",
-        "projects_list_header": "Ai {count} șantier(e) activ(e):\n\n",
+        "projects_list_header_singular": "Ai 1 șantier activ:\n\n",
+        "projects_list_header_plural": "Ai {count} șantiere active:\n\n",
+        "projects_found_singular": "1 șantier activ găsit.",
+        "projects_found_plural": "{count} șantiere active găsite.",
         "escalation_success": "✅ Cererea ta a fost trimisă echipei administrative. Un membru al echipei te va contacta în curând.",
         "report_incident": "Te voi ajuta să raportezi un incident. 🚨\n\nPentru a crea un raport de incident, am nevoie de:\n1. 📸 Cel puțin o fotografie a problemei\n2. 📝 O descriere scrisă sau audio a ceea ce s-a întâmplat\n3. 🏗️ Șantierul în cauză, dacă nu este șantierul {chantier_nom}\n\nPoți să-mi trimiți elementele unul câte unul, te voi ghida pas cu pas.",
         "menu_items": [
@@ -257,7 +278,10 @@ TRANSLATIONS = {
         "greeting": "Cześć {name}, jak mogę Ci pomóc dzisiaj?",
         "button": "Opcje",
         "no_projects": "Nie masz jeszcze aktywnych projektów.",
-        "projects_list_header": "Masz {count} aktywny(ch) projekt(ów):\n\n",
+        "projects_list_header_singular": "Masz 1 aktywny projekt:\n\n",
+        "projects_list_header_plural": "Masz {count} aktywnych projektów:\n\n",
+        "projects_found_singular": "1 aktywny projekt znaleziony.",
+        "projects_found_plural": "{count} aktywnych projektów znalezionych.",
         "escalation_success": "✅ Twoje zgłoszenie zostało przekazane do zespołu administracyjnego. Członek zespołu skontaktuje się z Tobą wkrótce.",
         "report_incident": "Pomogę Ci zgłosić incydent. 🚨\n\nAby utworzyć raport o incydencie, potrzebuję:\n1. 📸 Co najmniej jednego zdjęcia problemu\n2. 📝 Pisemnego lub audio opisu tego, co się stało\n3. 🏗️ Placu budowy, którego to dotyczy, jeśli nie jest to plac budowy {chantier_nom}\n\nMożesz przesyłać mi elementy jeden po drugim, poprowadzę Cię krok po kroku.",
         "menu_items": [
@@ -292,7 +316,10 @@ TRANSLATIONS = {
         "greeting": "مرحبا {name}، كيف يمكنني مساعدتك اليوم؟",
         "button": "خيارات",
         "no_projects": "ليس لديك مشاريع نشطة بعد.",
-        "projects_list_header": "لديك {count} مشروع (مشاريع) نشط:\n\n",
+        "projects_list_header_singular": "لديك مشروع نشط واحد:\n\n",
+        "projects_list_header_plural": "لديك {count} مشاريع نشطة:\n\n",
+        "projects_found_singular": "تم العثور على مشروع نشط واحد.",
+        "projects_found_plural": "تم العثور على {count} مشاريع نشطة.",
         "escalation_success": "✅ تم إرسال طلبك إلى الفريق الإداري. سيتصل بك أحد أعضاء الفريق قريبًا.",
         "report_incident": "سأساعدك في الإبلاغ عن حادث. 🚨\n\nلإنشاء تقرير حادث، أحتاج إلى:\n1. 📸 صورة واحدة على الأقل للمشكلة\n2. 📝 وصف كتابي أو صوتي لما حدث\n3. 🏗️ موقع البناء المعني، إذا لم يكن موقع البناء {chantier_nom}\n\nيمكنك إرسال العناصر واحدة تلو الأخرى، سأرشدك خطوة بخطوة.",
         "menu_items": [
@@ -345,6 +372,35 @@ def get_translation(language: str, key: str, default_language: str = "en") -> An
     else:
         log.error(f"Translation not found for {language}.{key} and fallback {default_language}")
         return None
+
+
+def get_plural_translation(language: str, base_key: str, count: int, default_language: str = "en") -> str:
+    """Get singular or plural translation based on count.
+
+    Args:
+        language: Target language code
+        base_key: Base translation key (e.g., "projects_list_header")
+        count: Number to determine singular/plural
+        default_language: Fallback language if target not found
+
+    Returns:
+        Translated string with count formatted in
+    """
+    # Determine singular or plural key
+    key = f"{base_key}_singular" if count == 1 else f"{base_key}_plural"
+
+    # Get translation
+    translation = get_translation(language, key, default_language)
+
+    if translation:
+        # Format with count for plural, singular already has "1" hardcoded
+        if count == 1:
+            return translation
+        else:
+            return translation.format(count=count)
+    else:
+        # Fallback if translation not found
+        return f"{count} items"
 
 
 def safe_truncate(text: str, max_length: int) -> str:

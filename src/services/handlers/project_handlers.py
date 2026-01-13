@@ -9,7 +9,7 @@ happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 from typing import Dict, Any
 from src.integrations.supabase import supabase_client
 from src.actions import documents as document_actions
-from src.utils.whatsapp_formatter import get_translation
+from src.utils.whatsapp_formatter import get_translation, get_plural_translation
 from src.utils.handler_helpers import get_projects_with_context, format_project_list
 from src.utils.logger import log
 
@@ -41,11 +41,10 @@ async def handle_list_projects(
             }
 
         # Format projects list with translation (ALWAYS French)
-        header_template = get_translation("fr", "projects_list_header")
-        message = header_template.format(count=len(projects)) if header_template else f"You have {len(projects)} projects:\n\n"
+        message = get_plural_translation("fr", "projects_list_header", len(projects))
 
         for i, project in enumerate(projects, 1):
-            message += f"{i}. 🏗️ *{project['name']}*\n"
+            message += f"{i}. 🏗️ *{project['nom']}*\n"
             if project.get('location'):
                 message += f"   📍 {project['location']}\n"
             message += f"   Statut: {project['status']}\n\n"
@@ -97,7 +96,7 @@ async def handle_list_documents(
         if current_project_id:
             # Find the current project
             current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
-            project_name = current_project['name'] if current_project else projects[0]['name']
+            project_name = current_project['nom'] if current_project else projects[0]['nom']
             project_id = current_project['id'] if current_project else projects[0]['id']
 
             message += get_translation("fr", "list_documents_project_context").format(project_name=project_name)
@@ -181,7 +180,7 @@ async def handle_report_incident(
         if current_project_id:
             # Find the current project name
             current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
-            project_name = current_project['name'] if current_project else projects[0]['name']
+            project_name = current_project['nom'] if current_project else projects[0]['nom']
 
             # Format with current project name
             message = template.replace("{chantier_nom}", project_name)

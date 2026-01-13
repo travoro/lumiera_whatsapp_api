@@ -69,7 +69,7 @@ def format_project_list(
     happens in the pipeline.
 
     Args:
-        projects: List of project dicts with 'name' field
+        projects: List of project dicts with 'nom' field
         language: User's language code (kept for compatibility, always uses "fr")
         max_items: Maximum number of projects to show
         header_key: Translation key for header (e.g. "project_list")
@@ -80,8 +80,8 @@ def format_project_list(
     # Get header from centralized translations (ALWAYS French)
     header = get_translation("fr", "available_projects_header")
     message = header
-    
+
     for i, project in enumerate(projects[:max_items], 1):
-        message += f"{i}. {project['name']}\n"
-        
+        message += f"{i}. {project['nom']}\n"
+
     return message

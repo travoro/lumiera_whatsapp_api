@@ -1,6 +1,7 @@
 """Project (Chantier) action handlers."""
 from typing import Dict, Any, List
 from src.integrations.supabase import supabase_client
+from src.utils.whatsapp_formatter import get_plural_translation
 from src.utils.logger import log
 
 
@@ -21,7 +22,7 @@ async def list_projects(user_id: str) -> Dict[str, Any]:
         for project in projects:
             formatted_projects.append({
                 "id": project.get("id"),
-                "name": project.get("name"),
+                "nom": project.get("nom"),
                 "location": project.get("location"),
                 "status": project.get("status"),
             })
@@ -36,7 +37,7 @@ async def list_projects(user_id: str) -> Dict[str, Any]:
 
         return {
             "success": True,
-            "message": f"{len(formatted_projects)} projet(s) actif(s) trouvé(s).",
+            "message": get_plural_translation("fr", "projects_found", len(formatted_projects)),
             "data": formatted_projects
         }
 
@@ -66,7 +67,7 @@ async def get_project_details(user_id: str, project_id: str) -> Dict[str, Any]:
             user_id=user_id,
             action_name="get_project_details",
             parameters={"project_id": project_id},
-            result={"project": project.get("name")}
+            result={"project": project.get("nom")}
         )
 
         return {

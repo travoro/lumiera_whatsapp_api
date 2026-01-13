@@ -94,4 +94,4 @@ def get_selected_project(
 
     # Use current project or fallback to first
     project = current_project if current_project else projects[0]
-    return project, project['name'], project['id']
+    return project, project['nom'], project['id']
