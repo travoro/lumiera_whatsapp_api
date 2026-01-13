@@ -32,6 +32,8 @@ venv.bak/
 .env
 .env.local
 .env.*.local
+.env.save
+.env.template
 
 # IDEs
 .vscode/
