@@ -25,6 +25,7 @@ async def list_projects(user_id: str) -> Dict[str, Any]:
                 "nom": project.get("nom"),
                 "location": project.get("location"),
                 "status": project.get("status"),
+                "planradar_project_id": project.get("planradar_project_id"),
             })
 
         # Log action

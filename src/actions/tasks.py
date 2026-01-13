@@ -8,7 +8,27 @@ from src.utils.logger import log
 async def list_tasks(user_id: str, project_id: str, status: Optional[str] = None) -> Dict[str, Any]:
     """List tasks for a specific project."""
     try:
-        tasks = await planradar_client.list_tasks(project_id, status)
+        # Get project details to retrieve PlanRadar project ID
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+
+        if not project:
+            return {
+                "success": False,
+                "message": "Projet non trouvé.",
+                "data": []
+            }
+
+        planradar_project_id = project.get("planradar_project_id")
+
+        if not planradar_project_id:
+            return {
+                "success": False,
+                "message": "Ce projet n'est pas lié à PlanRadar.",
+                "data": []
+            }
+
+        # Fetch tasks from PlanRadar using the PlanRadar project ID
+        tasks = await planradar_client.list_tasks(planradar_project_id, status)
 
         if not tasks:
             return {

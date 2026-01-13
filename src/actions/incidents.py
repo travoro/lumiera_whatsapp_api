@@ -41,9 +41,26 @@ async def submit_incident_report(
                 "message": "Une description est requise pour signaler un incident."
             }
 
-        # Submit incident to PlanRadar
+        # Get project details to retrieve PlanRadar project ID
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+
+        if not project:
+            return {
+                "success": False,
+                "message": "Projet non trouvé."
+            }
+
+        planradar_project_id = project.get("planradar_project_id")
+
+        if not planradar_project_id:
+            return {
+                "success": False,
+                "message": "Ce projet n'est pas lié à PlanRadar."
+            }
+
+        # Submit incident to PlanRadar using PlanRadar project ID
         incident_id = await planradar_client.submit_incident_report(
-            project_id=project_id,
+            project_id=planradar_project_id,
             title=title,
             description=description,
             image_urls=image_urls,

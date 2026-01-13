@@ -49,12 +49,22 @@ class PlanRadarClient:
         project_id: str,
         status: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """List tasks for a specific project."""
-        params = {"project_id": project_id}
+        """List tasks (tickets) for a specific PlanRadar project.
+
+        Args:
+            project_id: The PlanRadar project ID (not the internal DB ID)
+            status: Optional status filter
+
+        Returns:
+            List of tasks/tickets for the project
+        """
+        # Construct endpoint with project_id in path: /projects/{project_id}/tickets
+        endpoint = f"projects/{project_id}/tickets"
+        params = {}
         if status:
             params["status"] = status
 
-        result = await self._request("GET", "tickets", params=params)
+        result = await self._request("GET", endpoint, params=params)
         return result.get("data", []) if result else []
 
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -88,12 +98,22 @@ class PlanRadarClient:
         project_id: str,
         folder_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Get documents for a project."""
-        params = {"project_id": project_id}
+        """Get documents for a PlanRadar project.
+
+        Args:
+            project_id: The PlanRadar project ID
+            folder_id: Optional folder ID filter
+
+        Returns:
+            List of documents for the project
+        """
+        # Construct endpoint with project_id in path: /projects/{project_id}/documents
+        endpoint = f"projects/{project_id}/documents"
+        params = {}
         if folder_id:
             params["folder_id"] = folder_id
 
-        result = await self._request("GET", "documents", params=params)
+        result = await self._request("GET", endpoint, params=params)
         return result.get("data", []) if result else []
 
     async def add_task_comment(
@@ -121,9 +141,21 @@ class PlanRadarClient:
         image_urls: List[str],
         location: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
-        """Submit a new incident report."""
+        """Submit a new incident report (ticket) for a project.
+
+        Args:
+            project_id: The PlanRadar project ID
+            title: Incident title
+            description: Incident description
+            image_urls: List of image URLs
+            location: Optional location data
+
+        Returns:
+            The created ticket/incident ID
+        """
+        # Construct endpoint with project_id in path: /projects/{project_id}/tickets
+        endpoint = f"projects/{project_id}/tickets"
         data = {
-            "project_id": project_id,
             "title": title,
             "description": description,
             "type": "incident",
@@ -132,7 +164,7 @@ class PlanRadarClient:
         if location:
             data["location"] = location
 
-        result = await self._request("POST", "tickets", data=data)
+        result = await self._request("POST", endpoint, data=data)
         if result and result.get("data"):
             return result["data"].get("id")
         return None

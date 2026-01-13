@@ -21,8 +21,28 @@ async def get_documents(
         Result dictionary with success status and documents list
     """
     try:
+        # Get project details to retrieve PlanRadar project ID
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+
+        if not project:
+            return {
+                "success": False,
+                "message": "Projet non trouvé.",
+                "data": []
+            }
+
+        planradar_project_id = project.get("planradar_project_id")
+
+        if not planradar_project_id:
+            return {
+                "success": False,
+                "message": "Ce projet n'est pas lié à PlanRadar.",
+                "data": []
+            }
+
+        # Fetch documents from PlanRadar using PlanRadar project ID
         documents = await planradar_client.get_documents(
-            project_id=project_id,
+            project_id=planradar_project_id,
             folder_id=folder_id,
         )
 
