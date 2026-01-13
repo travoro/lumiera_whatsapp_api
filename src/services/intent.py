@@ -255,13 +255,13 @@ IMPORTANT: If the user is selecting a specific item from a list (like "Project #
 - report_incident (user wants to report a problem/incident)
 - update_progress (user wants to update task progress/progression)
 - escalate (user wants to speak with human/admin/help)
-- general (anything else - questions, clarifications, specific selections from lists, answers to bot questions)
+- general (anything else - questions, clarifications, complex requests)
 
 IMPORTANT CONTEXT RULES:
-- If the bot just asked a question and user is answering it → general
-- If user is selecting from a list the bot showed → general
-- If user mentions a project name after bot asked "which project" → general (let agent handle with full context)
-- If bot is in middle of a conversation flow → general (agent needs full context)
+- If bot asked "which project/chantier for tasks" and user answers with project name → list_tasks (user still wants tasks)
+- If bot is showing task list and user is selecting a specific task → general (needs full context)
+- If bot asked question about incident/progress and user answering → keep same intent as conversation topic
+- For simple project name after bot asked about tasks → list_tasks (fast path can handle it)
 {context_section}
 Current message: {message}
 
