@@ -41,6 +41,15 @@ class PlanRadarClient:
                 )
                 response.raise_for_status()
                 return response.json()
+        except httpx.HTTPStatusError as e:
+            # Differentiate between rate limit and other errors
+            if e.response.status_code == 429:
+                log.warning(f"PlanRadar API rate limit (429): {e}")
+                # Return special error structure for rate limits
+                return {"_rate_limited": True, "error": "Rate limit exceeded"}
+            else:
+                log.error(f"PlanRadar API HTTP error: {e}")
+                return None
         except httpx.HTTPError as e:
             log.error(f"PlanRadar API error: {e}")
             return None
@@ -66,6 +75,9 @@ class PlanRadarClient:
             params["status"] = status
 
         result = await self._request("GET", endpoint, params=params)
+        # Check for rate limit error
+        if result and result.get("_rate_limited"):
+            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
         # PlanRadar uses JSON:API format with nested "data" array
         return result.get("data", []) if result else []
 
@@ -116,6 +128,9 @@ class PlanRadarClient:
             params["folder_id"] = folder_id
 
         result = await self._request("GET", endpoint, params=params)
+        # Check for rate limit error
+        if result and result.get("_rate_limited"):
+            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
         # PlanRadar uses JSON:API format with nested "data" array
         return result.get("data", []) if result else []
 

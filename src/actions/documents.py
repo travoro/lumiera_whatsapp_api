@@ -41,10 +41,22 @@ async def get_documents(
             }
 
         # Fetch documents from PlanRadar using PlanRadar project ID
-        documents = await planradar_client.get_documents(
-            project_id=planradar_project_id,
-            folder_id=folder_id,
-        )
+        try:
+            documents = await planradar_client.get_documents(
+                project_id=planradar_project_id,
+                folder_id=folder_id,
+            )
+        except Exception as api_error:
+            # Handle rate limit errors specifically
+            if "rate limit" in str(api_error).lower():
+                return {
+                    "success": False,
+                    "message": "⏱️ L'API PlanRadar est temporairement surchargée. Veuillez réessayer dans quelques instants.",
+                    "data": [],
+                    "rate_limited": True
+                }
+            else:
+                raise  # Re-raise other exceptions
 
         if not documents:
             return {

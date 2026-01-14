@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from src.config import settings
 from src.utils.logger import log
 
@@ -12,19 +13,28 @@ class ConversationMemoryService:
 
     def __init__(self):
         """Initialize the conversation memory service."""
-        self.llm = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",  # Use Haiku for fast summarization
-            api_key=settings.anthropic_api_key,
-            temperature=0.3,
-            max_tokens=500,
-        )
+        if settings.llm_provider == "openai":
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",  # Fast and cheap for summarization
+                api_key=settings.openai_api_key,
+                temperature=0.3,
+                max_tokens=500,
+            )
+            log.info("Conversation memory service initialized with OpenAI")
+        else:
+            self.llm = ChatAnthropic(
+                model="claude-3-5-haiku-20241022",  # Use Haiku for fast summarization
+                api_key=settings.anthropic_api_key,
+                temperature=0.3,
+                max_tokens=500,
+            )
+            log.info("Conversation memory service initialized with Claude")
+
         self.max_messages_before_summary = 20
 
         # Summary caching: {user_id: {summary: str, timestamp: datetime, message_count: int}}
         self._summary_cache = {}
         self._cache_duration = timedelta(minutes=5)
-
-        log.info("Conversation memory service initialized")
 
     async def summarize_conversation(
         self,

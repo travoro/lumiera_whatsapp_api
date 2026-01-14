@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 import re
 import json
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from src.config import settings
 from src.utils.logger import log
 
@@ -77,17 +78,28 @@ INTENTS = {
 
 
 class IntentClassifier:
-    """Fast intent classification using Claude Haiku for hybrid approach."""
+    """Fast intent classification using LLM for hybrid approach."""
 
     def __init__(self):
-        """Initialize intent classifier with Claude Haiku for speed."""
-        self.haiku = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",
-            api_key=settings.anthropic_api_key,
-            temperature=0.1,
-            max_tokens=100  # Increased for menu context understanding
-        )
-        log.info("Intent classifier initialized with Claude Haiku")
+        """Initialize intent classifier with selected LLM provider."""
+        if settings.llm_provider == "openai":
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",  # Fast and cheap for classification
+                api_key=settings.openai_api_key,
+                temperature=0.1,
+                max_tokens=100
+            )
+            log.info("Intent classifier initialized with OpenAI (gpt-4o-mini)")
+        else:
+            self.llm = ChatAnthropic(
+                model="claude-3-5-haiku-20241022",
+                api_key=settings.anthropic_api_key,
+                temperature=0.1,
+                max_tokens=100
+            )
+            log.info("Intent classifier initialized with Claude Haiku")
+        # Keep backward compatibility
+        self.haiku = self.llm
 
     def _contains_numbered_list(self, text: str) -> bool:
         """Check if text contains a numbered list (1. 2. 3. etc).

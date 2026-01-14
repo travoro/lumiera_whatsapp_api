@@ -25,9 +25,17 @@ class Settings(BaseSettings):
     twilio_whatsapp_number: str
     twilio_webhook_url: str = ""
 
-    # Anthropic Claude
+    # LLM Provider Selection
+    llm_provider: str = "openai"  # Options: openai, anthropic
+
+    # OpenAI GPT
+    openai_model: str = "gpt-4o"
+    openai_max_tokens: int = 4096
+    openai_temperature: float = 0.7
+
+    # Anthropic Claude (Backup)
     anthropic_api_key: str
-    anthropic_model: str = "claude-opus-4-5-20251101"
+    anthropic_model: str = "claude-3-opus-20240229"
     anthropic_max_tokens: int = 4096
     anthropic_temperature: float = 0.7
 

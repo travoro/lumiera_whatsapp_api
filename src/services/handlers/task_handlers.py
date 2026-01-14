@@ -147,7 +147,11 @@ async def handle_list_tasks(
             # Also get structured data from actions layer (for metadata)
             task_result = await task_actions.list_tasks(user_id, project_id)
 
-            if not task_result["success"] or not task_result["data"]:
+            if not task_result["success"]:
+                # Use the specific error message (e.g., rate limit, API error)
+                message += task_result.get("message", get_translation("fr", "list_tasks_no_tasks"))
+            elif not task_result["data"]:
+                # Success but no tasks found
                 message += get_translation("fr", "list_tasks_no_tasks")
             else:
                 tasks = task_result["data"]

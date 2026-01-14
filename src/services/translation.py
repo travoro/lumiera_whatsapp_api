@@ -1,6 +1,7 @@
-"""Translation service using Claude for high-quality contextual translation."""
+"""Translation service using LLM for high-quality contextual translation."""
 from typing import Optional
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from langsmith import traceable
 from src.config import settings
 from src.utils.logger import log
@@ -11,15 +12,24 @@ class TranslationService:
     """Handle translation between user languages and French."""
 
     def __init__(self):
-        """Initialize translation service with ChatAnthropic for cost tracking."""
-        self.llm = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",
-            api_key=settings.anthropic_api_key,
-            temperature=0,
-            max_tokens=1000
-        )
+        """Initialize translation service with selected LLM provider."""
+        if settings.llm_provider == "openai":
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",  # Cheaper, faster for translation
+                api_key=settings.openai_api_key,
+                temperature=0,
+                max_tokens=1000
+            )
+            log.info("Translation service initialized with OpenAI (gpt-4o-mini)")
+        else:
+            self.llm = ChatAnthropic(
+                model="claude-3-5-haiku-20241022",
+                api_key=settings.anthropic_api_key,
+                temperature=0,
+                max_tokens=1000
+            )
+            log.info("Translation service initialized with ChatAnthropic")
         self.default_language = settings.default_language
-        log.info("Translation service initialized with ChatAnthropic")
 
     @retry_on_api_error(max_attempts=3)
     async def detect_language(self, text: str) -> str:

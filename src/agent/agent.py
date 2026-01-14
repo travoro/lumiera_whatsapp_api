@@ -27,6 +27,7 @@ else:
 
 # Import LangChain AFTER setting environment variables
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from src.agent.tools import all_tools
@@ -191,15 +192,25 @@ Types de contexte à mémoriser:
 
 
 def create_agent() -> AgentExecutor:
-    """Create and configure the LangChain agent with Claude."""
+    """Create and configure the LangChain agent with selected LLM provider."""
 
-    # Initialize Claude model
-    llm = ChatAnthropic(
-        model=settings.anthropic_model,
-        api_key=settings.anthropic_api_key,
-        temperature=settings.anthropic_temperature,
-        max_tokens=settings.anthropic_max_tokens,
-    )
+    # Initialize LLM based on provider selection
+    if settings.llm_provider == "openai":
+        log.info(f"🤖 Initializing OpenAI agent with model: {settings.openai_model}")
+        llm = ChatOpenAI(
+            model=settings.openai_model,
+            api_key=settings.openai_api_key,
+            temperature=settings.openai_temperature,
+            max_tokens=settings.openai_max_tokens,
+        )
+    else:  # Default to Anthropic
+        log.info(f"🤖 Initializing Anthropic agent with model: {settings.anthropic_model}")
+        llm = ChatAnthropic(
+            model=settings.anthropic_model,
+            api_key=settings.anthropic_api_key,
+            temperature=settings.anthropic_temperature,
+            max_tokens=settings.anthropic_max_tokens,
+        )
 
     # Create prompt template
     prompt = ChatPromptTemplate.from_messages([

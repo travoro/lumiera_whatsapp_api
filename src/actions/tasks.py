@@ -44,7 +44,19 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             }
 
         # Fetch tasks from PlanRadar using the PlanRadar project ID
-        tasks = await planradar_client.list_tasks(planradar_project_id, status)
+        try:
+            tasks = await planradar_client.list_tasks(planradar_project_id, status)
+        except Exception as api_error:
+            # Handle rate limit errors specifically
+            if "rate limit" in str(api_error).lower():
+                return {
+                    "success": False,
+                    "message": "⏱️ L'API PlanRadar est temporairement surchargée. Veuillez réessayer dans quelques instants.",
+                    "data": [],
+                    "rate_limited": True
+                }
+            else:
+                raise  # Re-raise other exceptions
 
         if not tasks:
             project_name = project.get("nom", "ce projet")

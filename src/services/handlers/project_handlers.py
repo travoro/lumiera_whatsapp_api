@@ -123,7 +123,11 @@ async def handle_list_documents(
             # Also get structured data from actions layer (for metadata)
             doc_result = await document_actions.get_documents(user_id, project_id)
 
-            if not doc_result["success"] or not doc_result["data"]:
+            if not doc_result["success"]:
+                # Use the specific error message (e.g., rate limit, API error)
+                message += doc_result.get("message", get_translation("fr", "list_documents_no_documents"))
+            elif not doc_result["data"]:
+                # Success but no documents found
                 message += get_translation("fr", "list_documents_no_documents")
             else:
                 documents = doc_result["data"]

@@ -212,9 +212,11 @@ async def handle_direct_action(
         # Load recent messages
         messages = await supabase_client.get_messages_by_session(
             session_id,
-            fields='content,direction,metadata,created_at',
-            limit=10
+            fields='content,direction,metadata,created_at'
         )
+
+        # Limit to last 10 messages
+        messages = messages[-10:] if messages else []
 
         # Find last bot message with tool_outputs
         for msg in reversed(messages):

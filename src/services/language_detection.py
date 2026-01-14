@@ -1,22 +1,32 @@
-"""Language detection service using Claude AI."""
+"""Language detection service using LLM."""
 from typing import Optional, Tuple
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from src.config import settings
 from src.utils.logger import log
 
 
 class LanguageDetectionService:
-    """Language detection using Claude AI."""
+    """Language detection using LLM."""
 
     def __init__(self):
-        """Initialize language detection service with Claude AI."""
-        self.llm = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",
-            api_key=settings.anthropic_api_key,
-            temperature=0,
-            max_tokens=10
-        )
-        log.info("Language detection service initialized with Claude AI")
+        """Initialize language detection service with selected LLM provider."""
+        if settings.llm_provider == "openai":
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",
+                api_key=settings.openai_api_key,
+                temperature=0,
+                max_tokens=10
+            )
+            log.info("Language detection service initialized with OpenAI")
+        else:
+            self.llm = ChatAnthropic(
+                model="claude-3-5-haiku-20241022",
+                api_key=settings.anthropic_api_key,
+                temperature=0,
+                max_tokens=10
+            )
+            log.info("Language detection service initialized with Claude AI")
 
     async def detect_with_claude(self, text: str) -> Optional[str]:
         """Detect language using Claude AI (most accurate method).
