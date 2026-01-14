@@ -1,6 +1,7 @@
 """Intent classification service for hybrid approach."""
 from typing import Optional, Dict, Any
 import re
+import json
 from langchain_anthropic import ChatAnthropic
 from src.config import settings
 from src.utils.logger import log
@@ -187,23 +188,47 @@ RÈGLES DE CONTEXTE IMPORTANTES :
 {context_section}
 Message actuel : {message}
 
-Retourne SEULEMENT le nom de l'intent et la confiance (0-100) au format : intent:confidence
-Exemple : greeting:95"""
+Retourne UNIQUEMENT un JSON valide sans texte supplémentaire. Format :
+{{"intent": "nom_intent", "confidence": 95}}
+
+Exemple : {{"intent": "greeting", "confidence": 95}}"""
 
                 response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
-                response_text = response.content.strip().lower()
+                response_text = response.content.strip()
 
-                # Parse response
-                if ":" in response_text:
-                    parts = response_text.split(":")
-                    intent = parts[0].strip()
-                    try:
-                        confidence = float(parts[1].strip()) / 100.0
-                    except:
-                        confidence = 0.75  # Default medium confidence
-                else:
-                    intent = response_text
-                    confidence = 0.75  # Default if no confidence provided
+                # Parse JSON response
+                try:
+                    # Try to extract JSON if there's extra text (sometimes LLMs add explanation)
+                    # Find first { and last } to extract JSON object
+                    start_idx = response_text.find('{')
+                    end_idx = response_text.rfind('}')
+
+                    if start_idx != -1 and end_idx != -1:
+                        json_str = response_text[start_idx:end_idx + 1]
+                        parsed = json.loads(json_str)
+                        intent = parsed.get('intent', 'general').lower()
+                        confidence = float(parsed.get('confidence', 75)) / 100.0
+                        log.debug(f"📊 Parsed JSON response: intent={intent}, confidence={confidence}")
+                    else:
+                        raise ValueError("No JSON object found in response")
+
+                except Exception as e:
+                    log.warning(f"Failed to parse JSON response: {e}. Response: {response_text[:200]}")
+                    # Fallback to old format if JSON parsing fails
+                    response_lower = response_text.lower()
+                    if ":" in response_lower:
+                        parts = response_lower.split(":")
+                        intent = parts[0].strip()
+                        try:
+                            # Extract just the number (handles "95" or "95%" or "95 explanation")
+                            conf_text = parts[1].strip().split()[0] if parts[1].strip() else "75"
+                            conf_text = conf_text.replace('%', '')
+                            confidence = float(conf_text) / 100.0
+                        except:
+                            confidence = 0.75
+                    else:
+                        intent = response_lower
+                        confidence = 0.75
 
                 log_prefix = "🔢" if is_menu_response else "🤖"
                 log.info(f"{log_prefix} Haiku classification: {intent} (confidence: {confidence})")
