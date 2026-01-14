@@ -31,7 +31,7 @@ async def handle_direct_action(
     user_id: str,
     phone_number: str,
     language: str,
-) -> Optional[str]:
+) -> Optional[Dict[str, Any]]:
     """Handle direct action execution without AI agent.
 
     Args:
@@ -41,7 +41,8 @@ async def handle_direct_action(
         language: User's language code
 
     Returns:
-        Response text if action was handled, None if needs AI conversation flow
+        Dict with 'message' and optional 'tool_outputs' if action was handled,
+        None if needs AI conversation flow
     """
     log.info(f"🎯 Direct action handler called for action: {action}")
 
@@ -51,7 +52,20 @@ async def handle_direct_action(
         # Call list_projects_tool directly
         log.info(f"📋 Calling list_projects_tool for user {user_id}")
         response = await list_projects_tool.ainvoke({"user_id": user_id})
-        return response
+
+        # Get raw projects data for metadata
+        from src.integrations.supabase import supabase_client
+        from src.utils.metadata_helpers import compact_projects
+        projects = await supabase_client.list_projects(user_id)
+
+        return {
+            "message": response,
+            "tool_outputs": [{
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": compact_projects(projects)
+            }]
+        }
 
     elif action == "view_tasks":
         # Route through intent router (proper layering)
@@ -70,7 +84,11 @@ async def handle_direct_action(
         )
 
         if result:
-            return result.get("message")
+            # Return structured response with tool_outputs from fast path
+            return {
+                "message": result.get("message"),
+                "tool_outputs": result.get("tool_outputs", [])
+            }
         else:
             # Fallback to AI if fast path fails
             return None
@@ -92,7 +110,11 @@ async def handle_direct_action(
         )
 
         if result:
-            return result.get("message")
+            # Return structured response with tool_outputs from fast path
+            return {
+                "message": result.get("message"),
+                "tool_outputs": result.get("tool_outputs", [])
+            }
         else:
             # Fallback to AI if fast path fails
             return None
@@ -106,7 +128,10 @@ async def handle_direct_action(
             "language": language,
             "reason": "L'utilisateur a demandé à parler avec l'équipe",
         })
-        return response
+        return {
+            "message": response,
+            "tool_outputs": []  # No tool outputs for escalation
+        }
 
     # === FAST PATH FOR COMPLEX ACTIONS ===
 
@@ -127,7 +152,11 @@ async def handle_direct_action(
         )
 
         if result:
-            return result.get("message")
+            # Return structured response with tool_outputs from fast path
+            return {
+                "message": result.get("message"),
+                "tool_outputs": result.get("tool_outputs", [])
+            }
         else:
             # Fallback to AI if fast path fails
             return None
@@ -149,7 +178,11 @@ async def handle_direct_action(
         )
 
         if result:
-            return result.get("message")
+            # Return structured response with tool_outputs from fast path
+            return {
+                "message": result.get("message"),
+                "tool_outputs": result.get("tool_outputs", [])
+            }
         else:
             # Fallback to AI if fast path fails
             return None
@@ -268,22 +301,36 @@ async def process_inbound_message(
             )
 
             if direct_response:
+                # Handle both string and dict responses (backward compatible)
+                if isinstance(direct_response, dict):
+                    response_message = direct_response.get("message", "")
+                    tool_outputs = direct_response.get("tool_outputs", [])
+                else:
+                    response_message = direct_response
+                    tool_outputs = []
+
                 log.info(f"✅ Direct action '{action_id}' executed successfully")
-                log.info(f"🔤 Handler response (French): {direct_response[:100]}...")
+                log.info(f"🔤 Handler response (French): {response_message[:100]}...")
 
                 # Translate response if needed
                 if user_language != "fr":
                     log.info(f"🔄 Translating from French to {user_language}")
                     response_text = await translation_service.translate_from_french(
-                        direct_response, user_language
+                        response_message, user_language
                     )
                     log.info(f"✅ Translated response: {response_text[:100]}...")
                 else:
-                    response_text = direct_response
+                    response_text = response_message
                     log.info(f"ℹ️ No translation needed (user language is French)")
 
                 # Check if escalation action
                 is_escalation_action = action_id == "talk_team"
+
+                # Build metadata
+                metadata = {}
+                if tool_outputs:
+                    metadata["tool_outputs"] = tool_outputs
+                    log.info(f"💾 Storing {len(tool_outputs)} tool outputs in metadata")
 
                 # Save messages to database
                 await supabase_client.save_message(
@@ -303,6 +350,7 @@ async def process_inbound_message(
                     session_id=session_id,
                     is_escalation=is_escalation_action,
                     escalation_reason="User requested to talk to team via direct action" if is_escalation_action else None,
+                    metadata=metadata if metadata else None,
                 )
 
                 # Send response
