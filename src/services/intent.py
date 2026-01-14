@@ -131,16 +131,21 @@ Based on the menu content and the user's selection of option {option}, classify 
 
 - greeting: User wants to see the main menu again
 - list_projects: User wants to see their projects/chantiers
-- list_tasks: User wants to see tasks/tâches
+- list_tasks: User wants to see tasks/tâches (OR selecting a PROJECT from a project list to see its tasks)
 - report_incident: User wants to report a problem/incident
 - update_progress: User wants to update task progress
 - escalate: User wants to talk to a human/team
-- general: The selection is for a specific item (project #3, task #2, etc.) - the agent needs full context
+- general: Selecting a specific TASK from a task list (needs full agent context for task details)
 
 Return ONLY the intent name and confidence (0-100) in format: intent:confidence
 Example: escalate:95
 
-IMPORTANT: If the user is selecting a specific item from a list (like "Project #3" or "Task #2"), return "general" so the agent can handle it with full conversation context."""
+CRITICAL RULES:
+1. If menu shows PROJECT LIST (contains "projet" or "chantier" or "🏗️") AND user selects number → Return: list_tasks
+   Example: "1. 🏗️ Champigny" + user says "1" → list_tasks (user wants tasks for Champigny)
+2. If menu shows TASK LIST (contains "tâche" or "📝") AND user selects number → Return: general
+   Example: "1. 📝 Installation" + user says "1" → general (needs full context for task details)
+3. If menu is MAIN GREETING (multiple action options) → Based on specific option selected"""
 
         try:
             response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])

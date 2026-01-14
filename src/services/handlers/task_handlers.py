@@ -54,6 +54,7 @@ async def handle_list_tasks(
 
         # Use mentioned project if found, otherwise use active context
         selected_project_id = mentioned_project_id or current_project_id
+        tool_outputs = []
 
         # Scenario 3: Has selected project (from message or context)
         if selected_project_id:
@@ -64,6 +65,13 @@ async def handle_list_tasks(
 
             message += get_translation("fr", "list_tasks_project_context").format(project_name=project_name)
 
+            # Store the selected project in tool_outputs for context
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": [project]  # Just the selected project
+            })
+
             # Get tasks for this project using actions layer
             task_result = await task_actions.list_tasks(user_id, project_id)
 
@@ -71,6 +79,13 @@ async def handle_list_tasks(
                 message += get_translation("fr", "list_tasks_no_tasks")
             else:
                 tasks = task_result["data"]
+                # Store tasks in tool_outputs
+                tool_outputs.append({
+                    "tool": "list_tasks_tool",
+                    "input": {"user_id": user_id, "project_id": project_id},
+                    "output": tasks
+                })
+
                 message += get_translation("fr", "list_tasks_tasks_header")
                 for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
                     status = task.get('status', 'pending')
@@ -97,11 +112,19 @@ async def handle_list_tasks(
             # Add prompt to select project using centralized translation
             message += get_translation("fr", "list_tasks_select_project")
 
+            # Store projects in tool_outputs (user needs to select one)
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": projects[:5]  # Only store the ones we showed
+            })
+
         return {
             "message": message,
             "escalation": False,
             "tools_called": [],
-            "fast_path": True
+            "fast_path": True,
+            "tool_outputs": tool_outputs
         }
 
     except Exception as e:
@@ -149,6 +172,7 @@ async def handle_update_progress(
 
         # Use mentioned project if found, otherwise use active context
         selected_project_id = mentioned_project_id or current_project_id
+        tool_outputs = []
 
         # Use centralized translations
         message = get_translation("fr", "update_progress_header")
@@ -160,6 +184,13 @@ async def handle_update_progress(
 
             message += get_translation("fr", "update_progress_project_context").format(project_name=project_name)
 
+            # Store the selected project in tool_outputs for context
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": [project]  # Just the selected project
+            })
+
             # Get tasks for this project using actions layer
             task_result = await task_actions.list_tasks(user_id, project_id)
 
@@ -167,6 +198,13 @@ async def handle_update_progress(
                 message += get_translation("fr", "update_progress_no_tasks")
             else:
                 tasks = task_result["data"]
+                # Store tasks in tool_outputs
+                tool_outputs.append({
+                    "tool": "list_tasks_tool",
+                    "input": {"user_id": user_id, "project_id": project_id},
+                    "output": tasks
+                })
+
                 message += get_translation("fr", "update_progress_tasks_header")
                 for i, task in enumerate(tasks[:10], 1):  # Limit to 10 tasks
                     progress = task.get('progress', 0)
@@ -181,11 +219,19 @@ async def handle_update_progress(
 
             message += get_translation("fr", "update_progress_footer")
 
+            # Store projects in tool_outputs (user needs to select one)
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": projects[:5]  # Only store the ones we showed
+            })
+
         return {
             "message": message,
             "escalation": False,
             "tools_called": [],
-            "fast_path": True
+            "fast_path": True,
+            "tool_outputs": tool_outputs
         }
 
     except Exception as e:

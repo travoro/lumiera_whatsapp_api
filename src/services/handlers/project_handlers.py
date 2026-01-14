@@ -37,7 +37,8 @@ async def handle_list_projects(
                 "message": get_translation("fr", "no_projects"),
                 "escalation": False,
                 "tools_called": ["list_projects_tool"],
-                "fast_path": True
+                "fast_path": True,
+                "tool_outputs": []  # No projects to store
             }
 
         # Format projects list with translation (ALWAYS French)
@@ -53,7 +54,12 @@ async def handle_list_projects(
             "message": message,
             "escalation": False,
             "tools_called": ["list_projects_tool"],
-            "fast_path": True
+            "fast_path": True,
+            "tool_outputs": [{
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": projects  # Raw structured project data with IDs
+            }]
         }
 
     except Exception as e:
@@ -86,11 +92,13 @@ async def handle_list_documents(
                 "message": no_projects_msg,
                 "escalation": False,
                 "tools_called": [],
-                "fast_path": True
+                "fast_path": True,
+                "tool_outputs": []
             }
 
         # Use centralized translations (ALWAYS French)
         message = get_translation("fr", "list_documents_header")
+        tool_outputs = []
 
         # Scenario 2: Has current project in context
         if current_project_id:
@@ -108,6 +116,13 @@ async def handle_list_documents(
                 message += get_translation("fr", "list_documents_no_documents")
             else:
                 documents = doc_result["data"]
+                # Store documents data in tool_outputs
+                tool_outputs.append({
+                    "tool": "list_documents_tool",
+                    "input": {"user_id": user_id, "project_id": project_id},
+                    "output": documents
+                })
+
                 for i, doc in enumerate(documents[:10], 1):  # Limit to 10 documents
                     doc_type = doc.get('type', 'document')
                     doc_name = doc.get('name', 'Untitled')
@@ -133,11 +148,19 @@ async def handle_list_documents(
             # Add prompt to select project using centralized translation (ALWAYS French)
             message += get_translation("fr", "list_documents_select_project")
 
+            # Store projects in tool_outputs (user needs to select one)
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": projects[:5]  # Only store the ones we showed
+            })
+
         return {
             "message": message,
             "escalation": False,
             "tools_called": [],
-            "fast_path": True
+            "fast_path": True,
+            "tool_outputs": tool_outputs
         }
 
     except Exception as e:
@@ -170,11 +193,13 @@ async def handle_report_incident(
                 "message": no_projects_msg,
                 "escalation": False,
                 "tools_called": [],
-                "fast_path": True
+                "fast_path": True,
+                "tool_outputs": []
             }
 
         # Get base template (ALWAYS French)
         template = get_translation("fr", "report_incident")
+        tool_outputs = []
 
         # Scenario 2: Has projects and current project in context
         if current_project_id:
@@ -184,6 +209,14 @@ async def handle_report_incident(
 
             # Format with current project name
             message = template.replace("{chantier_nom}", project_name)
+
+            # Store current project in tool_outputs for context
+            if current_project:
+                tool_outputs.append({
+                    "tool": "list_projects_tool",
+                    "input": {"user_id": user_id},
+                    "output": [current_project]  # Just the active project
+                })
 
         # Scenario 3: Has projects but no current project in context
         else:
@@ -195,11 +228,19 @@ async def handle_report_incident(
 
             message = base_msg
 
+            # Store projects in tool_outputs (user needs to select one)
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": projects[:5]  # Only store the ones we showed
+            })
+
         return {
             "message": message,
             "escalation": False,
             "tools_called": [],
-            "fast_path": True
+            "fast_path": True,
+            "tool_outputs": tool_outputs
         }
 
     except Exception as e:

@@ -492,7 +492,8 @@ class MessagePipeline:
                     ctx.response_text = result.get("message")
                     ctx.escalation = result.get("escalation", False)
                     ctx.tools_called = result.get("tools_called", [])
-                    log.info(f"✅ Fast path succeeded")
+                    ctx.tool_outputs = result.get("tool_outputs", [])  # Capture tool outputs from fast path
+                    log.info(f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)")
                     return Result.ok(None)
 
             # Fallback to full agent
@@ -576,6 +577,15 @@ class MessagePipeline:
                                     ]
                                     if tasks_compact:
                                         tool_context += f"\nTâches: {json.dumps(tasks_compact, ensure_ascii=False)}"
+
+                                elif tool_name == 'list_documents_tool' and isinstance(output_data, list):
+                                    # Extract just IDs and names
+                                    docs_compact = [
+                                        {"id": d.get("id"), "name": d.get("name"), "type": d.get("type")}
+                                        for d in output_data if isinstance(d, dict)
+                                    ]
+                                    if docs_compact:
+                                        tool_context += f"\nDocuments: {json.dumps(docs_compact, ensure_ascii=False)}"
 
                             tool_context += "]"
                             content += tool_context
