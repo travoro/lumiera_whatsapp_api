@@ -202,6 +202,7 @@ class IntentClassifier:
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (l'utilisateur veut voir ses projets/chantiers)
 - list_tasks (l'utilisateur veut voir les tâches pour un projet)
+- task_details (l'utilisateur veut voir les détails/description/photos d'une tâche spécifique)
 - report_incident (l'utilisateur veut signaler un problème/incident)
 - update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
@@ -209,7 +210,7 @@ class IntentClassifier:
 {menu_hint}
 RÈGLES DE CONTEXTE IMPORTANTES :
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
-- Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → general:85
+- Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90
 - Si le bot a demandé "quel projet/chantier" et l'utilisateur répond avec nom → list_tasks:90
 - Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
 - Quand utilisateur répond clairement à question du bot → confiance HAUTE (85-95) pour fast path
