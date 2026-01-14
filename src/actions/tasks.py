@@ -73,8 +73,8 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
         for task in tasks:
             attributes = task.get("attributes", {})
             formatted_tasks.append({
-                "id": task.get("id"),
-                "uuid": attributes.get("uuid"),  # UUID required for attachments endpoint
+                "id": attributes.get("uuid"),  # Use UUID as primary ID (latest API standard)
+                "short_id": task.get("id"),  # Keep short ID for backward compatibility
                 "title": attributes.get("subject", "Sans titre"),
                 "status": attributes.get("status-id", "unknown"),
                 "priority": attributes.get("priority", "normal"),
@@ -248,16 +248,15 @@ async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] =
         }
 
 
-async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] = None, task_uuid: Optional[str] = None) -> Dict[str, Any]:
+async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get images attached to a task.
 
     Args:
         user_id: The user ID
-        task_id: The task short ID
+        task_id: The task UUID (primary identifier, latest API standard)
         project_id: Optional project ID (fetched from context if not provided)
-        task_uuid: Optional task UUID (required for attachments endpoint, fetched if not provided)
     """
-    log.info(f"📷 get_task_images action: user_id={user_id[:8]}..., task_id={task_id}, project_id={project_id[:8] if project_id else 'None'}..., task_uuid={task_uuid[:8] if task_uuid else 'None'}...")
+    log.info(f"📷 get_task_images action: user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}...")
     try:
         # Get project_id from active context if not provided
         if not project_id:
@@ -281,8 +280,8 @@ async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] 
         log.info(f"   ✅ PlanRadar project ID: {planradar_project_id[:8]}...")
 
         log.info(f"   🌐 Calling PlanRadar API for task images")
-        # Pass task_uuid if available (required for attachments endpoint)
-        images = await planradar_client.get_task_images(task_id, planradar_project_id, task_uuid=task_uuid)
+        # task_id is now UUID, pass it directly to get_task_images
+        images = await planradar_client.get_task_images(task_id, planradar_project_id, task_uuid=task_id)
 
         # Log action
         await supabase_client.save_action_log(

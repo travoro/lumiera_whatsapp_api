@@ -448,9 +448,11 @@ async def process_inbound_message(
                 if isinstance(direct_response, dict):
                     response_message = direct_response.get("message", "")
                     tool_outputs = direct_response.get("tool_outputs", [])
+                    carousel_data = direct_response.get("carousel_data")
                 else:
                     response_message = direct_response
                     tool_outputs = []
+                    carousel_data = None
 
                 log.info(f"✅ Direct action '{action_id}' executed successfully")
                 log.info(f"🔤 Handler response (French): {response_message[:100]}...")
@@ -521,6 +523,32 @@ async def process_inbound_message(
                 )
 
                 log.info(f"📤 Direct action response sent (interactive: {interactive_data is not None})")
+
+                # Send carousel images as a separate message if available
+                if carousel_data and carousel_data.get("cards"):
+                    log.info(f"🖼️ Sending {len(carousel_data['cards'])} images as carousel")
+
+                    # Extract image URLs from carousel cards
+                    image_urls = []
+                    for card in carousel_data["cards"]:
+                        if card.get("media_url"):
+                            image_urls.append(card["media_url"])
+
+                    if image_urls:
+                        # WhatsApp supports up to 10 media items per message
+                        image_urls = image_urls[:10]
+                        log.info(f"📷 Sending {len(image_urls)} images: {image_urls[0][:50]}...")
+
+                        # Send images in a separate message
+                        # WhatsApp will automatically create a carousel/gallery from multiple media_url
+                        twilio_client.send_message(
+                            to=from_number,
+                            body="",  # Empty body - images only
+                            media_url=image_urls
+                        )
+
+                        log.info(f"✅ Carousel images sent successfully")
+
                 return
 
         # === PHASE 2: CORE PROCESSING - USE PIPELINE ===

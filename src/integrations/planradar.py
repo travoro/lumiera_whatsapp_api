@@ -119,10 +119,10 @@ class PlanRadarClient:
         """Get detailed information about a specific task.
 
         Args:
-            task_id: The task ID (short ID from PlanRadar)
+            task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID (required for API v2)
         """
-        log.info(f"📄 get_task called: task_id={task_id}, project_id={project_id[:8]}...")
+        log.info(f"📄 get_task called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}")
         task_data = result.get("data") if result else None
         if task_data:
@@ -132,8 +132,13 @@ class PlanRadarClient:
         return task_data
 
     async def get_task_description(self, task_id: str, project_id: str) -> Optional[str]:
-        """Get task description."""
-        log.info(f"📝 get_task_description called: task_id={task_id}, project_id={project_id[:8]}...")
+        """Get task description.
+
+        Args:
+            task_id: The task UUID (primary identifier, latest API standard)
+            project_id: The PlanRadar project ID
+        """
+        log.info(f"📝 get_task_description called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
         task = await self.get_task(task_id, project_id)
         description = task.get("description") if task else None
         if description:
@@ -143,8 +148,13 @@ class PlanRadarClient:
         return description
 
     async def get_task_plans(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
-        """Get plans/blueprints associated with a task."""
-        log.info(f"🗺️ get_task_plans called: task_id={task_id}, project_id={project_id[:8]}...")
+        """Get plans/blueprints associated with a task.
+
+        Args:
+            task_id: The task UUID (primary identifier, latest API standard)
+            project_id: The PlanRadar project ID
+        """
+        log.info(f"🗺️ get_task_plans called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/plans")
         plans = result.get("data", []) if result else []
         log.info(f"   ✅ Retrieved {len(plans)} plans")
@@ -154,31 +164,18 @@ class PlanRadarClient:
         """Get images attached to a task.
 
         Args:
-            task_id: The task short ID (used for logging)
+            task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
-            task_uuid: The task UUID (required for attachments endpoint)
+            task_uuid: Deprecated - task_id is now UUID by default, kept for backward compatibility
 
-        Note: PlanRadar attachments endpoint requires UUID, not short ID
+        Note: PlanRadar attachments endpoint requires UUID
         """
-        log.info(f"📷 get_task_images called: task_id={task_id}, project_id={project_id[:8]}..., task_uuid={task_uuid[:8] if task_uuid else 'None'}...")
-
-        # If no UUID provided, try to get the task first to retrieve UUID
-        if not task_uuid:
-            log.info(f"   🔍 No UUID provided, fetching task to get UUID")
-            task = await self.get_task(task_id, project_id)
-            if task:
-                task_uuid = task.get("attributes", {}).get("uuid")
-                if task_uuid:
-                    log.info(f"   ✅ Retrieved UUID from task: {task_uuid[:8]}...")
-                else:
-                    log.warning(f"   ⚠️ Task has no UUID attribute")
-                    return []
-            else:
-                log.warning(f"   ⚠️ Could not retrieve task")
-                return []
+        # Use task_uuid if provided (backward compatibility), otherwise use task_id (which is now UUID)
+        uuid_to_use = task_uuid if task_uuid else task_id
+        log.info(f"📷 get_task_images called: task_uuid={uuid_to_use[:8]}..., project_id={project_id[:8]}...")
 
         # Use UUID for attachments endpoint (required by PlanRadar API)
-        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_uuid}/attachments")
+        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{uuid_to_use}/attachments")
 
         if result and result.get("data"):
             attachments = result.get("data", [])
@@ -246,8 +243,14 @@ class PlanRadarClient:
         project_id: str,
         comment_text: str,
     ) -> bool:
-        """Add a comment to a task."""
-        log.info(f"💬 add_task_comment called: task_id={task_id}, project_id={project_id[:8]}..., comment_length={len(comment_text)}")
+        """Add a comment to a task.
+
+        Args:
+            task_id: The task UUID (primary identifier, latest API standard)
+            project_id: The PlanRadar project ID
+            comment_text: The comment text to add
+        """
+        log.info(f"💬 add_task_comment called: task_id={task_id[:8]}..., project_id={project_id[:8]}..., comment_length={len(comment_text)}")
         data = {
             "text": comment_text,
         }
@@ -260,8 +263,13 @@ class PlanRadarClient:
         return success
 
     async def get_task_comments(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
-        """Get all comments for a task."""
-        log.info(f"💬 get_task_comments called: task_id={task_id}, project_id={project_id[:8]}...")
+        """Get all comments for a task.
+
+        Args:
+            task_id: The task UUID (primary identifier, latest API standard)
+            project_id: The PlanRadar project ID
+        """
+        log.info(f"💬 get_task_comments called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comments")
         comments = result.get("data", []) if result else []
         log.info(f"   ✅ Retrieved {len(comments)} comments")
@@ -339,7 +347,15 @@ class PlanRadarClient:
         progress_note: Optional[str] = None,
         image_urls: Optional[List[str]] = None,
     ) -> bool:
-        """Update task progress with status, notes, and images."""
+        """Update task progress with status, notes, and images.
+
+        Args:
+            task_id: The task UUID (primary identifier, latest API standard)
+            project_id: The PlanRadar project ID
+            status: New status for the task
+            progress_note: Optional progress note
+            image_urls: Optional list of image URLs
+        """
         # Update status
         data = {"status": status}
         result = await self._request("PATCH", f"{self.account_id}/projects/{project_id}/tickets/{task_id}", data=data)
@@ -367,7 +383,12 @@ class PlanRadarClient:
         return True
 
     async def mark_task_complete(self, task_id: str, project_id: str) -> bool:
-        """Mark a task as complete."""
+        """Mark a task as complete.
+
+        Args:
+            task_id: The task UUID (primary identifier, latest API standard)
+            project_id: The PlanRadar project ID
+        """
         data = {"status": "completed"}
         result = await self._request("PATCH", f"{self.account_id}/projects/{project_id}/tickets/{task_id}", data=data)
         return result is not None
