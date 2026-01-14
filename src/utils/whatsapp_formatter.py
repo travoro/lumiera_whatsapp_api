@@ -505,12 +505,51 @@ def send_whatsapp_message_smart(
                 return sid
 
         elif msg_type == "list":
-            # AI-generated response with interactive list - DON'T use greeting template
-            log.info(f"⚠️ AI response with interactive list - falling back to plain text")
-            log.info(f"   (Universal template only for greetings)")
-            # Send as regular text message (the formatted text includes the list)
-            sid = twilio_client.send_message(to=to, body=text)
-            return sid
+            # AI-generated response with interactive list - Use dynamic template
+            log.info(f"✅ Processing list response with dynamic template")
+            log.debug(f"📋 Interactive data: {interactive_data}")
+
+            # Extract data from interactive_data
+            body_text = interactive_data.get("body_text", text)
+            button_text = interactive_data.get("button_text", "Choisir")
+            sections = interactive_data.get("sections", [])
+
+            # Convert to dynamic template format
+            formatted_items = []
+            for section in sections:
+                for row in section.get("rows", []):
+                    formatted_items.append({
+                        "item": safe_truncate(row.get("title", ""), 24),
+                        "description": safe_truncate(row.get("description", ""), 72) if row.get("description") else "",
+                        "id": row.get("id", "")
+                    })
+
+            if not formatted_items:
+                log.warning("⚠️ No list items found, falling back to text")
+                sid = twilio_client.send_message(to=to, body=text)
+                return sid
+
+            log.info(f"🚀 Sending dynamic list picker with {len(formatted_items)} items")
+
+            result = dynamic_template_service.send_list_picker(
+                to_number=to,
+                body_text=body_text,
+                button_text=safe_truncate(button_text, 20),
+                items=formatted_items,
+                cleanup=True,  # Auto-delete after sending
+                language=language
+            )
+
+            if result['success']:
+                log.info(f"✅ Sent list via dynamic template to {to}")
+                log.info(f"📊 Performance: {result['total_ms']:.0f}ms (create → send → delete)")
+                return result['message_sid']
+            else:
+                log.error(f"❌ Dynamic template send FAILED: {result.get('error')}")
+                # Fallback to regular text
+                log.info("📱 Falling back to regular text message")
+                sid = twilio_client.send_message(to=to, body=text)
+                return sid
 
         elif msg_type == "buttons":
             # Buttons not yet implemented

@@ -353,9 +353,24 @@ async def process_inbound_message(
                     metadata=metadata if metadata else None,
                 )
 
-                # Send response
-                twilio_client.send_message(from_number, response_text)
-                log.info(f"📤 Direct action response sent")
+                # Send response with interactive formatting
+                log.info(f"📱 Formatting direct action response for potential interactive list")
+                from src.utils.response_parser import format_for_interactive
+                from src.utils.whatsapp_formatter import send_whatsapp_message_smart
+
+                # Format for interactive if applicable (e.g., list_projects)
+                formatted_text, interactive_data = format_for_interactive(response_text, user_language)
+
+                send_whatsapp_message_smart(
+                    to=from_number,
+                    text=formatted_text,
+                    interactive_data=interactive_data,
+                    user_name=user_name,
+                    language=user_language,
+                    is_greeting=False  # Direct actions are not greetings
+                )
+
+                log.info(f"📤 Direct action response sent (interactive: {interactive_data is not None})")
                 return
 
         # === PHASE 2: CORE PROCESSING - USE PIPELINE ===
