@@ -150,19 +150,67 @@ class PlanRadarClient:
         log.info(f"   ✅ Retrieved {len(plans)} plans")
         return plans
 
-    async def get_task_images(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
-        """Get images attached to a task."""
-        log.info(f"📷 get_task_images called: task_id={task_id}, project_id={project_id[:8]}...")
-        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/attachments")
+    async def get_task_images(self, task_id: str, project_id: str, task_uuid: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get images attached to a task.
+
+        Args:
+            task_id: The task short ID (used for logging)
+            project_id: The PlanRadar project ID
+            task_uuid: The task UUID (required for attachments endpoint)
+
+        Note: PlanRadar attachments endpoint requires UUID, not short ID
+        """
+        log.info(f"📷 get_task_images called: task_id={task_id}, project_id={project_id[:8]}..., task_uuid={task_uuid[:8] if task_uuid else 'None'}...")
+
+        # If no UUID provided, try to get the task first to retrieve UUID
+        if not task_uuid:
+            log.info(f"   🔍 No UUID provided, fetching task to get UUID")
+            task = await self.get_task(task_id, project_id)
+            if task:
+                task_uuid = task.get("attributes", {}).get("uuid")
+                if task_uuid:
+                    log.info(f"   ✅ Retrieved UUID from task: {task_uuid[:8]}...")
+                else:
+                    log.warning(f"   ⚠️ Task has no UUID attribute")
+                    return []
+            else:
+                log.warning(f"   ⚠️ Could not retrieve task")
+                return []
+
+        # Use UUID for attachments endpoint (required by PlanRadar API)
+        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_uuid}/attachments")
+
         if result and result.get("data"):
-            # Filter for images only
-            images = [
-                att for att in result["data"]
-                if att.get("type", "").startswith("image/")
-            ]
-            log.info(f"   ✅ Retrieved {len(images)} images (from {len(result['data'])} total attachments)")
+            attachments = result.get("data", [])
+            # Get image URLs from included section (JSON:API format)
+            included = result.get("included", [])
+
+            images = []
+            for att in attachments:
+                # Find corresponding image data in included section
+                att_id = att.get("id")
+                attachable_type = att.get("attributes", {}).get("attachable-type", "")
+
+                # Look for image in included section
+                for inc in included:
+                    if inc.get("id") == att_id and "image" in inc.get("type", "").lower():
+                        inc_attributes = inc.get("attributes", {})
+                        images.append({
+                            "id": att_id,
+                            "type": inc.get("type"),
+                            "title": att.get("attributes", {}).get("title"),
+                            "url": inc_attributes.get("image-url"),
+                            "thumbnail_url": inc_attributes.get("image-url-thumb"),
+                            "content_type": inc_attributes.get("image-content-type"),
+                            "file_size": inc_attributes.get("image-file-size"),
+                            "metadata": inc_attributes.get("metadata"),
+                        })
+                        break
+
+            log.info(f"   ✅ Retrieved {len(images)} images (from {len(attachments)} total attachments)")
             return images
-        log.info(f"   ℹ️ No images found")
+
+        log.info(f"   ℹ️ No attachments found")
         return []
 
     async def get_documents(

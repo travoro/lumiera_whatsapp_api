@@ -386,6 +386,7 @@ async def handle_task_details(
     try:
         # Scenario 1: Resolve numeric selection from last tool_outputs (task list)
         selected_task_id = None
+        selected_task_uuid = None  # UUID needed for attachments endpoint
         task_title = None
 
         # Log what we received for debugging
@@ -407,9 +408,11 @@ async def handle_task_details(
                     log.debug(f"📋 Found list_tasks_tool with {len(output_tasks)} tasks")
 
                     if 0 <= selection_index < len(output_tasks):
-                        selected_task_id = output_tasks[selection_index].get('id')
-                        task_title = output_tasks[selection_index].get('title')
-                        log.info(f"✅ Resolved numeric selection '{message_text}' → {task_title} (ID: {selected_task_id[:8]}...)")
+                        selected_task = output_tasks[selection_index]
+                        selected_task_id = selected_task.get('id')
+                        selected_task_uuid = selected_task.get('uuid')  # Get UUID for attachments
+                        task_title = selected_task.get('title')
+                        log.info(f"✅ Resolved numeric selection '{message_text}' → {task_title} (ID: {selected_task_id[:8]}..., UUID: {selected_task_uuid[:8] if selected_task_uuid else 'None'}...)")
                         break
                     else:
                         log.warning(f"⚠️ Selection index {selection_index} out of range (0-{len(output_tasks)-1})")
@@ -438,8 +441,15 @@ async def handle_task_details(
         _ = await get_task_images_tool.ainvoke({"user_id": user_id, "task_id": selected_task_id})
 
         # Get structured data from actions layer
+        # Pass UUID to get_task_images if available (required for attachments endpoint)
         desc_result = await task_actions.get_task_description(user_id, selected_task_id)
-        images_result = await task_actions.get_task_images(user_id, selected_task_id)
+
+        if selected_task_uuid:
+            log.info(f"📷 Passing UUID to get_task_images: {selected_task_uuid[:8]}...")
+            images_result = await task_actions.get_task_images(user_id, selected_task_id, task_uuid=selected_task_uuid)
+        else:
+            log.warning(f"⚠️ No UUID available, get_task_images will fetch task first")
+            images_result = await task_actions.get_task_images(user_id, selected_task_id)
 
         # If we don't have task_title yet (used active context), get it from desc_result
         if not task_title and desc_result.get("success"):
