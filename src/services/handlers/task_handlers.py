@@ -12,6 +12,7 @@ from src.utils.whatsapp_formatter import get_translation
 from src.utils.handler_helpers import get_projects_with_context, format_project_list
 from src.utils.response_helpers import build_no_projects_response, get_selected_project
 from src.utils.metadata_helpers import compact_projects, compact_tasks
+from src.utils.fuzzy_matcher import fuzzy_match_project
 from src.utils.logger import log
 
 
@@ -69,19 +70,46 @@ async def handle_list_tasks(
             if not mentioned_project_id:
                 log.warning(f"⚠️ Could not resolve numeric selection '{message_text}' - no list_projects_tool found in tool_outputs")
 
-        # Scenario 3: Extract project name from message if mentioned
+        # Scenario 3: Extract project name from message if mentioned (exact match)
         # User might say "taches pour Champigny" or just "champigny"
         if not mentioned_project_id and message_text and not current_project_id:
+            log.debug(f"🔎 Scenario 3: Trying exact match for '{message_text}'")
             message_lower = message_text.lower()
             for project in projects:
                 project_name = project.get('nom', '').lower()
                 if project_name and project_name in message_lower:
                     mentioned_project_id = project.get('id')
-                    log.info(f"📍 Extracted project from message: {project.get('nom')}")
+                    log.info(f"✅ Exact match: Extracted project '{project.get('nom')}' from message")
                     break
+
+            if not mentioned_project_id:
+                log.debug(f"❌ Exact match failed for '{message_text}'")
+
+        # Scenario 3b: Try fuzzy matching if exact match failed
+        if not mentioned_project_id and message_text and not current_project_id:
+            log.debug(f"🔎 Scenario 3b: Trying fuzzy match for '{message_text}'")
+            fuzzy_result = fuzzy_match_project(message_text, projects, threshold=0.80)
+
+            if fuzzy_result:
+                mentioned_project_id = fuzzy_result['project_id']
+                log.info(f"✅ Fuzzy match: '{message_text}' → '{fuzzy_result['project_name']}' (confidence: {fuzzy_result['confidence']:.2%})")
+            else:
+                log.debug(f"❌ Fuzzy match failed for '{message_text}'")
 
         # Use mentioned project if found, otherwise use active context
         selected_project_id = mentioned_project_id or current_project_id
+
+        # Log parameter resolution result
+        if selected_project_id:
+            resolution_method = "mentioned" if mentioned_project_id else "active_context"
+            log.info(f"✅ Parameter resolution successful: project_id={selected_project_id[:8]}... (method: {resolution_method})")
+        else:
+            log.warning(f"⚠️ Parameter resolution FAILED: No project context available")
+            log.debug(f"   - mentioned_project_id: {mentioned_project_id}")
+            log.debug(f"   - current_project_id: {current_project_id}")
+            log.debug(f"   - message_text: '{message_text}'")
+            log.debug(f"   - available_projects: {len(projects)}")
+
         tool_outputs = []
 
         # Scenario 4: Has selected project (from message or context)
@@ -135,31 +163,24 @@ async def handle_list_tasks(
 
             message += get_translation("fr", "list_tasks_footer")
 
-        # Scenario 5: Has projects but no selection (ask which project)
+            return {
+                "message": message,
+                "escalation": False,
+                "tools_called": [],
+                "fast_path": True,
+                "tool_outputs": tool_outputs
+            }
+
+        # Scenario 5: Parameters unclear - Route to full AI agent
         else:
-            # Use header for asking which project
-            message = get_translation("fr", "list_tasks_select_header")
+            log.warning(f"🤖 FAST PATH FALLBACK → Routing to full AI agent")
+            log.info(f"   Reason: Could not determine which project user wants")
+            log.info(f"   User message: '{message_text}'")
+            log.info(f"   Available projects: {[p.get('nom') for p in projects[:5]]}")
+            log.info(f"   AI agent will use conversation history to understand user intent")
 
-            # Use helper to format project list
-            message += format_project_list(projects, language, max_items=5)
-
-            # Add prompt to select project using centralized translation
-            message += get_translation("fr", "list_tasks_select_project")
-
-            # Store projects in tool_outputs (user needs to select one)
-            tool_outputs.append({
-                "tool": "list_projects_tool",
-                "input": {"user_id": user_id},
-                "output": compact_projects(projects[:5])  # Only essential fields
-            })
-
-        return {
-            "message": message,
-            "escalation": False,
-            "tools_called": [],
-            "fast_path": True,
-            "tool_outputs": tool_outputs
-        }
+            # Return None to signal that full AI agent should handle this
+            return None
 
     except Exception as e:
         log.error(f"Error in fast path list_tasks: {e}")

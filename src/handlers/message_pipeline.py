@@ -525,9 +525,15 @@ class MessagePipeline:
                     ctx.tool_outputs = result.get("tool_outputs", [])  # Capture tool outputs from fast path
                     log.info(f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)")
                     return Result.ok(None)
+                else:
+                    log.warning(f"❌ Fast path returned None - parameters unclear")
+                    log.info(f"🤖 Falling back to full AI agent to resolve ambiguity")
+                    log.info(f"   Intent: {ctx.intent}")
+                    log.info(f"   Message: '{ctx.message_in_french}'")
+                    log.info(f"   AI will use conversation history to understand user intent")
 
             # Fallback to full agent
-            log.info(f"⚙️ Using full agent (Opus)")
+            log.info(f"⚙️ Using full agent (Opus) - reason: {ctx.intent_confidence < 0.8 if ctx.intent_confidence else 'fast path returned None'}")
 
             # LAYER 1: Build AUTHORITATIVE explicit state
             from src.services.agent_state import agent_state_builder
@@ -623,9 +629,16 @@ class MessagePipeline:
                         chat_history.append(AIMessage(content=content))
 
                 log.info(f"📜 Loaded {len(chat_history)} messages for agent context")
+                log.debug(f"   Chat history has {len([m for m in chat_history if isinstance(m, HumanMessage)])} user messages")
+                log.debug(f"   Chat history has {len([m for m in chat_history if isinstance(m, AIMessage)])} AI messages")
             except Exception as e:
                 log.warning(f"Could not load chat history for agent: {e}")
                 chat_history = []
+
+            log.info(f"🤖 Invoking full AI agent with conversation context")
+            log.debug(f"   User message: '{ctx.message_in_french}'")
+            log.debug(f"   Chat history: {len(chat_history)} messages")
+            log.debug(f"   Explicit state: {state_context if state_context else 'None'}")
 
             agent_result = await lumiera_agent.process_message(
                 user_id=ctx.user_id,
@@ -640,6 +653,11 @@ class MessagePipeline:
             ctx.response_text = agent_result.get("message")
             ctx.escalation = agent_result.get("escalation", False)
             ctx.tools_called = agent_result.get("tools_called", [])
+
+            log.info(f"✅ AI agent completed")
+            log.debug(f"   Response length: {len(ctx.response_text) if ctx.response_text else 0} chars")
+            log.debug(f"   Tools called: {ctx.tools_called}")
+            log.debug(f"   Escalation: {ctx.escalation}")
             ctx.tool_outputs = agent_result.get("tool_outputs", [])  # NEW: Store for persistence
 
             log.info(f"✅ Agent processed message")
