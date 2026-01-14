@@ -187,6 +187,91 @@ async def handle_direct_action(
             # Fallback to AI if fast path fails
             return None
 
+    # Handle interactive list selections (option_1_fr, option_2_fr, etc.)
+    if action.startswith("option_"):
+        log.info(f"📋 Interactive list selection detected: {action}")
+
+        # Parse the option number (option_1 → 1 or option_1_fr → 1)
+        import re
+        match = re.match(r'option_(\d+)', action)
+        if not match:
+            log.warning(f"⚠️ Could not parse option number from: {action}")
+            return None
+
+        option_number = match.group(1)
+        log.info(f"🔢 User selected option #{option_number}")
+
+        # Get the last bot message to find what was in that position
+        from src.integrations.supabase import supabase_client
+        from src.services.session import session_service
+
+        # Get session
+        session = await session_service.get_or_create_session(user_id, phone_number)
+        session_id = session["id"]
+
+        # Load recent messages
+        messages = await supabase_client.get_messages_by_session(
+            session_id,
+            fields='content,direction,metadata,created_at',
+            limit=10
+        )
+
+        # Find last bot message with tool_outputs
+        for msg in reversed(messages):
+            if msg and msg.get('direction') == 'outbound':
+                metadata = msg.get('metadata', {})
+                tool_outputs = metadata.get('tool_outputs', []) if metadata else []
+
+                if tool_outputs:
+                    log.info(f"📦 Found tool_outputs in last bot message")
+
+                    # Check for list_projects_tool output
+                    for tool_output in tool_outputs:
+                        if tool_output.get('tool') == 'list_projects_tool':
+                            projects = tool_output.get('output', [])
+                            log.info(f"📋 Found {len(projects)} projects in tool_outputs")
+
+                            # Get the project at the selected index (1-based)
+                            index = int(option_number) - 1
+                            if 0 <= index < len(projects):
+                                selected_project = projects[index]
+                                project_id = selected_project.get('id')
+                                project_name = selected_project.get('nom')
+                                log.info(f"✅ Resolved option_{option_number} → {project_name} (ID: {project_id[:8]}...)")
+
+                                # Trigger list_tasks with the selected project
+                                from src.services.handlers import execute_direct_handler
+                                from src.integrations.supabase import supabase_client
+
+                                # Get user name
+                                user_name = supabase_client.get_user_name(user_id)
+
+                                # Call list_tasks handler directly with project context
+                                result = await execute_direct_handler(
+                                    intent="list_tasks",
+                                    user_id=user_id,
+                                    phone_number=phone_number,
+                                    user_name=user_name,
+                                    language=language,
+                                    message_text=project_name,  # Pass project name so it can be resolved
+                                    session_id=session_id,
+                                    last_tool_outputs=tool_outputs
+                                )
+
+                                if result:
+                                    log.info(f"✅ List tasks called for selected project")
+                                    return result
+                                else:
+                                    log.warning(f"⚠️ List tasks handler returned None")
+                                    return None
+                            else:
+                                log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
+
+                break
+
+        log.warning(f"⚠️ Could not resolve list selection {action}")
+        return None
+
     # Unknown action
     log.warning(f"⚠️ Unknown action: {action}")
     return None

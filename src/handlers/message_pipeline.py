@@ -533,7 +533,7 @@ class MessagePipeline:
                     log.info(f"   AI will use conversation history to understand user intent")
 
             # Fallback to full agent
-            log.info(f"⚙️ Using full agent (Opus) - reason: {ctx.intent_confidence < 0.8 if ctx.intent_confidence else 'fast path returned None'}")
+            log.info(f"⚙️ Using full agent (Opus)")
 
             # LAYER 1: Build AUTHORITATIVE explicit state
             from src.services.agent_state import agent_state_builder
