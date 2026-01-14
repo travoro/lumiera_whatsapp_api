@@ -40,8 +40,8 @@ def detect_numbered_list(text: str, language: str = "fr") -> Optional[List[Dict[
             # End of numbered section
             break
 
-    # Must have at least 2 items to be considered a menu
-    if len(current_section) < 2:
+    # Must have at least 1 item to be considered a menu (easier for users to click)
+    if len(current_section) < 1:
         return None
 
     # Parse items
@@ -151,9 +151,9 @@ def should_use_interactive_message(text: str) -> bool:
     if not items:
         return False
 
-    # Use interactive if we have 2-10 items (WhatsApp limits)
+    # Use interactive if we have 1-10 items (WhatsApp limits, easier for users to click)
     num_items = len(items)
-    return 2 <= num_items <= 10
+    return 1 <= num_items <= 10
 
 
 def format_for_interactive(text: str, language: str = "fr") -> Tuple[str, Optional[Dict[str, Any]]]:
