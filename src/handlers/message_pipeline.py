@@ -482,11 +482,11 @@ class MessagePipeline:
                 try:
                     messages = await supabase_client.get_messages_by_session(
                         ctx.session_id,
-                        fields='content,direction,metadata',
-                        limit=5  # Only need recent messages
+                        fields='content,direction,metadata'
                     )
-                    # Find the most recent outbound message
-                    for msg in reversed(messages):
+                    # Find the most recent outbound message (only check last 5 messages)
+                    recent_messages = messages[-5:] if len(messages) > 5 else messages
+                    for msg in reversed(recent_messages):
                         if msg and msg.get('direction') == 'outbound':
                             last_bot_message = msg.get('content', '')
                             last_tool_outputs = msg.get('metadata', {}).get('tool_outputs', [])
