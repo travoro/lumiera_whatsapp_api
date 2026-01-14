@@ -15,6 +15,9 @@ from src.utils.metadata_helpers import compact_projects, compact_tasks
 from src.utils.fuzzy_matcher import fuzzy_match_project
 from src.utils.logger import log
 
+# Import LangChain tools for LangSmith tracing
+from src.agent.tools import list_tasks_tool
+
 
 async def handle_list_tasks(
     user_id: str,
@@ -134,7 +137,14 @@ async def handle_list_tasks(
                 "output": compact_projects([project])  # Only essential fields
             })
 
-            # Get tasks for this project using actions layer
+            # Call LangChain tool for LangSmith tracing (returns formatted string)
+            log.debug(f"🔧 Calling list_tasks_tool via LangChain for LangSmith tracing")
+            _ = await list_tasks_tool.ainvoke({
+                "user_id": user_id,
+                "project_id": project_id
+            })
+
+            # Also get structured data from actions layer (for metadata)
             task_result = await task_actions.list_tasks(user_id, project_id)
 
             if not task_result["success"] or not task_result["data"]:
@@ -280,7 +290,14 @@ async def handle_update_progress(
                 "output": compact_projects([project])  # Only essential fields
             })
 
-            # Get tasks for this project using actions layer
+            # Call LangChain tool for LangSmith tracing
+            log.debug(f"🔧 Calling list_tasks_tool via LangChain for LangSmith tracing")
+            _ = await list_tasks_tool.ainvoke({
+                "user_id": user_id,
+                "project_id": project_id
+            })
+
+            # Also get structured data from actions layer (for metadata)
             task_result = await task_actions.list_tasks(user_id, project_id)
 
             if not task_result["success"] or not task_result["data"]:
