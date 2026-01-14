@@ -30,7 +30,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from src.agent.tools import all_tools
+# NOTE: all_tools import removed - now using build_tools_for_user() for closure pattern
 
 
 # System prompt for the agent (in French since all internal logic is in French)
@@ -47,6 +47,19 @@ SYSTEM_PROMPT = """Tu es Lumiera, l'assistant virtuel pour les sous-traitants du
 3. Signaler des incidents - Avec photos et description
 4. Mettre à jour la progression - Avancement des tâches
 5. Parler avec un humain - Redirection vers l'équipe administrative
+
+# ⚙️ CONTEXTE UTILISATEUR (AUTO-INJECTÉ)
+**IMPORTANT**: L'identité de l'utilisateur (user_id, phone_number, language) est automatiquement
+gérée par le système via injection de contexte. Tu n'as PAS besoin de:
+- ❌ Extraire ou mentionner le user_id dans tes réponses
+- ❌ Demander le numéro de téléphone à l'utilisateur
+- ❌ Te préoccuper de la langue (gestion automatique)
+
+Ces informations sont capturées automatiquement lors de l'authentification et injectées
+dans tous les outils. Concentre-toi uniquement sur l'extraction des paramètres métier:
+- ✅ project_id (UUID du projet depuis l'état explicite ou les données précédentes)
+- ✅ task_id (UUID de la tâche depuis l'état explicite ou les données précédentes)
+- ✅ status, description, title, etc. (paramètres fonctionnels)
 
 # RÈGLES CRITIQUES (SÉCURITÉ)
 
@@ -128,9 +141,9 @@ Quand l'utilisateur envoie un chiffre (1, 2, 3...) ou un nom de projet après av
 EXEMPLE CORRECT:
 - Liste affichée: "1. 🏗️ Champigny" avec project_id="abc-123-def-456"
 - Utilisateur dit: "champigny" OU "1"
-- Tu appelles: list_tasks_tool(user_id="real-uuid", project_id="abc-123-def-456")
+- Tu appelles: list_tasks_tool(project_id="abc-123-def-456")  ← user_id auto-injecté
 - Tu réponds: "Voici les tâches pour Champigny" ← PAS d'UUID visible
-- ❌ JAMAIS: list_tasks_tool(user_id="user_jean", project_id="proj_champigny")
+- ❌ JAMAIS: list_tasks_tool(project_id="proj_champigny")  ← ID inventé
 - ❌ JAMAIS: "Voici les tâches pour le projet abc-123-def-456" ← UUID visible
 
 # 🎯 ÉTAT EXPLICITE ET CONTEXTE (RÈGLE CRITIQUE)
@@ -145,9 +158,9 @@ Quand tu vois [État actuel - Source de vérité] dans le contexte:
 
 ## Utilisation des Outils avec l'État
 - Si "Projet actif: X (ID: abc-123)" est présent ET l'utilisateur demande "mes tâches":
-  → Appelle: list_tasks_tool(user_id, project_id="abc-123")
+  → Appelle: list_tasks_tool(project_id="abc-123")  ← user_id auto-injecté
 - Si "Tâche active: Y (ID: def-456)" est présent ET l'utilisateur dit "mettre à jour":
-  → Appelle: update_task_progress(user_id, task_id="def-456", ...)
+  → Appelle: update_task_progress(task_id="def-456", ...)  ← user_id auto-injecté
 
 ## Cycle de Vie de l'État
 1. ✅ L'état reste actif pendant 7 heures d'inactivité
@@ -191,12 +204,29 @@ Types de contexte à mémoriser:
 - Toujours filtrer par user_id pour la sécurité"""
 
 
-def create_agent() -> AgentExecutor:
-    """Create and configure the LangChain agent with selected LLM provider."""
+def create_agent(user_id: str, phone_number: str, language: str) -> AgentExecutor:
+    """Create and configure the LangChain agent with user-specific tools.
 
+    This function builds a fresh agent per request using the closure pattern to inject
+    authenticated user context (user_id, phone_number, language) into tools without
+    exposing these parameters to the LLM.
+
+    Args:
+        user_id: User UUID from authentication (injected into tools via closure)
+        phone_number: User WhatsApp phone number (injected into tools via closure)
+        language: User preferred language (injected into tools via closure)
+
+    Returns:
+        AgentExecutor with tools that have captured user context
+
+    Note:
+        This follows LangChain best practices for AgentExecutor which doesn't support
+        runtime parameter injection. The closure pattern ensures user_id is always
+        the authenticated UUID from the pipeline, preventing extraction errors.
+    """
     # Initialize LLM based on provider selection
     if settings.llm_provider == "openai":
-        log.info(f"🤖 Initializing OpenAI agent with model: {settings.openai_model}")
+        log.debug(f"🤖 Initializing OpenAI agent with model: {settings.openai_model} (user: {user_id[:8]}...)")
         llm = ChatOpenAI(
             model=settings.openai_model,
             api_key=settings.openai_api_key,
@@ -204,7 +234,7 @@ def create_agent() -> AgentExecutor:
             max_tokens=settings.openai_max_tokens,
         )
     else:  # Default to Anthropic
-        log.info(f"🤖 Initializing Anthropic agent with model: {settings.anthropic_model}")
+        log.debug(f"🤖 Initializing Anthropic agent with model: {settings.anthropic_model} (user: {user_id[:8]}...)")
         llm = ChatAnthropic(
             model=settings.anthropic_model,
             api_key=settings.anthropic_api_key,
@@ -220,30 +250,45 @@ def create_agent() -> AgentExecutor:
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
 
-    # Create agent with tool calling
-    agent = create_tool_calling_agent(llm, all_tools, prompt)
+    # Build user-specific tools with captured context (closure pattern)
+    from src.agent.tools import build_tools_for_user
+    user_tools = build_tools_for_user(user_id, phone_number, language)
+
+    log.debug(f"🔧 Built {len(user_tools)} tools with captured context for user {user_id[:8]}...")
+
+    # Create agent with user-specific tools
+    agent = create_tool_calling_agent(llm, user_tools, prompt)
 
     # Create agent executor
     agent_executor = AgentExecutor(
         agent=agent,
-        tools=all_tools,
+        tools=user_tools,  # User-specific tools with captured context
         verbose=settings.debug,
         handle_parsing_errors=True,
         max_iterations=5,
         return_intermediate_steps=True,  # CRITICAL: Capture tool outputs for short-term memory
     )
 
-    log.info("Agent created successfully")
+    log.debug(f"✅ Agent created successfully for user {user_id[:8]}...")
     return agent_executor
 
 
 class LumieraAgent:
-    """Main agent class for handling user requests."""
+    """Main agent class for handling user requests.
+
+    With the closure pattern, the agent is built per-request to inject user-specific
+    context into tools. This class serves as the interface for processing messages.
+    """
 
     def __init__(self):
-        """Initialize the Lumiera agent."""
-        self.agent_executor = create_agent()
-        log.info("Lumiera Agent initialized")
+        """Initialize the Lumiera agent.
+
+        Note: With closure pattern, the agent is NOT created here. Instead, it's
+        built fresh for each request in process_message() with the user's context.
+        This allows tools to capture authenticated user_id, phone_number, and language
+        from the closure scope, following LangChain best practices for AgentExecutor.
+        """
+        log.info("🚀 Lumiera Agent initialized (agent built per-request with closure pattern)")
 
     async def process_message(
         self,
@@ -278,17 +323,24 @@ class LumieraAgent:
         # Use execution context scope for thread-safe execution tracking
         with execution_context_scope() as ctx:
             try:
+                # Build agent with user-specific tools (closure pattern)
+                # Tools capture user_id, phone_number, language from closure scope
+                log.debug(f"🔨 Building agent for user {user_id[:8]}...")
+                agent_executor = create_agent(user_id, phone_number, language)
+
                 # Build context prefix with AUTHORITATIVE state first
                 # NOTE: Language code is intentionally NOT included here to ensure
                 # agent always responds in French (internal processing language).
                 # Translation to user language happens in the pipeline after agent response.
+                # NOTE: user_id, phone_number, language are NO LONGER in text context
+                # because they're captured in tool closures.
                 context_prefix = ""
 
                 # LAYER 1: Explicit State (AUTHORITATIVE - takes precedence)
                 if state_context:
                     context_prefix += state_context  # Already formatted with headers
 
-                # LAYER 2: User context
+                # LAYER 2: User context (name only - NO user_id)
                 context_prefix += "[Contexte utilisateur]\n"
                 if user_name:
                     context_prefix += f"Nom: {user_name}\n"
@@ -296,19 +348,18 @@ class LumieraAgent:
                     context_prefix += f"Contexte additionnel:\n{user_context}\n"
                 context_prefix += "\n"
 
-                # Prepare agent input
+                # Prepare agent input (SIMPLIFIED - no user_id/phone/language in dict)
+                # These are captured in tool closures, not passed to LLM
                 agent_input = {
                     "input": f"{context_prefix}{message_text}",
-                    "user_id": user_id,
-                    "phone_number": phone_number,
-                    "language": language,
                 }
 
                 if chat_history:
                     agent_input["chat_history"] = chat_history
 
                 # Run agent
-                result = await self.agent_executor.ainvoke(agent_input)
+                log.debug(f"🤖 Invoking agent for user {user_id[:8]}...")
+                result = await agent_executor.ainvoke(agent_input)
 
                 # Extract output
                 output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
