@@ -41,6 +41,7 @@ class MessageContext:
     response_text: Optional[str] = None
     escalation: bool = False
     tools_called: list = field(default_factory=list)
+    tool_outputs: list = field(default_factory=list)  # Structured tool outputs (for short-term memory)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for logging."""
@@ -497,20 +498,86 @@ class MessagePipeline:
             # Fallback to full agent
             log.info(f"⚙️ Using full agent (Opus)")
 
-            # Load chat history for agent context
+            # LAYER 1: Build AUTHORITATIVE explicit state
+            from src.services.agent_state import agent_state_builder
+            agent_state = await agent_state_builder.build_state(
+                user_id=ctx.user_id,
+                language=ctx.user_language,
+                session_id=ctx.session_id
+            )
+            state_context = agent_state.to_prompt_context()
+            if agent_state.has_active_context():
+                log.info(f"📍 Injecting explicit state: project={agent_state.active_project_id}, task={agent_state.active_task_id}")
+
+            # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history = []
             try:
                 from langchain_core.messages import HumanMessage, AIMessage
+                import json
+
+                # Load messages WITH metadata
                 messages = await supabase_client.get_messages_by_session(
                     ctx.session_id,
-                    fields='content,direction,created_at'
+                    fields='content,direction,metadata,created_at'
                 )
+
                 # Convert to LangChain message format (last 10 messages for context)
-                for msg in messages[-10:]:
+                # BUT only include tool outputs from the LAST 1-3 turns (prevent bloat!)
+                messages_for_history = messages[-10:] if messages else []
+
+                # Find how many recent turns have tool outputs
+                recent_tool_turns = 0
+                for msg in reversed(messages_for_history):
+                    if msg.get('direction') == 'outbound' and msg.get('metadata', {}).get('tool_outputs'):
+                        recent_tool_turns += 1
+                        if recent_tool_turns >= 3:  # MAX 3 turns with tool outputs
+                            break
+
+                for idx, msg in enumerate(messages_for_history):
                     if msg.get('direction') == 'inbound':
                         chat_history.append(HumanMessage(content=msg.get('content', '')))
+
                     elif msg.get('direction') == 'outbound':
-                        chat_history.append(AIMessage(content=msg.get('content', '')))
+                        content = msg.get('content', '')
+
+                        # Check if this message has tool outputs AND is within last 3 tool-using turns
+                        metadata = msg.get('metadata', {})
+                        tool_outputs = metadata.get('tool_outputs', [])
+
+                        # Only append tool outputs if from recent turns (prevent token bloat!)
+                        is_recent_enough = (len(messages_for_history) - idx) <= (recent_tool_turns if recent_tool_turns <= 3 else 3)
+
+                        if tool_outputs and is_recent_enough:
+                            # Append structured data for agent reference (compact format)
+                            tool_context = "\n[Données précédentes:"
+                            for tool_output in tool_outputs:
+                                tool_name = tool_output.get('tool', 'unknown')
+                                output_data = tool_output.get('output')
+
+                                # Only include essential structured data (not full details)
+                                if tool_name == 'list_projects_tool' and isinstance(output_data, list):
+                                    # Extract just IDs and names
+                                    projects_compact = [
+                                        {"id": p.get("id"), "nom": p.get("nom")}
+                                        for p in output_data if isinstance(p, dict)
+                                    ]
+                                    if projects_compact:
+                                        tool_context += f"\nProjets: {json.dumps(projects_compact, ensure_ascii=False)}"
+
+                                elif tool_name == 'list_tasks_tool' and isinstance(output_data, list):
+                                    # Extract just IDs and titles
+                                    tasks_compact = [
+                                        {"id": t.get("id"), "title": t.get("title")}
+                                        for t in output_data if isinstance(t, dict)
+                                    ]
+                                    if tasks_compact:
+                                        tool_context += f"\nTâches: {json.dumps(tasks_compact, ensure_ascii=False)}"
+
+                            tool_context += "]"
+                            content += tool_context
+
+                        chat_history.append(AIMessage(content=content))
+
                 log.info(f"📜 Loaded {len(chat_history)} messages for agent context")
             except Exception as e:
                 log.warning(f"Could not load chat history for agent: {e}")
@@ -522,12 +589,14 @@ class MessagePipeline:
                 user_name=ctx.user_name,
                 language=ctx.user_language,
                 message_text=ctx.message_in_french,
-                chat_history=chat_history
+                chat_history=chat_history,
+                state_context=state_context  # NEW: Inject explicit state
             )
 
             ctx.response_text = agent_result.get("message")
             ctx.escalation = agent_result.get("escalation", False)
             ctx.tools_called = agent_result.get("tools_called", [])
+            ctx.tool_outputs = agent_result.get("tool_outputs", [])  # NEW: Store for persistence
 
             log.info(f"✅ Agent processed message")
             return Result.ok(None)
@@ -602,14 +671,24 @@ class MessagePipeline:
                 session_id=ctx.session_id
             )
 
-            # Save outbound message
+            # Build metadata for outbound message
+            outbound_metadata = {}
+
+            # Add escalation metadata if applicable (handled by save_message)
+            # Add tool outputs metadata if any (for short-term memory)
+            if ctx.tool_outputs:
+                outbound_metadata["tool_outputs"] = ctx.tool_outputs
+                log.debug(f"💾 Storing {len(ctx.tool_outputs)} tool outputs in message metadata")
+
+            # Save outbound message with metadata
             await supabase_client.save_message(
                 user_id=ctx.user_id,
                 message_text=ctx.response_text,
                 original_language=ctx.user_language,
                 direction="outbound",
                 session_id=ctx.session_id,
-                is_escalation=ctx.escalation
+                is_escalation=ctx.escalation,
+                metadata=outbound_metadata if outbound_metadata else None
             )
 
             log.info(f"✅ Messages persisted")

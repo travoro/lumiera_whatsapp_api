@@ -165,6 +165,7 @@ class SupabaseClient:
         escalation_reason: Optional[str] = None,
         need_human: bool = False,  # DEPRECATED: Use is_escalation instead
         source: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Save message to database for audit trail with session tracking.
 
@@ -182,6 +183,7 @@ class SupabaseClient:
             escalation_reason: Reason for escalation if applicable
             need_human: DEPRECATED - Use is_escalation instead. Kept for backward compatibility.
             source: Message source ('user', 'agent', 'whatsapp'). Auto-detected if not provided.
+            metadata: Additional metadata to store (e.g., tool_outputs for short-term memory)
         """
         try:
             # Auto-detect source if not provided
@@ -207,8 +209,8 @@ class SupabaseClient:
             if session_id:
                 message_data["session_id"] = session_id
 
-            # Add metadata if applicable
-            metadata = {}
+            # Build metadata (merge provided metadata with escalation data)
+            message_metadata = metadata.copy() if metadata else {}
 
             # BACKWARD COMPATIBILITY: Convert need_human to is_escalation
             if need_human and not is_escalation:
@@ -217,13 +219,13 @@ class SupabaseClient:
 
             # Add escalation metadata if applicable (standardized format)
             if is_escalation:
-                metadata["is_escalation"] = True
-                metadata["escalation_reason"] = escalation_reason
-                metadata["escalation_timestamp"] = datetime.utcnow().isoformat()
+                message_metadata["is_escalation"] = True
+                message_metadata["escalation_reason"] = escalation_reason
+                message_metadata["escalation_timestamp"] = datetime.utcnow().isoformat()
 
-            # Save metadata if any flags are set
-            if metadata:
-                message_data["metadata"] = metadata
+            # Save metadata if any data is present
+            if message_metadata:
+                message_data["metadata"] = message_metadata
 
             self.client.table("messages").insert(message_data).execute()
             return True

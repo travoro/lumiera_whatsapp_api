@@ -186,6 +186,109 @@ class ProjectContextService:
             log.error(f"Error getting active project details for user {user_id}: {e}")
             return None
 
+    async def get_active_task(self, user_id: str) -> Optional[str]:
+        """Get the currently active task for a subcontractor.
+
+        Returns None if:
+        - No active task is set
+        - Active task has expired (>7 hours since last activity)
+
+        Args:
+            user_id: Subcontractor ID (UUID)
+
+        Returns:
+            Task ID (UUID) if active and not expired, None otherwise
+        """
+        try:
+            # Get subcontractor data
+            user = self.client.get_user(user_id)
+            if not user:
+                return None
+
+            active_task_id = user.get("active_task_id")
+            last_activity = user.get("active_task_last_activity")
+
+            # No active task set
+            if not active_task_id:
+                return None
+
+            # Check if expired
+            if self._is_expired(last_activity):
+                log.info(f"Active task context expired for user {user_id}")
+                await self.clear_active_task(user_id)
+                return None
+
+            log.debug(f"Active task for user {user_id}: {active_task_id}")
+            return active_task_id
+
+        except Exception as e:
+            log.error(f"Error getting active task for user {user_id}: {e}")
+            return None
+
+    async def set_active_task(
+        self,
+        user_id: str,
+        task_id: str,
+        task_title: Optional[str] = None
+    ) -> bool:
+        """Set or update the active task for a subcontractor.
+
+        Resets the activity timestamp to NOW.
+
+        Args:
+            user_id: Subcontractor ID (UUID)
+            task_id: Task ID (UUID) to set as active
+            task_title: Optional task title for logging
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            response = self.client.client.table("subcontractors").update({
+                "active_task_id": task_id,
+                "active_task_last_activity": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+
+            if response.data and len(response.data) > 0:
+                task_display = task_title if task_title else task_id
+                log.info(
+                    f"🎯 Set active task for user {user_id}: {task_display}"
+                )
+                return True
+            else:
+                log.warning(f"Failed to set active task for user {user_id}")
+                return False
+
+        except Exception as e:
+            log.error(f"Error setting active task for user {user_id}: {e}")
+            return False
+
+    async def clear_active_task(self, user_id: str) -> bool:
+        """Clear the active task context for a subcontractor.
+
+        Args:
+            user_id: Subcontractor ID (UUID)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            response = self.client.client.table("subcontractors").update({
+                "active_task_id": None,
+                "active_task_last_activity": None,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+
+            if response.data and len(response.data) > 0:
+                log.info(f"🧹 Cleared active task context for user {user_id}")
+                return True
+            return False
+
+        except Exception as e:
+            log.error(f"Error clearing active task for user {user_id}: {e}")
+            return False
+
     def _is_expired(self, last_activity: Optional[str]) -> bool:
         """Check if the active project context has expired.
 

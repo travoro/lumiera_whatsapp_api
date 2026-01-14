@@ -132,24 +132,40 @@ EXEMPLE CORRECT:
 - ❌ JAMAIS: list_tasks_tool(user_id="user_jean", project_id="proj_champigny")
 - ❌ JAMAIS: "Voici les tâches pour le projet abc-123-def-456" ← UUID visible
 
-# 🎯 CONTEXTE DE PROJET ACTIF
-Le système mémorise automatiquement le projet sur lequel travaille le sous-traitant:
-1. ✅ Quand l'utilisateur sélectionne un projet, il devient son "projet actif"
-2. ✅ Le projet actif reste en mémoire pendant 7 heures d'inactivité
-3. ✅ Si l'utilisateur demande "mes tâches" SANS préciser le projet:
-   - Tu peux appeler list_tasks_tool SANS project_id (optionnel)
-   - Le système utilisera automatiquement le projet actif
-   - Si pas de projet actif: l'outil demandera de sélectionner un projet
-4. ✅ Si l'utilisateur dit "je suis sur le chantier X" ou "je travaille sur Y":
-   - Le système met automatiquement à jour le projet actif
-5. ✅ Après 7h sans activité, le contexte expire et l'utilisateur devra re-sélectionner
+# 🎯 ÉTAT EXPLICITE ET CONTEXTE (RÈGLE CRITIQUE)
+
+## État Actif (Source de Vérité)
+Quand tu vois [État actuel - Source de vérité] dans le contexte:
+1. ✅ CETTE INFORMATION EST AUTHORITATIVE - elle prend toujours la priorité
+2. ✅ Projet actif: ID → Utilise cet ID directement pour les outils
+3. ✅ Tâche active: ID → Utilise cet ID directement pour les outils
+4. ❌ NE JAMAIS inventer de nouveaux IDs si l'état actif existe
+5. ❌ NE PAS demander à l'utilisateur ce qu'il a déjà sélectionné
+
+## Utilisation des Outils avec l'État
+- Si "Projet actif: X (ID: abc-123)" est présent ET l'utilisateur demande "mes tâches":
+  → Appelle: list_tasks_tool(user_id, project_id="abc-123")
+- Si "Tâche active: Y (ID: def-456)" est présent ET l'utilisateur dit "mettre à jour":
+  → Appelle: update_task_progress(user_id, task_id="def-456", ...)
+
+## Cycle de Vie de l'État
+1. ✅ L'état reste actif pendant 7 heures d'inactivité
+2. ✅ Quand un outil est appelé, l'état est mis à jour automatiquement
+3. ✅ Si AUCUN état actif n'existe, demande à l'utilisateur de sélectionner
+
+## Priorité des Sources (Du plus au moins prioritaire)
+1. **État Explicite** (ID dans [État actuel]) → UTILISER EN PREMIER
+2. **Historique récent** (derniers tool outputs, 1-3 tours) → Si état vide
+3. **Recherche par nom** (lookup tools) → Si aucune des 2 options précédentes
 
 Exemples:
-- Matin: "Montrez-moi les tâches" → Demande quel projet
-- Utilisateur: "Chantier Bureau" → Devient projet actif
-- Utilisateur: "Montrez-moi les tâches" → Utilise automatiquement "Chantier Bureau"
-- Utilisateur (2h plus tard): "Quelles sont mes tâches?" → Toujours "Chantier Bureau"
-- Utilisateur (lendemain): "Les tâches" → Contexte expiré, redemande le projet
+- État: "Projet actif: Champigny (ID: abc-123)"
+  User: "Montre-moi les tâches"
+  → list_tasks_tool(user_id, project_id="abc-123")  ✅ Utilise l'ID de l'état
+
+- Pas d'état actif
+  User: "Les tâches pour Champigny"
+  → Appelle d'abord find_project_by_name("Champigny") pour obtenir l'ID
 
 # 🧠 MÉMORISATION ET PERSONNALISATION
 1. ✅ TOUJOURS mémoriser les informations importantes avec remember_user_context_tool
@@ -203,6 +219,7 @@ def create_agent() -> AgentExecutor:
         verbose=settings.debug,
         handle_parsing_errors=True,
         max_iterations=5,
+        return_intermediate_steps=True,  # CRITICAL: Capture tool outputs for short-term memory
     )
 
     log.info("Agent created successfully")
@@ -226,8 +243,9 @@ class LumieraAgent:
         chat_history: list = None,
         user_name: str = "",
         user_context: str = "",
-    ) -> str:
-        """Process a user message and return a response.
+        state_context: str = "",
+    ) -> Dict[str, Any]:
+        """Process a user message and return a response with structured data.
 
         Args:
             user_id: The user's ID
@@ -237,21 +255,32 @@ class LumieraAgent:
             chat_history: Optional chat history for context
             user_name: Official contact name from subcontractors table
             user_context: Additional user context for personalization
+            state_context: AUTHORITATIVE explicit state (active project/task IDs)
 
         Returns:
-            The response text (in French, to be translated back)
+            Dict with:
+                - message: Response text (in French)
+                - escalation: Whether escalation occurred
+                - tools_called: List of tool names that were executed
+                - tool_outputs: Structured tool outputs (for short-term memory)
         """
         # Use execution context scope for thread-safe execution tracking
         with execution_context_scope() as ctx:
             try:
-                # Add user context to the message
+                # Build context prefix with AUTHORITATIVE state first
                 # NOTE: Language code is intentionally NOT included here to ensure
                 # agent always responds in French (internal processing language).
                 # Translation to user language happens in the pipeline after agent response.
-                context_prefix = "[Contexte utilisateur]\n"
+                context_prefix = ""
+
+                # LAYER 1: Explicit State (AUTHORITATIVE - takes precedence)
+                if state_context:
+                    context_prefix += state_context  # Already formatted with headers
+
+                # LAYER 2: User context
+                context_prefix += "[Contexte utilisateur]\n"
                 if user_name:
                     context_prefix += f"Nom: {user_name}\n"
-                # Language code removed - agent must always respond in French
                 if user_context:
                     context_prefix += f"Contexte additionnel:\n{user_context}\n"
                 context_prefix += "\n"
@@ -295,6 +324,24 @@ class LumieraAgent:
                     log.warning(f"Agent returned unexpected type {type(output)}, converting to string")
                     output = str(output)
 
+                # Extract intermediate_steps (tool calls + outputs)
+                # Format: List[Tuple[AgentAction, Any]]
+                intermediate_steps = result.get("intermediate_steps", [])
+                tool_outputs = []
+
+                for action, tool_result in intermediate_steps:
+                    # Store STRUCTURED data only (not display strings)
+                    # Keep tool outputs strictly structured
+                    tool_output_entry = {
+                        "tool": action.tool,
+                        "input": action.tool_input,
+                        "output": tool_result  # Raw structured data from tool
+                    }
+                    tool_outputs.append(tool_output_entry)
+
+                if tool_outputs:
+                    log.info(f"📦 Captured {len(tool_outputs)} tool outputs for short-term memory")
+
                 # Get escalation flag from execution context (set by tools)
                 escalation_occurred = ctx.escalation_occurred
 
@@ -306,7 +353,8 @@ class LumieraAgent:
                 return {
                     "message": output,
                     "escalation": escalation_occurred,
-                    "tools_called": ctx.tools_called
+                    "tools_called": ctx.tools_called,
+                    "tool_outputs": tool_outputs  # NEW: Short-term tool memory
                 }
 
             except Exception as e:
@@ -314,7 +362,8 @@ class LumieraAgent:
                 return {
                     "message": "Désolé, une erreur s'est produite. Veuillez réessayer.",
                     "escalation": False,
-                    "tools_called": []
+                    "tools_called": [],
+                    "tool_outputs": []
                 }
 
 

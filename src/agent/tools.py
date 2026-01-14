@@ -545,6 +545,79 @@ async def remember_user_context_tool(
     return f"❌ Could not remember context"
 
 
+@tool
+async def find_project_by_name(user_id: str, project_name: str) -> str:
+    """Find a project by its name when the user mentions it.
+
+    IMPORTANT: Only use this tool when:
+    1. NO active project exists in the explicit state
+    2. User mentions a project by name
+    3. You need the project_id to call another tool
+
+    Args:
+        user_id: The ID of the user
+        project_name: The name or partial name of the project (case-insensitive)
+
+    Returns:
+        JSON string with project details if found, or error message
+    """
+    import json
+    from src.actions import projects
+
+    result = await projects.list_projects(user_id)
+
+    if not result["success"] or not result["data"]:
+        return json.dumps({
+            "success": False,
+            "error": "no_projects",
+            "message": "Aucun projet trouvé pour cet utilisateur"
+        })
+
+    # Search for project by name (fuzzy matching)
+    project_name_lower = project_name.lower().strip()
+    matches = []
+
+    for project in result["data"]:
+        project_nom = project.get("nom", "").lower()
+        # Exact match
+        if project_nom == project_name_lower:
+            return json.dumps({
+                "success": True,
+                "project_id": project["id"],
+                "project_name": project["nom"],
+                "match_type": "exact"
+            })
+        # Partial match
+        elif project_name_lower in project_nom or project_nom in project_name_lower:
+            matches.append(project)
+
+    # Single partial match found
+    if len(matches) == 1:
+        return json.dumps({
+            "success": True,
+            "project_id": matches[0]["id"],
+            "project_name": matches[0]["nom"],
+            "match_type": "partial"
+        })
+
+    # Multiple matches - return list for disambiguation
+    elif len(matches) > 1:
+        return json.dumps({
+            "success": False,
+            "error": "multiple_matches",
+            "message": f"Plusieurs projets correspondent à '{project_name}'",
+            "matches": [{"name": p["nom"]} for p in matches]
+        })
+
+    # No matches
+    else:
+        return json.dumps({
+            "success": False,
+            "error": "not_found",
+            "message": f"Aucun projet trouvé avec le nom '{project_name}'"
+        })
+
+
 # List of all tools
 all_tools = [
     list_projects_tool,
@@ -562,4 +635,5 @@ all_tools = [
     set_language_tool,
     escalate_to_human_tool,
     remember_user_context_tool,
+    find_project_by_name,  # Layer 3: Fallback lookup when no explicit state
 ]
