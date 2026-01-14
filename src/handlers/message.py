@@ -327,8 +327,6 @@ async def handle_direct_action(
                             log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
                         break
 
-                break
-
         log.warning(f"⚠️ Could not resolve list selection {action}")
         return None
 

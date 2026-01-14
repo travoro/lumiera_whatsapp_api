@@ -80,6 +80,7 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
                 "due_date": attributes.get("due-date"),
                 "progress": attributes.get("progress", 0),
                 "sequential_id": attributes.get("sequential-id"),
+                "project_id": attributes.get("project-id") or planradar_project_id,  # Store project_id for API calls
             })
 
         # Update active project context (set or touch activity)
@@ -113,11 +114,35 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
         }
 
 
-async def get_task_description(user_id: str, task_id: str) -> Dict[str, Any]:
+async def get_task_description(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get detailed description of a task."""
     try:
+        # Get project_id from active context if not provided
+        if not project_id:
+            project_id = await project_context_service.get_active_project(user_id)
+            if not project_id:
+                return {
+                    "success": False,
+                    "message": "Contexte du projet non trouvé. Veuillez d'abord sélectionner un projet."
+                }
+
+        # Get PlanRadar project ID from database
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+        if not project:
+            return {
+                "success": False,
+                "message": "Projet non trouvé."
+            }
+
+        planradar_project_id = project.get("planradar_project_id")
+        if not planradar_project_id:
+            return {
+                "success": False,
+                "message": "Ce projet n'est pas lié à PlanRadar."
+            }
+
         # Get full task details to include title
-        task = await planradar_client.get_task(task_id)
+        task = await planradar_client.get_task(task_id, planradar_project_id)
 
         if not task:
             return {
@@ -156,10 +181,24 @@ async def get_task_description(user_id: str, task_id: str) -> Dict[str, Any]:
         }
 
 
-async def get_task_plans(user_id: str, task_id: str) -> Dict[str, Any]:
+async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get plans/blueprints for a task."""
     try:
-        plans = await planradar_client.get_task_plans(task_id)
+        # Get project_id from active context if not provided
+        if not project_id:
+            project_id = await project_context_service.get_active_project(user_id)
+            if not project_id:
+                return {"success": False, "message": "Contexte du projet non trouvé."}
+
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+        if not project:
+            return {"success": False, "message": "Projet non trouvé."}
+
+        planradar_project_id = project.get("planradar_project_id")
+        if not planradar_project_id:
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
+
+        plans = await planradar_client.get_task_plans(task_id, planradar_project_id)
 
         # Log action
         await supabase_client.save_action_log(
@@ -184,10 +223,24 @@ async def get_task_plans(user_id: str, task_id: str) -> Dict[str, Any]:
         }
 
 
-async def get_task_images(user_id: str, task_id: str) -> Dict[str, Any]:
+async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get images attached to a task."""
     try:
-        images = await planradar_client.get_task_images(task_id)
+        # Get project_id from active context if not provided
+        if not project_id:
+            project_id = await project_context_service.get_active_project(user_id)
+            if not project_id:
+                return {"success": False, "message": "Contexte du projet non trouvé."}
+
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+        if not project:
+            return {"success": False, "message": "Projet non trouvé."}
+
+        planradar_project_id = project.get("planradar_project_id")
+        if not planradar_project_id:
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
+
+        images = await planradar_client.get_task_images(task_id, planradar_project_id)
 
         # Log action
         await supabase_client.save_action_log(
@@ -212,10 +265,24 @@ async def get_task_images(user_id: str, task_id: str) -> Dict[str, Any]:
         }
 
 
-async def add_task_comment(user_id: str, task_id: str, comment_text: str) -> Dict[str, Any]:
+async def add_task_comment(user_id: str, task_id: str, comment_text: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Add a comment to a task."""
     try:
-        success = await planradar_client.add_task_comment(task_id, comment_text)
+        # Get project_id from active context if not provided
+        if not project_id:
+            project_id = await project_context_service.get_active_project(user_id)
+            if not project_id:
+                return {"success": False, "message": "Contexte du projet non trouvé."}
+
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+        if not project:
+            return {"success": False, "message": "Projet non trouvé."}
+
+        planradar_project_id = project.get("planradar_project_id")
+        if not planradar_project_id:
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
+
+        success = await planradar_client.add_task_comment(task_id, planradar_project_id, comment_text)
 
         if not success:
             return {
@@ -245,10 +312,24 @@ async def add_task_comment(user_id: str, task_id: str, comment_text: str) -> Dic
         }
 
 
-async def get_task_comments(user_id: str, task_id: str) -> Dict[str, Any]:
+async def get_task_comments(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get all comments for a task."""
     try:
-        comments = await planradar_client.get_task_comments(task_id)
+        # Get project_id from active context if not provided
+        if not project_id:
+            project_id = await project_context_service.get_active_project(user_id)
+            if not project_id:
+                return {"success": False, "message": "Contexte du projet non trouvé."}
+
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+        if not project:
+            return {"success": False, "message": "Projet non trouvé."}
+
+        planradar_project_id = project.get("planradar_project_id")
+        if not planradar_project_id:
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
+
+        comments = await planradar_client.get_task_comments(task_id, planradar_project_id)
 
         # Log action
         await supabase_client.save_action_log(
