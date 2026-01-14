@@ -226,50 +226,13 @@ async def handle_direct_action(
 
                 if tool_outputs:
                     log.info(f"📦 Found tool_outputs in last bot message")
+                    log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
 
-                    # Check for list_projects_tool output
+                    # Check for list_tasks_tool FIRST (most specific/recent context)
+                    # Then check for list_projects_tool (less specific context)
+                    # This prioritizes task selections over project selections
                     for tool_output in tool_outputs:
-                        if tool_output.get('tool') == 'list_projects_tool':
-                            projects = tool_output.get('output', [])
-                            log.info(f"📋 Found {len(projects)} projects in tool_outputs")
-
-                            # Get the project at the selected index (1-based)
-                            index = int(option_number) - 1
-                            if 0 <= index < len(projects):
-                                selected_project = projects[index]
-                                project_id = selected_project.get('id')
-                                project_name = selected_project.get('nom')
-                                log.info(f"✅ Resolved option_{option_number} → {project_name} (ID: {project_id[:8]}...)")
-
-                                # Trigger list_tasks with the selected project
-                                from src.services.handlers import execute_direct_handler
-                                from src.integrations.supabase import supabase_client
-
-                                # Get user name
-                                user_name = supabase_client.get_user_name(user_id)
-
-                                # Call list_tasks handler directly with project context
-                                result = await execute_direct_handler(
-                                    intent="list_tasks",
-                                    user_id=user_id,
-                                    phone_number=phone_number,
-                                    user_name=user_name,
-                                    language=language,
-                                    message_text=project_name,  # Pass project name so it can be resolved
-                                    session_id=session_id,
-                                    last_tool_outputs=tool_outputs
-                                )
-
-                                if result:
-                                    log.info(f"✅ List tasks called for selected project")
-                                    return result
-                                else:
-                                    log.warning(f"⚠️ List tasks handler returned None")
-                                    return None
-                            else:
-                                log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
-
-                        elif tool_output.get('tool') == 'list_tasks_tool':
+                        if tool_output.get('tool') == 'list_tasks_tool':
                             tasks = tool_output.get('output', [])
                             log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
 
@@ -308,6 +271,46 @@ async def handle_direct_action(
                                     return None
                             else:
                                 log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
+
+                        elif tool_output.get('tool') == 'list_projects_tool':
+                            projects = tool_output.get('output', [])
+                            log.info(f"📋 Found {len(projects)} projects in tool_outputs")
+
+                            # Get the project at the selected index (1-based)
+                            index = int(option_number) - 1
+                            if 0 <= index < len(projects):
+                                selected_project = projects[index]
+                                project_id = selected_project.get('id')
+                                project_name = selected_project.get('nom')
+                                log.info(f"✅ Resolved option_{option_number} → {project_name} (ID: {project_id[:8]}...)")
+
+                                # Trigger list_tasks with the selected project
+                                from src.services.handlers import execute_direct_handler
+                                from src.integrations.supabase import supabase_client
+
+                                # Get user name
+                                user_name = supabase_client.get_user_name(user_id)
+
+                                # Call list_tasks handler directly with project context
+                                result = await execute_direct_handler(
+                                    intent="list_tasks",
+                                    user_id=user_id,
+                                    phone_number=phone_number,
+                                    user_name=user_name,
+                                    language=language,
+                                    message_text=project_name,  # Pass project name so it can be resolved
+                                    session_id=session_id,
+                                    last_tool_outputs=tool_outputs
+                                )
+
+                                if result:
+                                    log.info(f"✅ List tasks called for selected project")
+                                    return result
+                                else:
+                                    log.warning(f"⚠️ List tasks handler returned None")
+                                    return None
+                            else:
+                                log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
 
                 break
 
