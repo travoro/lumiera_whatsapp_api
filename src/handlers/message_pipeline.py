@@ -534,6 +534,10 @@ class MessagePipeline:
                             break
 
                 for idx, msg in enumerate(messages_for_history):
+                    # Safety check: skip None messages
+                    if not msg:
+                        continue
+
                     if msg.get('direction') == 'inbound':
                         chat_history.append(HumanMessage(content=msg.get('content', '')))
 
