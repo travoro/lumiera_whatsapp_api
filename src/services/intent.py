@@ -105,72 +105,6 @@ class IntentClassifier:
         matches = re.findall(pattern, text, re.MULTILINE)
         return len(matches) >= 1
 
-    async def _classify_menu_selection(self, option: int, menu_text: str) -> str:
-        """Use Haiku to intelligently classify menu selection based on context.
-
-        Instead of hardcoded mappings, we let Haiku understand the menu content
-        and determine what the user wants to do based on their selection.
-
-        Args:
-            option: Selected option number (1-9)
-            menu_text: The full menu text shown to user
-
-        Returns:
-            Intent name based on Haiku's understanding of the menu
-        """
-        # Truncate menu text if too long (keep first 500 chars for context)
-        menu_preview = menu_text[:500] if len(menu_text) > 500 else menu_text
-
-        prompt = f"""Le bot a montré ce menu à l'utilisateur :
-
-{menu_preview}
-
-L'utilisateur a répondu avec : {option}
-
-En fonction du contenu du menu et de la sélection de l'option {option} par l'utilisateur, classifie ce que l'utilisateur veut faire :
-
-- greeting: L'utilisateur veut revoir le menu principal
-- list_projects: L'utilisateur veut voir ses projets/chantiers
-- list_tasks: L'utilisateur veut voir les tâches (OU sélectionne un PROJET d'une liste de projets pour voir ses tâches)
-- report_incident: L'utilisateur veut signaler un problème/incident
-- update_progress: L'utilisateur veut mettre à jour la progression d'une tâche
-- escalate: L'utilisateur veut parler à un humain/équipe
-- general: Sélection d'une TÂCHE spécifique d'une liste de tâches (nécessite le contexte complet de l'agent)
-
-Retourne SEULEMENT le nom de l'intent et la confiance (0-100) au format : intent:confidence
-Exemple : escalate:95
-
-RÈGLES CRITIQUES :
-1. Si le menu montre une LISTE DE PROJETS (contient "projet" ou "chantier" ou "🏗️") ET l'utilisateur sélectionne un numéro → Retourne : list_tasks
-   Exemple : "1. 🏗️ Champigny" + utilisateur dit "1" → list_tasks (utilisateur veut les tâches pour Champigny)
-2. Si le menu montre une LISTE DE TÂCHES (contient "tâche" ou "📝") ET l'utilisateur sélectionne un numéro → Retourne : general
-   Exemple : "1. 📝 Installation" + utilisateur dit "1" → general (nécessite contexte complet)
-3. Si le menu est le MENU PRINCIPAL (plusieurs options d'action) → Basé sur l'option spécifique sélectionnée"""
-
-        try:
-            response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
-            response_text = response.content.strip().lower()
-
-            # Parse response
-            if ":" in response_text:
-                parts = response_text.split(":")
-                intent = parts[0].strip()
-                try:
-                    confidence = float(parts[1].strip()) / 100.0
-                except:
-                    confidence = 0.90  # High confidence for menu selection
-            else:
-                intent = response_text.strip()
-                confidence = 0.90
-
-            log.info(f"🤖 Haiku classified menu option {option} → {intent} (confidence: {confidence})")
-            return intent
-
-        except Exception as e:
-            log.error(f"Error in Haiku menu classification: {e}")
-            # Fallback: return general so agent can handle it
-            return "general"
-
     async def classify(
         self,
         message: str,
@@ -193,31 +127,7 @@ RÈGLES CRITIQUES :
             message_lower = message.lower().strip()
             confidence = 0.0
 
-            # PRIORITY 1: Check for numeric menu selection (highest priority)
-            # If user sends a single digit and the last bot message contained a menu,
-            # use Haiku to intelligently understand what the selection means
-            if message.strip().isdigit() and last_bot_message:
-                option_number = int(message.strip())
-                # Check if last message was a numbered menu
-                if self._contains_numbered_list(last_bot_message):
-                    log.info(f"🔢 Numeric menu selection detected: '{message}' - asking Haiku to classify with context")
-
-                    # Use Haiku to understand the menu and classify the intent
-                    intent = await self._classify_menu_selection(option_number, last_bot_message)
-
-                    # Get intent metadata
-                    intent_metadata = INTENTS.get(intent, INTENTS["general"])
-
-                    return {
-                        "intent": intent,
-                        "confidence": 0.95,  # Very high confidence for menu selection with context
-                        "requires_tools": intent_metadata.get("requires_tools", True),
-                        "tools": intent_metadata.get("tools", []),
-                        "requires_confirmation": intent_metadata.get("requires_confirmation", False),
-                        "menu_selection": True  # Flag to indicate this was a menu selection
-                    }
-
-            # PRIORITY 2: Check for exact keyword matches (high confidence)
+            # PRIORITY 1: Check for exact keyword matches (high confidence)
             # Exact keyword matching for high confidence
             for intent_name, intent_config in INTENTS.items():
                 keywords = intent_config.get("keywords", [])
@@ -238,20 +148,26 @@ RÈGLES CRITIQUES :
                 if confidence >= 0.90:
                     break
 
-            # If no strong keyword match, use Claude Haiku for classification
+            # PRIORITY 2: Use Claude Haiku for classification (handles both menu selections and general messages)
             if confidence < 0.90:
                 # Build conversation context if available
                 context_section = ""
                 if conversation_history and len(conversation_history) > 0:
-                    context_section = "\n\nRecent conversation history:\n"
+                    context_section = "\n\nHistorique récent de conversation :\n"
                     for msg in conversation_history:
                         direction = msg.get('direction', '')
-                        content = msg.get('content', '')[:100]  # Limit to 100 chars
+                        content = msg.get('content', '')[:200]  # Limit to 200 chars
                         if direction == 'inbound':
                             context_section += f"User: {content}\n"
                         elif direction == 'outbound':
                             context_section += f"Bot: {content}\n"
                     context_section += "\n"
+
+                # Check if last bot message was a numbered menu
+                is_menu_response = message.strip().isdigit() and last_bot_message and self._contains_numbered_list(last_bot_message)
+                menu_hint = ""
+                if is_menu_response:
+                    menu_hint = f"\n⚠️ IMPORTANT : L'utilisateur répond à un menu numéroté avec '{message}'. Analyse l'historique pour comprendre ce que ce numéro représente.\n"
 
                 prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
@@ -261,13 +177,13 @@ RÈGLES CRITIQUES :
 - update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
 - general (tout le reste - questions, clarifications, demandes complexes)
-
+{menu_hint}
 RÈGLES DE CONTEXTE IMPORTANTES :
-- Si le bot a demandé "quel projet/chantier pour les tâches" et l'utilisateur répond avec un nom de projet → list_tasks:90 (l'utilisateur veut toujours les tâches)
-- Si le bot montre une liste de tâches et l'utilisateur sélectionne une tâche spécifique → general:85 (nécessite le contexte complet)
-- Si le bot a posé une question sur un incident/progression et l'utilisateur répond → garder le même intent que le sujet de conversation avec haute confiance (85-90)
-- Pour un simple nom de projet après que le bot a demandé les tâches → list_tasks:90 (le fast path peut le gérer)
-- Quand l'utilisateur répond clairement à une question du bot, retourne une confiance PLUS ÉLEVÉE (85-95) pour activer le fast path
+- Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
+- Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → general:85
+- Si le bot a demandé "quel projet/chantier" et l'utilisateur répond avec nom → list_tasks:90
+- Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
+- Quand utilisateur répond clairement à question du bot → confiance HAUTE (85-95) pour fast path
 {context_section}
 Message actuel : {message}
 
@@ -289,7 +205,8 @@ Exemple : greeting:95"""
                     intent = response_text
                     confidence = 0.75  # Default if no confidence provided
 
-                log.info(f"🤖 Haiku classification: {intent} (confidence: {confidence})")
+                log_prefix = "🔢" if is_menu_response else "🤖"
+                log.info(f"{log_prefix} Haiku classification: {intent} (confidence: {confidence})")
 
             # Validate intent
             if intent not in INTENTS:
