@@ -269,6 +269,46 @@ async def handle_direct_action(
                             else:
                                 log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
 
+                        elif tool_output.get('tool') == 'list_tasks_tool':
+                            tasks = tool_output.get('output', [])
+                            log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
+
+                            # Get the task at the selected index (1-based)
+                            index = int(option_number) - 1
+                            if 0 <= index < len(tasks):
+                                selected_task = tasks[index]
+                                task_id = selected_task.get('id')
+                                task_title = selected_task.get('title')
+                                log.info(f"✅ Resolved option_{option_number} → {task_title} (ID: {task_id[:8]}...)")
+
+                                # Trigger task_details with the selected task
+                                from src.services.handlers import execute_direct_handler
+                                from src.integrations.supabase import supabase_client
+
+                                # Get user name
+                                user_name = supabase_client.get_user_name(user_id)
+
+                                # Call task_details handler directly with task context
+                                result = await execute_direct_handler(
+                                    intent="task_details",
+                                    user_id=user_id,
+                                    phone_number=phone_number,
+                                    user_name=user_name,
+                                    language=language,
+                                    message_text=str(option_number),  # Pass number for resolution
+                                    session_id=session_id,
+                                    last_tool_outputs=tool_outputs
+                                )
+
+                                if result:
+                                    log.info(f"✅ Task details called for selected task")
+                                    return result
+                                else:
+                                    log.warning(f"⚠️ Task details handler returned None")
+                                    return None
+                            else:
+                                log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
+
                 break
 
         log.warning(f"⚠️ Could not resolve list selection {action}")
