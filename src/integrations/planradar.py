@@ -83,7 +83,7 @@ class PlanRadarClient:
 
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed information about a specific task."""
-        result = await self._request("GET", f"tickets/{task_id}")
+        result = await self._request("GET", f"{self.account_id}/tickets/{task_id}")
         return result.get("data") if result else None
 
     async def get_task_description(self, task_id: str) -> Optional[str]:
@@ -93,12 +93,12 @@ class PlanRadarClient:
 
     async def get_task_plans(self, task_id: str) -> List[Dict[str, Any]]:
         """Get plans/blueprints associated with a task."""
-        result = await self._request("GET", f"tickets/{task_id}/plans")
+        result = await self._request("GET", f"{self.account_id}/tickets/{task_id}/plans")
         return result.get("data", []) if result else []
 
     async def get_task_images(self, task_id: str) -> List[Dict[str, Any]]:
         """Get images attached to a task."""
-        result = await self._request("GET", f"tickets/{task_id}/attachments")
+        result = await self._request("GET", f"{self.account_id}/tickets/{task_id}/attachments")
         if result and result.get("data"):
             # Filter for images only
             return [
@@ -143,12 +143,12 @@ class PlanRadarClient:
         data = {
             "text": comment_text,
         }
-        result = await self._request("POST", f"tickets/{task_id}/comments", data=data)
+        result = await self._request("POST", f"{self.account_id}/tickets/{task_id}/comments", data=data)
         return result is not None
 
     async def get_task_comments(self, task_id: str) -> List[Dict[str, Any]]:
         """Get all comments for a task."""
-        result = await self._request("GET", f"tickets/{task_id}/comments")
+        result = await self._request("GET", f"{self.account_id}/tickets/{task_id}/comments")
         return result.get("data", []) if result else []
 
     async def submit_incident_report(
