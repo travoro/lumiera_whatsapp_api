@@ -12,8 +12,11 @@ Environment="PYTHONPATH=/home/ceeai/whatsapp_api"
 ExecStart=/home/ceeai/whatsapp_api/venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
-StandardOutput=append:/home/ceeai/whatsapp_api/logs/server.log
-StandardError=append:/home/ceeai/whatsapp_api/logs/server.error.log
+
+# Logging: Use journald (view with: journalctl -u lumiera-whatsapp -f)
+# Application logs to logs/app.log with automatic rotation
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

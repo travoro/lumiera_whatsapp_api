@@ -8,11 +8,12 @@ This directory contains all application logs with automatic rotation and retenti
 
 ### Active Logs (Check these for debugging)
 
-- **`app.log`** - Main application log
+- **`app.log`** - Main application log ⭐
   - Contains: All INFO, WARNING, and ERROR messages
   - Rotation: Automatically rotates at 50 MB
   - Retention: 30 days
   - When rotated: Creates `app.log.2026-01-14_12-30-45.zip`
+  - **This is your primary log file - check here first!**
 
 - **`errors.log`** - Error-only log
   - Contains: ERROR and CRITICAL messages only
@@ -20,26 +21,11 @@ This directory contains all application logs with automatic rotation and retenti
   - Retention: 90 days
   - Purpose: Quick error debugging without noise
 
-### System Logs (Managed by Systemd)
+### System Logs (Optional - Journald)
 
-- **`server.log`** - Systemd stdout redirect (⚠️ Can grow large)
-- **`server.error.log`** - Systemd stderr redirect (⚠️ Can grow large)
-  - These are created by systemd when running as a service
-  - **Not automatically rotated** - Must be rotated manually or with logrotate
-  - **Recommendation**: Use `app.log` instead for debugging (has better rotation)
-
-#### Manual Rotation
-```bash
-# Rotate server logs manually
-sudo ./rotate-server-logs.sh
-```
-
-#### Automatic Rotation (One-time setup)
-```bash
-# Install logrotate configuration
-sudo cp logrotate.conf /etc/logrotate.d/lumiera-whatsapp
-sudo logrotate -f /etc/logrotate.d/lumiera-whatsapp
-```
+- Use `journalctl -u lumiera-whatsapp -f` to view systemd journal logs
+- These are managed by systemd and rotate automatically
+- **Recommendation**: Use `app.log` instead (better formatting)
 
 ### Archived Logs
 

@@ -53,6 +53,10 @@ logs/*
 !logs/archive/
 !logs/archive/.gitkeep
 
+# Ignore old systemd log files (no longer used)
+logs/server.log
+logs/server.error.log
+
 # Testing
 .coverage
 .pytest_cache/
