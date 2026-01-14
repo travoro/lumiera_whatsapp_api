@@ -571,68 +571,97 @@ class MessagePipeline:
                             break
 
                 for idx, msg in enumerate(messages_for_history):
-                    # Safety check: skip None messages
-                    if not msg:
+                    try:
+                        # Safety check: skip None messages
+                        if not msg:
+                            log.debug(f"⚠️ Skipping None message at index {idx}")
+                            continue
+
+                        # Validate message structure (must be a dict)
+                        if not isinstance(msg, dict):
+                            log.warning(f"⚠️ Invalid message type at index {idx}: {type(msg)}")
+                            continue
+
+                        # Validate required fields
+                        direction = msg.get('direction')
+                        if not direction:
+                            log.warning(f"⚠️ Message missing 'direction' field at index {idx}")
+                            continue
+
+                        if direction == 'inbound':
+                            chat_history.append(HumanMessage(content=msg.get('content', '')))
+
+                        elif direction == 'outbound':
+                            content = msg.get('content', '')
+
+                            # Check if this message has tool outputs AND is within last 3 tool-using turns
+                            metadata = msg.get('metadata', {})
+                            if metadata is None:
+                                metadata = {}
+
+                            tool_outputs = metadata.get('tool_outputs', []) if isinstance(metadata, dict) else []
+
+                            # Only append tool outputs if from recent turns (prevent token bloat!)
+                            is_recent_enough = (len(messages_for_history) - idx) <= (recent_tool_turns if recent_tool_turns <= 3 else 3)
+
+                            if tool_outputs and is_recent_enough:
+                                # Append structured data for agent reference (compact format)
+                                tool_context = "\n[Données précédentes:"
+                                for tool_output in tool_outputs:
+                                    if not isinstance(tool_output, dict):
+                                        log.debug(f"⚠️ Skipping non-dict tool_output: {type(tool_output)}")
+                                        continue
+
+                                    tool_name = tool_output.get('tool', 'unknown')
+                                    output_data = tool_output.get('output')
+
+                                    # Only include essential structured data (not full details)
+                                    if tool_name == 'list_projects_tool' and isinstance(output_data, list):
+                                        # Extract just IDs and names
+                                        projects_compact = [
+                                            {"id": p.get("id"), "nom": p.get("nom")}
+                                            for p in output_data if isinstance(p, dict)
+                                        ]
+                                        if projects_compact:
+                                            tool_context += f"\nProjets: {json.dumps(projects_compact, ensure_ascii=False)}"
+
+                                    elif tool_name == 'list_tasks_tool' and isinstance(output_data, list):
+                                        # Extract just IDs and titles
+                                        tasks_compact = [
+                                            {"id": t.get("id"), "title": t.get("title")}
+                                            for t in output_data if isinstance(t, dict)
+                                        ]
+                                        if tasks_compact:
+                                            tool_context += f"\nTâches: {json.dumps(tasks_compact, ensure_ascii=False)}"
+
+                                    elif tool_name == 'list_documents_tool' and isinstance(output_data, list):
+                                        # Extract just IDs and names
+                                        docs_compact = [
+                                            {"id": d.get("id"), "name": d.get("name"), "type": d.get("type")}
+                                            for d in output_data if isinstance(d, dict)
+                                        ]
+                                        if docs_compact:
+                                            tool_context += f"\nDocuments: {json.dumps(docs_compact, ensure_ascii=False)}"
+
+                                tool_context += "]"
+                                content += tool_context
+
+                            chat_history.append(AIMessage(content=content))
+
+                    except Exception as msg_error:
+                        # Log error but continue processing other messages (graceful degradation)
+                        log.warning(f"⚠️ Error processing message at index {idx}: {msg_error}")
+                        log.debug(f"   Problematic message: {msg}")
                         continue
-
-                    if msg.get('direction') == 'inbound':
-                        chat_history.append(HumanMessage(content=msg.get('content', '')))
-
-                    elif msg.get('direction') == 'outbound':
-                        content = msg.get('content', '')
-
-                        # Check if this message has tool outputs AND is within last 3 tool-using turns
-                        metadata = msg.get('metadata', {})
-                        tool_outputs = metadata.get('tool_outputs', [])
-
-                        # Only append tool outputs if from recent turns (prevent token bloat!)
-                        is_recent_enough = (len(messages_for_history) - idx) <= (recent_tool_turns if recent_tool_turns <= 3 else 3)
-
-                        if tool_outputs and is_recent_enough:
-                            # Append structured data for agent reference (compact format)
-                            tool_context = "\n[Données précédentes:"
-                            for tool_output in tool_outputs:
-                                tool_name = tool_output.get('tool', 'unknown')
-                                output_data = tool_output.get('output')
-
-                                # Only include essential structured data (not full details)
-                                if tool_name == 'list_projects_tool' and isinstance(output_data, list):
-                                    # Extract just IDs and names
-                                    projects_compact = [
-                                        {"id": p.get("id"), "nom": p.get("nom")}
-                                        for p in output_data if isinstance(p, dict)
-                                    ]
-                                    if projects_compact:
-                                        tool_context += f"\nProjets: {json.dumps(projects_compact, ensure_ascii=False)}"
-
-                                elif tool_name == 'list_tasks_tool' and isinstance(output_data, list):
-                                    # Extract just IDs and titles
-                                    tasks_compact = [
-                                        {"id": t.get("id"), "title": t.get("title")}
-                                        for t in output_data if isinstance(t, dict)
-                                    ]
-                                    if tasks_compact:
-                                        tool_context += f"\nTâches: {json.dumps(tasks_compact, ensure_ascii=False)}"
-
-                                elif tool_name == 'list_documents_tool' and isinstance(output_data, list):
-                                    # Extract just IDs and names
-                                    docs_compact = [
-                                        {"id": d.get("id"), "name": d.get("name"), "type": d.get("type")}
-                                        for d in output_data if isinstance(d, dict)
-                                    ]
-                                    if docs_compact:
-                                        tool_context += f"\nDocuments: {json.dumps(docs_compact, ensure_ascii=False)}"
-
-                            tool_context += "]"
-                            content += tool_context
-
-                        chat_history.append(AIMessage(content=content))
 
                 log.info(f"📜 Loaded {len(chat_history)} messages for agent context")
                 log.debug(f"   Chat history has {len([m for m in chat_history if isinstance(m, HumanMessage)])} user messages")
                 log.debug(f"   Chat history has {len([m for m in chat_history if isinstance(m, AIMessage)])} AI messages")
             except Exception as e:
                 log.warning(f"Could not load chat history for agent: {e}")
+                log.exception(e)  # Full stack trace for debugging
+                log.debug(f"   Session ID: {ctx.session_id}")
+                log.debug(f"   Messages loaded: {len(messages) if 'messages' in locals() else 'N/A'}")
                 chat_history = []
 
             log.info(f"🤖 Invoking full AI agent with conversation context")

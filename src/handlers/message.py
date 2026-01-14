@@ -187,10 +187,11 @@ async def handle_direct_action(
             # Fallback to AI if fast path fails
             return None
 
-    # Handle interactive list selections (task_1_fr, project_2_fr, option_3_fr, etc.)
+    # Handle interactive list selections (task_1_fr, tasks_1_fr, project_2_fr, projects_2_fr, option_3_fr, etc.)
     # Parse action format: {list_type}_{number}_{language}
+    # Supports both singular and plural forms (task/tasks, project/projects)
     import re
-    list_match = re.match(r'(task|project|option)_(\d+)(?:_[a-z]{2})?', action)
+    list_match = re.match(r'(tasks?|projects?|option)_(\d+)(?:_[a-z]{2})?', action)
 
     if list_match:
         list_type = list_match.group(1)
@@ -228,7 +229,7 @@ async def handle_direct_action(
                     # Route based on list_type parsed from action ID (robust approach)
                     # This eliminates ambiguity when multiple tool outputs are present
 
-                    if list_type == "tasks":
+                    if list_type in ["task", "tasks"]:
                         # User selected a task from the list → Show task details
                         for tool_output in tool_outputs:
                             if tool_output.get('tool') == 'list_tasks_tool':
@@ -270,7 +271,7 @@ async def handle_direct_action(
                                     log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
                                 break
 
-                    elif list_type == "projects" or list_type == "option":
+                    elif list_type in ["project", "projects", "option"]:
                         # User selected a project from the list → Show project tasks
                         for tool_output in tool_outputs:
                             if tool_output.get('tool') == 'list_projects_tool':
@@ -491,7 +492,8 @@ async def process_inbound_message(
                 from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 
                 # Extract list_type from response metadata (defaults to "option" if not provided)
-                list_type = response_data.get("list_type", "option")
+                # Use direct_response if it's a dict, otherwise default to "option"
+                list_type = direct_response.get("list_type", "option") if isinstance(direct_response, dict) else "option"
                 log.info(f"🏷️  List type for interactive formatting: {list_type}")
 
                 # Format for interactive if applicable (e.g., list_projects, list_tasks)
