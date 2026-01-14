@@ -208,9 +208,6 @@ async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status
         emoji = get_status_emoji(task.get('status', ''))
         output += f"{i}. {emoji} {task['title']}\n"
 
-    # Add helpful prompt
-    output += f"\nSélectionnez un numéro pour voir les détails."
-
     log.info(f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)")
     return output
 
@@ -845,9 +842,6 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         for i, task in enumerate(result["data"], 1):
             emoji = get_status_emoji(task.get('status', ''))
             output += f"{i}. {emoji} {task['title']}\n"
-
-        # Add helpful prompt
-        output += f"\nSélectionnez un numéro pour voir les détails."
 
         log.info(f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)")
         return output
