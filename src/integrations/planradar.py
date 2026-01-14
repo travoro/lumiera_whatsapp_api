@@ -29,6 +29,14 @@ class PlanRadarClient:
     ) -> Optional[Dict[str, Any]]:
         """Make HTTP request to PlanRadar API."""
         url = f"{self.base_url}/{endpoint}"
+
+        # Log the request details
+        log.info(f"🌐 PlanRadar API Request: {method} {endpoint}")
+        if params:
+            log.info(f"   📝 Query params: {params}")
+        if data:
+            log.info(f"   📦 Request body: {data}")
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.request(
@@ -39,19 +47,41 @@ class PlanRadarClient:
                     params=params,
                     timeout=30.0,
                 )
+
+                # Log response status
+                log.info(f"   ✅ Response: {response.status_code}")
+
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+
+                # Log response summary
+                if isinstance(result, dict):
+                    if "data" in result:
+                        data_count = len(result["data"]) if isinstance(result["data"], list) else 1
+                        log.info(f"   📊 Response data: {data_count} item(s)")
+                    else:
+                        log.info(f"   📊 Response keys: {list(result.keys())}")
+
+                return result
         except httpx.HTTPStatusError as e:
             # Differentiate between rate limit and other errors
             if e.response.status_code == 429:
-                log.warning(f"PlanRadar API rate limit (429): {e}")
+                log.warning(f"   ⚠️ PlanRadar API rate limit (429)")
+                log.warning(f"   URL was: {url}")
                 # Return special error structure for rate limits
                 return {"_rate_limited": True, "error": "Rate limit exceeded"}
             else:
-                log.error(f"PlanRadar API HTTP error: {e}")
+                log.error(f"   ❌ PlanRadar API HTTP error: {e.response.status_code} {e.response.reason_phrase}")
+                log.error(f"   URL was: {url}")
+                try:
+                    error_body = e.response.json()
+                    log.error(f"   Error details: {error_body}")
+                except:
+                    log.error(f"   Error text: {e.response.text[:200]}")
                 return None
         except httpx.HTTPError as e:
-            log.error(f"PlanRadar API error: {e}")
+            log.error(f"   ❌ PlanRadar API error: {type(e).__name__}: {e}")
+            log.error(f"   URL was: {url}")
             return None
 
     async def list_tasks(
@@ -68,6 +98,8 @@ class PlanRadarClient:
         Returns:
             List of tasks/tickets for the project
         """
+        log.info(f"📋 list_tasks called: project_id={project_id[:8]}..., status={status}")
+
         # PlanRadar v2 API requires customer_id in path
         endpoint = f"{self.account_id}/projects/{project_id}/tickets"
         params = {}
@@ -79,7 +111,9 @@ class PlanRadarClient:
         if result and result.get("_rate_limited"):
             raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
         # PlanRadar uses JSON:API format with nested "data" array
-        return result.get("data", []) if result else []
+        tasks = result.get("data", []) if result else []
+        log.info(f"   ✅ Retrieved {len(tasks)} tasks")
+        return tasks
 
     async def get_task(self, task_id: str, project_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed information about a specific task.
@@ -88,28 +122,47 @@ class PlanRadarClient:
             task_id: The task ID (short ID from PlanRadar)
             project_id: The PlanRadar project ID (required for API v2)
         """
+        log.info(f"📄 get_task called: task_id={task_id}, project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}")
-        return result.get("data") if result else None
+        task_data = result.get("data") if result else None
+        if task_data:
+            log.info(f"   ✅ Task retrieved: {task_data.get('id')}")
+        else:
+            log.warning(f"   ⚠️ Task not found")
+        return task_data
 
     async def get_task_description(self, task_id: str, project_id: str) -> Optional[str]:
         """Get task description."""
+        log.info(f"📝 get_task_description called: task_id={task_id}, project_id={project_id[:8]}...")
         task = await self.get_task(task_id, project_id)
-        return task.get("description") if task else None
+        description = task.get("description") if task else None
+        if description:
+            log.info(f"   ✅ Description retrieved ({len(description)} chars)")
+        else:
+            log.info(f"   ℹ️ No description available")
+        return description
 
     async def get_task_plans(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get plans/blueprints associated with a task."""
+        log.info(f"🗺️ get_task_plans called: task_id={task_id}, project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/plans")
-        return result.get("data", []) if result else []
+        plans = result.get("data", []) if result else []
+        log.info(f"   ✅ Retrieved {len(plans)} plans")
+        return plans
 
     async def get_task_images(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get images attached to a task."""
+        log.info(f"📷 get_task_images called: task_id={task_id}, project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/attachments")
         if result and result.get("data"):
             # Filter for images only
-            return [
+            images = [
                 att for att in result["data"]
                 if att.get("type", "").startswith("image/")
             ]
+            log.info(f"   ✅ Retrieved {len(images)} images (from {len(result['data'])} total attachments)")
+            return images
+        log.info(f"   ℹ️ No images found")
         return []
 
     async def get_documents(
@@ -146,16 +199,25 @@ class PlanRadarClient:
         comment_text: str,
     ) -> bool:
         """Add a comment to a task."""
+        log.info(f"💬 add_task_comment called: task_id={task_id}, project_id={project_id[:8]}..., comment_length={len(comment_text)}")
         data = {
             "text": comment_text,
         }
         result = await self._request("POST", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comments", data=data)
-        return result is not None
+        success = result is not None
+        if success:
+            log.info(f"   ✅ Comment added successfully")
+        else:
+            log.warning(f"   ⚠️ Failed to add comment")
+        return success
 
     async def get_task_comments(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get all comments for a task."""
+        log.info(f"💬 get_task_comments called: task_id={task_id}, project_id={project_id[:8]}...")
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comments")
-        return result.get("data", []) if result else []
+        comments = result.get("data", []) if result else []
+        log.info(f"   ✅ Retrieved {len(comments)} comments")
+        return comments
 
     async def submit_incident_report(
         self,
