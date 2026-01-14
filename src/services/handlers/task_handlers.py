@@ -386,6 +386,13 @@ async def handle_task_details(
         selected_task_id = None
         task_title = None
 
+        # Log what we received for debugging
+        log.info(f"📥 Received message_text: '{message_text}'")
+        if last_tool_outputs:
+            log.info(f"📥 Tool output keys: {[t.get('tool') for t in last_tool_outputs]}")
+        else:
+            log.warning(f"⚠️ No last_tool_outputs available")
+
         if message_text and message_text.strip().isdigit() and last_tool_outputs:
             selection_index = int(message_text.strip()) - 1
             log.debug(f"🔢 Attempting to resolve numeric task selection: '{message_text}' (index: {selection_index})")

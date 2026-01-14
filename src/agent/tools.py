@@ -216,9 +216,13 @@ async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status
 async def get_task_description_tool(user_id: str, task_id: str) -> str:
     """Get the detailed description of a specific task.
 
+    IMPORTANT: Use the task 'id' field from list_tasks_tool output, NOT the task title.
+    If user asks for "task X", first call list_tasks_tool to get the task list with IDs,
+    then use the 'id' field from the matching task.
+
     Args:
         user_id: The ID of the user requesting the description
-        task_id: The ID of the task
+        task_id: The UUID of the task (from list_tasks_tool 'id' field, NOT the title)
 
     Returns:
         The task description
@@ -271,9 +275,13 @@ async def get_task_plans_tool(user_id: str, task_id: str) -> str:
 async def get_task_images_tool(user_id: str, task_id: str) -> str:
     """Get images attached to a specific task.
 
+    IMPORTANT: Use the task 'id' field from list_tasks_tool output, NOT the task title.
+    If user asks for "task X", first call list_tasks_tool to get the task list with IDs,
+    then use the 'id' field from the matching task.
+
     Args:
         user_id: The ID of the user requesting images
-        task_id: The ID of the task
+        task_id: The UUID of the task (from list_tasks_tool 'id' field, NOT the title)
 
     Returns:
         Information about available images
