@@ -159,10 +159,25 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
                 "message": "Tâche non trouvée."
             }
 
-        description = task.get("description")
-        # Handle PlanRadar's JSON:API format - title is in attributes.subject
+        # Handle PlanRadar's JSON:API format - title and description are in attributes
         attributes = task.get("attributes", {})
         title = attributes.get("subject") or task.get("title", "")
+
+        # Description can be in multiple places:
+        # 1. Standard description field
+        # 2. Custom fields in typed-values (PlanRadar custom fields)
+        description = task.get("description") or attributes.get("description")
+
+        # If no standard description, check typed-values for description-like fields
+        if not description:
+            typed_values = attributes.get("typed-values", {})
+            if typed_values and isinstance(typed_values, dict):
+                # Look for the first non-empty text value (likely description)
+                for field_id, field_value in typed_values.items():
+                    if field_value and isinstance(field_value, str) and len(field_value) > 10:
+                        description = field_value
+                        log.info(f"   📝 Found description in typed-values field: {field_id}")
+                        break
 
         # Log action
         await supabase_client.save_action_log(
