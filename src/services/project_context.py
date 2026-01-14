@@ -10,9 +10,12 @@ class ProjectContextService:
 
     Tracks which project a subcontractor is currently working on,
     with automatic expiration after 7 hours of inactivity.
+
+    Also tracks active task with 1-hour expiration.
     """
 
-    EXPIRATION_HOURS = 7
+    PROJECT_EXPIRATION_HOURS = 7
+    TASK_EXPIRATION_HOURS = 1
 
     def __init__(self):
         """Initialize project context service."""
@@ -45,8 +48,8 @@ class ProjectContextService:
             if not active_project_id:
                 return None
 
-            # Check if expired
-            if self._is_expired(last_activity):
+            # Check if expired (7 hours for projects)
+            if self._is_expired(last_activity, self.PROJECT_EXPIRATION_HOURS):
                 log.info(f"Active project context expired for user {user_id}")
                 await self.clear_active_project(user_id)
                 return None
@@ -191,7 +194,7 @@ class ProjectContextService:
 
         Returns None if:
         - No active task is set
-        - Active task has expired (>7 hours since last activity)
+        - Active task has expired (>1 hour since last activity)
 
         Args:
             user_id: Subcontractor ID (UUID)
@@ -212,9 +215,9 @@ class ProjectContextService:
             if not active_task_id:
                 return None
 
-            # Check if expired
-            if self._is_expired(last_activity):
-                log.info(f"Active task context expired for user {user_id}")
+            # Check if expired (1 hour for tasks)
+            if self._is_expired(last_activity, self.TASK_EXPIRATION_HOURS):
+                log.info(f"Active task context expired for user {user_id} (>1 hour)")
                 await self.clear_active_task(user_id)
                 return None
 
@@ -289,14 +292,15 @@ class ProjectContextService:
             log.error(f"Error clearing active task for user {user_id}: {e}")
             return False
 
-    def _is_expired(self, last_activity: Optional[str]) -> bool:
-        """Check if the active project context has expired.
+    def _is_expired(self, last_activity: Optional[str], expiration_hours: int) -> bool:
+        """Check if the active context has expired.
 
         Args:
             last_activity: ISO format timestamp string
+            expiration_hours: Number of hours before expiration (7 for projects, 1 for tasks)
 
         Returns:
-            True if expired (>7 hours) or no activity, False otherwise
+            True if expired or no activity, False otherwise
         """
         if not last_activity:
             return True
@@ -308,9 +312,9 @@ class ProjectContextService:
             else:
                 last_activity_dt = last_activity
 
-            # Check if more than 7 hours have passed
+            # Check if more than expiration_hours have passed
             time_since_activity = datetime.utcnow() - last_activity_dt.replace(tzinfo=None)
-            return time_since_activity > timedelta(hours=self.EXPIRATION_HOURS)
+            return time_since_activity > timedelta(hours=expiration_hours)
 
         except Exception as e:
             log.error(f"Error parsing last activity timestamp: {e}")
@@ -335,7 +339,7 @@ class ProjectContextService:
 
             cleared_count = 0
             for user in response.data:
-                if self._is_expired(user.get("active_project_last_activity")):
+                if self._is_expired(user.get("active_project_last_activity"), self.PROJECT_EXPIRATION_HOURS):
                     await self.clear_active_project(user["id"])
                     cleared_count += 1
 

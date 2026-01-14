@@ -116,13 +116,19 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
 async def get_task_description(user_id: str, task_id: str) -> Dict[str, Any]:
     """Get detailed description of a task."""
     try:
-        description = await planradar_client.get_task_description(task_id)
+        # Get full task details to include title
+        task = await planradar_client.get_task(task_id)
 
-        if not description:
+        if not task:
             return {
                 "success": False,
-                "message": "Description de tâche non trouvée."
+                "message": "Tâche non trouvée."
             }
+
+        description = task.get("description")
+        # Handle PlanRadar's JSON:API format - title is in attributes.subject
+        attributes = task.get("attributes", {})
+        title = attributes.get("subject") or task.get("title", "")
 
         # Log action
         await supabase_client.save_action_log(
@@ -135,7 +141,10 @@ async def get_task_description(user_id: str, task_id: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": "Description de la tâche récupérée.",
-            "data": {"description": description}
+            "data": {
+                "description": description,
+                "title": title
+            }
         }
 
     except Exception as e:

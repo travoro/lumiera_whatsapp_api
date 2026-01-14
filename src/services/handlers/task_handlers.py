@@ -14,6 +14,7 @@ from src.utils.response_helpers import build_no_projects_response, get_selected_
 from src.utils.metadata_helpers import compact_projects, compact_tasks
 from src.utils.fuzzy_matcher import fuzzy_match_project
 from src.utils.logger import log
+from src.services.project_context import project_context_service
 
 # Import LangChain tools for LangSmith tracing
 from src.agent.tools import list_tasks_tool, get_task_description_tool, get_task_images_tool
@@ -393,6 +394,7 @@ async def handle_task_details(
         else:
             log.warning(f"⚠️ No last_tool_outputs available")
 
+        # Scenario 1a: Numeric selection from task list
         if message_text and message_text.strip().isdigit() and last_tool_outputs:
             selection_index = int(message_text.strip()) - 1
             log.debug(f"🔢 Attempting to resolve numeric task selection: '{message_text}' (index: {selection_index})")
@@ -410,6 +412,14 @@ async def handle_task_details(
                         break
                     else:
                         log.warning(f"⚠️ Selection index {selection_index} out of range (0-{len(output_tasks)-1})")
+
+        # Scenario 1b: Check active task context (if user just asks for "details" without specifying)
+        if not selected_task_id and not (message_text and message_text.strip().isdigit()):
+            active_task_id = await project_context_service.get_active_task(user_id)
+            if active_task_id:
+                log.info(f"📌 Using active task context: {active_task_id[:8]}...")
+                selected_task_id = active_task_id
+                # We'll need to fetch the title later
 
         # Scenario 2: No task selected - fallback to AI agent
         if not selected_task_id:
@@ -430,8 +440,15 @@ async def handle_task_details(
         desc_result = await task_actions.get_task_description(user_id, selected_task_id)
         images_result = await task_actions.get_task_images(user_id, selected_task_id)
 
+        # If we don't have task_title yet (used active context), get it from desc_result
+        if not task_title and desc_result.get("success"):
+            task_title = desc_result.get("data", {}).get("title", "Tâche")
+
+        # Set active task context (1 hour expiration)
+        await project_context_service.set_active_task(user_id, selected_task_id, task_title)
+
         # Build response message
-        message = get_translation("fr", "task_details_header").format(task_title=task_title)
+        message = get_translation("fr", "task_details_header").format(task_title=task_title or "Tâche")
 
         # Add description section
         if desc_result["success"] and desc_result["data"].get("description"):
