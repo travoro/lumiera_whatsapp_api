@@ -44,8 +44,14 @@ venv.bak/
 .DS_Store
 
 # Logs
-logs/
+logs/*
 *.log
+
+# But keep log directory structure and documentation
+!logs/.gitignore
+!logs/README.md
+!logs/archive/
+!logs/archive/.gitkeep
 
 # Testing
 .coverage

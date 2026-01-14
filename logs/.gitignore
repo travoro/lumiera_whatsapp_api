@@ -1,0 +1,11 @@
+# Ignore all log files
+*.log
+*.log.*
+*.zip
+
+# But keep this .gitignore
+!.gitignore
+
+# Keep the archive directory structure but ignore contents
+archive/*
+!archive/.gitkeep
