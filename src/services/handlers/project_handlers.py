@@ -14,6 +14,9 @@ from src.utils.handler_helpers import get_projects_with_context, format_project_
 from src.utils.metadata_helpers import compact_projects, compact_documents
 from src.utils.logger import log
 
+# Import LangChain tools for LangSmith tracing
+from src.agent.tools import get_documents_tool
+
 
 async def handle_list_projects(
     user_id: str,
@@ -110,7 +113,14 @@ async def handle_list_documents(
 
             message += get_translation("fr", "list_documents_project_context").format(project_name=project_name)
 
-            # Get documents for this project using actions layer
+            # Call LangChain tool for LangSmith tracing
+            log.debug(f"🔧 Calling get_documents_tool via LangChain for LangSmith tracing")
+            _ = await get_documents_tool.ainvoke({
+                "user_id": user_id,
+                "project_id": project_id
+            })
+
+            # Also get structured data from actions layer (for metadata)
             doc_result = await document_actions.get_documents(user_id, project_id)
 
             if not doc_result["success"] or not doc_result["data"]:
