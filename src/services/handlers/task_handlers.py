@@ -6,37 +6,13 @@ providing fast responses for task operations.
 IMPORTANT: All handlers ALWAYS return French text. Translation to user language
 happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 """
-from typing import Dict, Any, List
+from typing import Dict, Any
 from src.actions import tasks as task_actions
 from src.utils.whatsapp_formatter import get_translation
 from src.utils.handler_helpers import get_projects_with_context, format_project_list
 from src.utils.response_helpers import build_no_projects_response, get_selected_project
+from src.utils.metadata_helpers import compact_projects, compact_tasks
 from src.utils.logger import log
-
-
-def _compact_projects(projects: List[Dict]) -> List[Dict]:
-    """Extract only essential fields from projects for metadata storage."""
-    return [
-        {
-            "id": p.get("id"),
-            "nom": p.get("nom"),
-            "planradar_project_id": p.get("planradar_project_id")
-        }
-        for p in projects
-    ]
-
-
-def _compact_tasks(tasks: List[Dict]) -> List[Dict]:
-    """Extract only essential fields from tasks for metadata storage."""
-    return [
-        {
-            "id": t.get("id"),
-            "title": t.get("title"),
-            "status": t.get("status"),
-            "progress": t.get("progress")
-        }
-        for t in tasks
-    ]
 
 
 async def handle_list_tasks(
@@ -117,7 +93,7 @@ async def handle_list_tasks(
             tool_outputs.append({
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects([project])  # Only essential fields
+                "output": compact_projects([project])  # Only essential fields
             })
 
             # Get tasks for this project using actions layer
@@ -131,7 +107,7 @@ async def handle_list_tasks(
                 tool_outputs.append({
                     "tool": "list_tasks_tool",
                     "input": {"user_id": user_id, "project_id": project_id},
-                    "output": _compact_tasks(tasks)  # Only essential fields
+                    "output": compact_tasks(tasks)  # Only essential fields
                 })
 
                 message += get_translation("fr", "list_tasks_tasks_header")
@@ -164,7 +140,7 @@ async def handle_list_tasks(
             tool_outputs.append({
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects(projects[:5])  # Only essential fields
+                "output": compact_projects(projects[:5])  # Only essential fields
             })
 
         return {
@@ -260,7 +236,7 @@ async def handle_update_progress(
             tool_outputs.append({
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects([project])  # Only essential fields
+                "output": compact_projects([project])  # Only essential fields
             })
 
             # Get tasks for this project using actions layer
@@ -274,7 +250,7 @@ async def handle_update_progress(
                 tool_outputs.append({
                     "tool": "list_tasks_tool",
                     "input": {"user_id": user_id, "project_id": project_id},
-                    "output": _compact_tasks(tasks)  # Only essential fields
+                    "output": compact_tasks(tasks)  # Only essential fields
                 })
 
                 message += get_translation("fr", "update_progress_tasks_header")
@@ -295,7 +271,7 @@ async def handle_update_progress(
             tool_outputs.append({
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects(projects[:5])  # Only essential fields
+                "output": compact_projects(projects[:5])  # Only essential fields
             })
 
         return {

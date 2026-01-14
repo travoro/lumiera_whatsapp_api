@@ -6,50 +6,13 @@ providing fast responses for project, document, and incident operations.
 IMPORTANT: All handlers ALWAYS return French text. Translation to user language
 happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 """
-from typing import Dict, Any, List
+from typing import Dict, Any
 from src.integrations.supabase import supabase_client
 from src.actions import documents as document_actions
 from src.utils.whatsapp_formatter import get_translation, get_plural_translation
 from src.utils.handler_helpers import get_projects_with_context, format_project_list
+from src.utils.metadata_helpers import compact_projects, compact_documents
 from src.utils.logger import log
-
-
-def _compact_projects(projects: List[Dict]) -> List[Dict]:
-    """Extract only essential fields from projects for metadata storage.
-
-    Args:
-        projects: Full project objects from database
-
-    Returns:
-        Compact project list with only id, nom, planradar_project_id
-    """
-    return [
-        {
-            "id": p.get("id"),
-            "nom": p.get("nom"),
-            "planradar_project_id": p.get("planradar_project_id")
-        }
-        for p in projects
-    ]
-
-
-def _compact_documents(documents: List[Dict]) -> List[Dict]:
-    """Extract only essential fields from documents for metadata storage.
-
-    Args:
-        documents: Full document objects from database
-
-    Returns:
-        Compact document list with only id, name, type
-    """
-    return [
-        {
-            "id": d.get("id"),
-            "name": d.get("name"),
-            "type": d.get("type")
-        }
-        for d in documents
-    ]
 
 
 async def handle_list_projects(
@@ -96,7 +59,7 @@ async def handle_list_projects(
             "tool_outputs": [{
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects(projects)  # Only essential fields
+                "output": compact_projects(projects)  # Only essential fields
             }]
         }
 
@@ -158,7 +121,7 @@ async def handle_list_documents(
                 tool_outputs.append({
                     "tool": "list_documents_tool",
                     "input": {"user_id": user_id, "project_id": project_id},
-                    "output": _compact_documents(documents)  # Only essential fields
+                    "output": compact_documents(documents)  # Only essential fields
                 })
 
                 for i, doc in enumerate(documents[:10], 1):  # Limit to 10 documents
@@ -190,7 +153,7 @@ async def handle_list_documents(
             tool_outputs.append({
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects(projects[:5])  # Only essential fields
+                "output": compact_projects(projects[:5])  # Only essential fields
             })
 
         return {
@@ -253,7 +216,7 @@ async def handle_report_incident(
                 tool_outputs.append({
                     "tool": "list_projects_tool",
                     "input": {"user_id": user_id},
-                    "output": _compact_projects([current_project])  # Only essential fields
+                    "output": compact_projects([current_project])  # Only essential fields
                 })
 
         # Scenario 3: Has projects but no current project in context
@@ -270,7 +233,7 @@ async def handle_report_incident(
             tool_outputs.append({
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
-                "output": _compact_projects(projects[:5])  # Only essential fields
+                "output": compact_projects(projects[:5])  # Only essential fields
             })
 
         return {
