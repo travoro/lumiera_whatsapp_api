@@ -121,31 +121,31 @@ class IntentClassifier:
         # Truncate menu text if too long (keep first 500 chars for context)
         menu_preview = menu_text[:500] if len(menu_text) > 500 else menu_text
 
-        prompt = f"""The bot showed this menu to the user:
+        prompt = f"""Le bot a montré ce menu à l'utilisateur :
 
 {menu_preview}
 
-The user replied with: {option}
+L'utilisateur a répondu avec : {option}
 
-Based on the menu content and the user's selection of option {option}, classify what the user wants to do:
+En fonction du contenu du menu et de la sélection de l'option {option} par l'utilisateur, classifie ce que l'utilisateur veut faire :
 
-- greeting: User wants to see the main menu again
-- list_projects: User wants to see their projects/chantiers
-- list_tasks: User wants to see tasks/tâches (OR selecting a PROJECT from a project list to see its tasks)
-- report_incident: User wants to report a problem/incident
-- update_progress: User wants to update task progress
-- escalate: User wants to talk to a human/team
-- general: Selecting a specific TASK from a task list (needs full agent context for task details)
+- greeting: L'utilisateur veut revoir le menu principal
+- list_projects: L'utilisateur veut voir ses projets/chantiers
+- list_tasks: L'utilisateur veut voir les tâches (OU sélectionne un PROJET d'une liste de projets pour voir ses tâches)
+- report_incident: L'utilisateur veut signaler un problème/incident
+- update_progress: L'utilisateur veut mettre à jour la progression d'une tâche
+- escalate: L'utilisateur veut parler à un humain/équipe
+- general: Sélection d'une TÂCHE spécifique d'une liste de tâches (nécessite le contexte complet de l'agent)
 
-Return ONLY the intent name and confidence (0-100) in format: intent:confidence
-Example: escalate:95
+Retourne SEULEMENT le nom de l'intent et la confiance (0-100) au format : intent:confidence
+Exemple : escalate:95
 
-CRITICAL RULES:
-1. If menu shows PROJECT LIST (contains "projet" or "chantier" or "🏗️") AND user selects number → Return: list_tasks
-   Example: "1. 🏗️ Champigny" + user says "1" → list_tasks (user wants tasks for Champigny)
-2. If menu shows TASK LIST (contains "tâche" or "📝") AND user selects number → Return: general
-   Example: "1. 📝 Installation" + user says "1" → general (needs full context for task details)
-3. If menu is MAIN GREETING (multiple action options) → Based on specific option selected"""
+RÈGLES CRITIQUES :
+1. Si le menu montre une LISTE DE PROJETS (contient "projet" ou "chantier" ou "🏗️") ET l'utilisateur sélectionne un numéro → Retourne : list_tasks
+   Exemple : "1. 🏗️ Champigny" + utilisateur dit "1" → list_tasks (utilisateur veut les tâches pour Champigny)
+2. Si le menu montre une LISTE DE TÂCHES (contient "tâche" ou "📝") ET l'utilisateur sélectionne un numéro → Retourne : general
+   Exemple : "1. 📝 Installation" + utilisateur dit "1" → general (nécessite contexte complet)
+3. Si le menu est le MENU PRINCIPAL (plusieurs options d'action) → Basé sur l'option spécifique sélectionnée"""
 
         try:
             response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])

@@ -476,6 +476,26 @@ class MessagePipeline:
             if settings.enable_fast_path_handlers and ctx.confidence >= settings.intent_confidence_threshold:
                 log.info(f"🚀 HIGH CONFIDENCE - Attempting fast path")
 
+                # Load last bot message's tool_outputs for resolving numeric selections
+                last_tool_outputs = []
+                last_bot_message = None
+                try:
+                    messages = await supabase_client.get_messages_by_session(
+                        ctx.session_id,
+                        fields='content,direction,metadata',
+                        limit=5  # Only need recent messages
+                    )
+                    # Find the most recent outbound message
+                    for msg in reversed(messages):
+                        if msg and msg.get('direction') == 'outbound':
+                            last_bot_message = msg.get('content', '')
+                            last_tool_outputs = msg.get('metadata', {}).get('tool_outputs', [])
+                            if last_tool_outputs:
+                                log.info(f"📦 Loaded {len(last_tool_outputs)} tool outputs from last bot message")
+                            break
+                except Exception as e:
+                    log.warning(f"Could not load last message tool_outputs: {e}")
+
                 # Try fast path through router
                 from src.services.handlers import execute_direct_handler
 
@@ -485,7 +505,10 @@ class MessagePipeline:
                     phone_number=ctx.from_number,
                     user_name=ctx.user_name,
                     language=ctx.user_language,
-                    message_text=ctx.message_in_french  # Pass message for project name extraction
+                    message_text=ctx.message_in_french,  # Pass message for project name extraction
+                    session_id=ctx.session_id,  # Pass session for context queries
+                    last_tool_outputs=last_tool_outputs,  # For resolving numeric selections
+                    last_bot_message=last_bot_message  # For menu context
                 )
 
                 if result:
