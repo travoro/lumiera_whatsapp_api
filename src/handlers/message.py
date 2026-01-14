@@ -206,7 +206,7 @@ async def handle_direct_action(
         from src.services.session import session_service
 
         # Get session
-        session = await session_service.get_or_create_session(user_id, phone_number)
+        session = await session_service.get_or_create_session(user_id)
         session_id = session["id"]
 
         # Load recent messages
