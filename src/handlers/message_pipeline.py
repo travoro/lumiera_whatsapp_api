@@ -565,6 +565,8 @@ class MessagePipeline:
                 # Find how many recent turns have tool outputs
                 recent_tool_turns = 0
                 for msg in reversed(messages_for_history):
+                    if not msg or not isinstance(msg, dict):
+                        continue
                     if msg.get('direction') == 'outbound' and msg.get('metadata', {}).get('tool_outputs'):
                         recent_tool_turns += 1
                         if recent_tool_turns >= 3:  # MAX 3 turns with tool outputs

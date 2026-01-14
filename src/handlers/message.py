@@ -216,102 +216,116 @@ async def handle_direct_action(
         # Limit to last 10 messages
         messages = messages[-10:] if messages else []
 
-        # Find last bot message with tool_outputs
+        # Find bot message with the specific tool_outputs we need
+        # Search for the RIGHT tool, not just any tool_outputs
+        target_tool = None
+        if list_type in ["task", "tasks"]:
+            target_tool = 'list_tasks_tool'
+        elif list_type in ["project", "projects", "option"]:
+            target_tool = 'list_projects_tool'
+
+        tool_outputs = None
         for msg in reversed(messages):
             if msg and msg.get('direction') == 'outbound':
                 metadata = msg.get('metadata', {})
-                tool_outputs = metadata.get('tool_outputs', []) if metadata else []
+                msg_tool_outputs = metadata.get('tool_outputs', []) if metadata else []
 
-                if tool_outputs:
-                    log.info(f"📦 Found tool_outputs in last bot message")
-                    log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
+                if msg_tool_outputs:
+                    # Check if this message has the tool we're looking for
+                    has_target_tool = any(t.get('tool') == target_tool for t in msg_tool_outputs if isinstance(t, dict))
+                    if has_target_tool:
+                        tool_outputs = msg_tool_outputs
+                        log.info(f"📦 Found tool_outputs with {target_tool}")
+                        log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
+                        break
 
-                    # Route based on list_type parsed from action ID (robust approach)
-                    # This eliminates ambiguity when multiple tool outputs are present
+        if tool_outputs:
+            # Route based on list_type parsed from action ID (robust approach)
+            # This eliminates ambiguity when multiple tool outputs are present
 
-                    if list_type in ["task", "tasks"]:
-                        # User selected a task from the list → Show task details
-                        for tool_output in tool_outputs:
-                            if tool_output.get('tool') == 'list_tasks_tool':
-                                tasks = tool_output.get('output', [])
-                                log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
+            if list_type in ["task", "tasks"]:
+                # User selected a task from the list → Show task details
+                for tool_output in tool_outputs:
+                    if tool_output.get('tool') == 'list_tasks_tool':
+                        tasks = tool_output.get('output', [])
+                        log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
 
-                                # Get the task at the selected index (1-based)
-                                index = int(option_number) - 1
-                                if 0 <= index < len(tasks):
-                                    selected_task = tasks[index]
-                                    task_id = selected_task.get('id')
-                                    task_title = selected_task.get('title')
-                                    log.info(f"✅ Resolved {list_type}_{option_number} → {task_title} (ID: {task_id[:8]}...)")
+                        # Get the task at the selected index (1-based)
+                        index = int(option_number) - 1
+                        if 0 <= index < len(tasks):
+                            selected_task = tasks[index]
+                            task_id = selected_task.get('id')
+                            task_title = selected_task.get('title')
+                            log.info(f"✅ Resolved {list_type}_{option_number} → {task_title} (ID: {task_id[:8]}...)")
 
-                                    # Trigger task_details with the selected task
-                                    from src.services.handlers import execute_direct_handler
-                                    from src.integrations.supabase import supabase_client
+                            # Trigger task_details with the selected task
+                            from src.services.handlers import execute_direct_handler
+                            from src.integrations.supabase import supabase_client
 
-                                    user_name = supabase_client.get_user_name(user_id)
+                            user_name = supabase_client.get_user_name(user_id)
 
-                                    result = await execute_direct_handler(
-                                        intent="task_details",
-                                        user_id=user_id,
-                                        phone_number=phone_number,
-                                        user_name=user_name,
-                                        language=language,
-                                        message_text=str(option_number),
-                                        session_id=session_id,
-                                        last_tool_outputs=tool_outputs
-                                    )
+                            result = await execute_direct_handler(
+                                intent="task_details",
+                                user_id=user_id,
+                                phone_number=phone_number,
+                                user_name=user_name,
+                                language=language,
+                                message_text=str(option_number),
+                                session_id=session_id,
+                                last_tool_outputs=tool_outputs
+                            )
 
-                                    if result:
-                                        log.info(f"✅ Task details called for selected task")
-                                        return result
-                                    else:
-                                        log.warning(f"⚠️ Task details handler returned None")
-                                        return None
-                                else:
-                                    log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
-                                break
+                            if result:
+                                log.info(f"✅ Task details called for selected task")
+                                return result
+                            else:
+                                log.warning(f"⚠️ Task details handler returned None")
+                                return None
+                        else:
+                            log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
+                        break
 
-                    elif list_type in ["project", "projects", "option"]:
-                        # User selected a project from the list → Show project tasks
-                        for tool_output in tool_outputs:
-                            if tool_output.get('tool') == 'list_projects_tool':
-                                projects = tool_output.get('output', [])
-                                log.info(f"📋 Found {len(projects)} projects in tool_outputs")
+            elif list_type in ["project", "projects", "option"]:
+                # User selected a project from the list → Show project tasks
+                for tool_output in tool_outputs:
+                    if tool_output.get('tool') == 'list_projects_tool':
+                        projects = tool_output.get('output', [])
+                        log.info(f"📋 Found {len(projects)} projects in tool_outputs")
 
-                                # Get the project at the selected index (1-based)
-                                index = int(option_number) - 1
-                                if 0 <= index < len(projects):
-                                    selected_project = projects[index]
-                                    project_id = selected_project.get('id')
-                                    project_name = selected_project.get('nom')
-                                    log.info(f"✅ Resolved {list_type}_{option_number} → {project_name} (ID: {project_id[:8]}...)")
+                        # Get the project at the selected index (1-based)
+                        index = int(option_number) - 1
+                        if 0 <= index < len(projects):
+                            selected_project = projects[index]
+                            project_id = selected_project.get('id')
+                            project_name = selected_project.get('nom')
+                            log.info(f"✅ Resolved {list_type}_{option_number} → {project_name} (ID: {project_id[:8]}...)")
 
-                                    # Trigger list_tasks with the selected project
-                                    from src.services.handlers import execute_direct_handler
-                                    from src.integrations.supabase import supabase_client
+                            # Trigger list_tasks with the selected project
+                            from src.services.handlers import execute_direct_handler
+                            from src.integrations.supabase import supabase_client
 
-                                    user_name = supabase_client.get_user_name(user_id)
+                            user_name = supabase_client.get_user_name(user_id)
 
-                                    result = await execute_direct_handler(
-                                        intent="list_tasks",
-                                        user_id=user_id,
-                                        phone_number=phone_number,
-                                        user_name=user_name,
-                                        language=language,
-                                        message_text=project_name,
-                                        session_id=session_id,
-                                        last_tool_outputs=tool_outputs
-                                    )
+                            result = await execute_direct_handler(
+                                intent="list_tasks",
+                                user_id=user_id,
+                                phone_number=phone_number,
+                                user_name=user_name,
+                                language=language,
+                                message_text=project_name,
+                                session_id=session_id,
+                                last_tool_outputs=tool_outputs
+                            )
 
-                                    if result:
-                                        log.info(f"✅ List tasks called for selected project")
-                                        return result
-                                    else:
-                                        log.warning(f"⚠️ List tasks handler returned None")
-                                        return None
-                                else:
-                                    log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
-                                break
+                            if result:
+                                log.info(f"✅ List tasks called for selected project")
+                                return result
+                            else:
+                                log.warning(f"⚠️ List tasks handler returned None")
+                                return None
+                        else:
+                            log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
+                        break
 
                 break
 

@@ -73,12 +73,20 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
             description = None
 
         # Add emoji back to title if it was present
+        # WhatsApp/Twilio limit: 24 characters total (including emoji)
         if emoji:
-            title = f"{emoji} {title}"
+            # Reserve space for emoji + space (usually 3-4 chars)
+            emoji_length = len(emoji) + 1  # +1 for space
+            max_title_length = 24 - emoji_length
+            if max_title_length < 1:
+                max_title_length = 20  # Fallback if emoji is too long
+            title = f"{emoji} {title[:max_title_length]}"
+        else:
+            title = title[:24]
 
         items.append({
             "id": f"{list_type}_{number}_{language}",  # e.g., "task_1_fr" or "project_1_fr"
-            "title": title[:24],  # WhatsApp limit
+            "title": title[:24],  # Final safety truncation
             "description": description[:72] if description else None  # WhatsApp limit
         })
 
