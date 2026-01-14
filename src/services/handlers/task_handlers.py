@@ -16,7 +16,7 @@ from src.utils.fuzzy_matcher import fuzzy_match_project
 from src.utils.logger import log
 
 # Import LangChain tools for LangSmith tracing
-from src.agent.tools import list_tasks_tool
+from src.agent.tools import list_tasks_tool, get_task_description_tool, get_task_images_tool
 
 
 async def handle_list_tasks(
@@ -347,4 +347,134 @@ async def handle_update_progress(
     except Exception as e:
         log.error(f"Error in fast path update_progress: {e}")
         # Return None to trigger fallback to full agent
+        return None
+
+
+async def handle_task_details(
+    user_id: str,
+    phone_number: str,
+    user_name: str,
+    language: str,
+    message_text: str = "",
+    last_tool_outputs: list = None,
+    session_id: str = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Handle task details intent with context-aware task selection.
+
+    Displays task description and photos in two separate messages:
+    1. Text message with description
+    2. Carousel with up to 10 images (if images exist)
+
+    Supports:
+    - Numeric selection from task list (e.g., "2")
+    - Explicit task ID mention
+    - Interactive button selections
+
+    Args:
+        message_text: User's message text for task selection
+        last_tool_outputs: Tool outputs from previous bot message (for resolving numeric selections)
+        session_id: Session ID for context
+
+    Returns:
+        Dict with message, escalation, tools_called, carousel_data
+    """
+    log.info(f"🚀 FAST PATH: Handling task details for {user_id}")
+
+    try:
+        # Scenario 1: Resolve numeric selection from last tool_outputs (task list)
+        selected_task_id = None
+        task_title = None
+
+        if message_text and message_text.strip().isdigit() and last_tool_outputs:
+            selection_index = int(message_text.strip()) - 1
+            log.debug(f"🔢 Attempting to resolve numeric task selection: '{message_text}' (index: {selection_index})")
+
+            # Find tasks in last tool_outputs
+            for tool_output in last_tool_outputs:
+                if tool_output.get('tool') == 'list_tasks_tool':
+                    output_tasks = tool_output.get('output', [])
+                    log.debug(f"📋 Found list_tasks_tool with {len(output_tasks)} tasks")
+
+                    if 0 <= selection_index < len(output_tasks):
+                        selected_task_id = output_tasks[selection_index].get('id')
+                        task_title = output_tasks[selection_index].get('title')
+                        log.info(f"✅ Resolved numeric selection '{message_text}' → {task_title} (ID: {selected_task_id[:8]}...)")
+                        break
+                    else:
+                        log.warning(f"⚠️ Selection index {selection_index} out of range (0-{len(output_tasks)-1})")
+
+        # Scenario 2: No task selected - fallback to AI agent
+        if not selected_task_id:
+            log.warning(f"🤖 FAST PATH FALLBACK → Routing to full AI agent")
+            log.info(f"   Reason: Could not determine which task user wants")
+            log.info(f"   User message: '{message_text}'")
+            return None
+
+        # Scenario 3: Fetch task description and images in parallel
+        tool_outputs = []
+
+        # Call LangChain tools for LangSmith tracing
+        log.debug(f"🔧 Calling get_task_description_tool and get_task_images_tool via LangChain")
+        _ = await get_task_description_tool.ainvoke({"user_id": user_id, "task_id": selected_task_id})
+        _ = await get_task_images_tool.ainvoke({"user_id": user_id, "task_id": selected_task_id})
+
+        # Get structured data from actions layer
+        desc_result = await task_actions.get_task_description(user_id, selected_task_id)
+        images_result = await task_actions.get_task_images(user_id, selected_task_id)
+
+        # Build response message
+        message = get_translation("fr", "task_details_header").format(task_title=task_title)
+
+        # Add description section
+        if desc_result["success"] and desc_result["data"].get("description"):
+            description = desc_result["data"]["description"]
+            message += f"\n\n📄 Description:\n{description}"
+
+            # Store description in tool_outputs
+            tool_outputs.append({
+                "tool": "get_task_description_tool",
+                "input": {"task_id": selected_task_id},
+                "output": {"description": description[:200]}  # Truncate for metadata
+            })
+        else:
+            message += "\n\n📄 Aucune description disponible pour cette tâche."
+
+        # Prepare carousel data for images
+        carousel_data = None
+        if images_result["success"] and images_result["data"]:
+            images = images_result["data"][:10]  # WhatsApp limit: 10 cards
+
+            carousel_data = {
+                "cards": [
+                    {
+                        "media_url": img.get("url"),
+                        "media_type": img.get("type", "image/jpeg")
+                    }
+                    for img in images
+                ]
+            }
+
+            # Store images in tool_outputs
+            tool_outputs.append({
+                "tool": "get_task_images_tool",
+                "input": {"task_id": selected_task_id},
+                "output": {"count": len(images), "urls": [img.get("url") for img in images[:3]]}
+            })
+
+            message += f"\n\n📷 {len(images)} photo(s) disponible(s) (voir carrousel ci-dessous)"
+        else:
+            message += "\n\n📷 Aucune photo disponible pour cette tâche."
+
+        return {
+            "message": message,
+            "escalation": False,
+            "tools_called": ["get_task_description_tool", "get_task_images_tool"],
+            "fast_path": True,
+            "tool_outputs": tool_outputs,
+            "carousel_data": carousel_data  # NEW: carousel data for image display
+        }
+
+    except Exception as e:
+        log.error(f"Error in fast path task_details: {e}")
         return None

@@ -23,6 +23,7 @@ class IntentRouter:
         # Lazy import handlers
         from src.services.handlers import (
             handle_list_tasks,
+            handle_task_details,
             handle_list_documents,
             handle_report_incident,
             handle_update_progress,
@@ -34,6 +35,7 @@ class IntentRouter:
         handler_mapping = {
             "view_tasks": handle_list_tasks,
             "list_tasks": handle_list_tasks,
+            "task_details": handle_task_details,
             "view_documents": handle_list_documents,
             "list_documents": handle_list_documents,
             "report_incident": handle_report_incident,

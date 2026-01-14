@@ -717,6 +717,107 @@ class DynamicTemplateService:
         }
 
     # ============================================================================
+    # CAROUSEL METHODS (twilio/carousel)
+    # ============================================================================
+
+    def create_carousel(
+        self,
+        cards: List[Dict[str, str]],
+        body: str = "",
+        language: str = "en"
+    ) -> Optional[str]:
+        """Create carousel with up to 10 image cards.
+
+        Args:
+            cards: List of cards (max 10), each with:
+                   - media_url: URL to image (required)
+                   - title: Card title (optional)
+                   - body: Card body text (optional)
+            body: Intro message text above carousel
+            language: Language code
+
+        Returns:
+            Content SID if successful, None otherwise
+        """
+        # Validate cards
+        if not cards or len(cards) > 10:
+            log.error(f"❌ Invalid card count: {len(cards) if cards else 0} (must be 1-10)")
+            return None
+
+        # Format cards for Twilio carousel
+        formatted_cards = []
+        for i, card in enumerate(cards[:10]):
+            if not card.get("media_url"):
+                log.error(f"❌ Card {i} missing required media_url")
+                continue
+
+            card_data = {
+                "media": card.get("media_url")
+            }
+
+            # Optional: Add title/body if provided
+            if card.get("title"):
+                card_data["title"] = card.get("title")[:160]  # Max 160 chars combined with body
+            if card.get("body"):
+                card_data["body"] = card.get("body")[:160]
+
+            formatted_cards.append(card_data)
+
+        if not formatted_cards:
+            log.error(f"❌ No valid cards after validation")
+            return None
+
+        content_data = {
+            "body": body or "Photos",
+            "cards": formatted_cards
+        }
+
+        return self.create_dynamic_template("twilio/carousel", content_data, language)
+
+    def send_carousel(
+        self,
+        to_number: str,
+        cards: List[Dict[str, str]],
+        body: str = "",
+        cleanup: bool = True,
+        language: str = "en"
+    ) -> Dict[str, Any]:
+        """Full workflow: create → send → delete carousel.
+
+        Args:
+            to_number: Recipient WhatsApp number
+            cards: List of image cards
+            body: Intro message text above carousel
+            cleanup: Delete template after sending (default: True)
+            language: Language code
+
+        Returns:
+            Result dict with success status and IDs
+        """
+        workflow_start = time.time()
+
+        content_sid = self.create_carousel(cards, body, language)
+        if not content_sid:
+            return {'success': False, 'error': 'Failed to create carousel template'}
+
+        message_sid = self.send_with_template(to_number, content_sid)
+        if not message_sid:
+            self.delete_template(content_sid)
+            return {'success': False, 'error': 'Failed to send carousel'}
+
+        if cleanup:
+            self.schedule_deletion(content_sid, delay_seconds=2)
+
+        total_time = (time.time() - workflow_start) * 1000
+
+        return {
+            'success': True,
+            'content_sid': content_sid,
+            'message_sid': message_sid,
+            'total_ms': total_time
+        }
+
+    # ============================================================================
     # DATABASE INTEGRATION METHODS
     # ============================================================================
 

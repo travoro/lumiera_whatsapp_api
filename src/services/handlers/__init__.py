@@ -15,7 +15,7 @@ from src.services.handlers.project_handlers import (
     handle_list_documents,
     handle_report_incident
 )
-from src.services.handlers.task_handlers import handle_list_tasks, handle_update_progress
+from src.services.handlers.task_handlers import handle_list_tasks, handle_update_progress, handle_task_details
 from src.utils.logger import log
 
 
@@ -24,6 +24,7 @@ INTENT_HANDLERS = {
     "greeting": handle_greeting,
     "list_projects": handle_list_projects,
     "list_tasks": handle_list_tasks,
+    "task_details": handle_task_details,
     "list_documents": handle_list_documents,
     "escalate": handle_escalation,
     "report_incident": handle_report_incident,
@@ -91,5 +92,6 @@ __all__ = [
     "handle_list_documents",
     "handle_report_incident",
     "handle_list_tasks",
+    "handle_task_details",
     "handle_update_progress",
 ]

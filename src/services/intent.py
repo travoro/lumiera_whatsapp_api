@@ -69,6 +69,22 @@ INTENTS = {
         "tools": ["update_task_progress_tool"],
         "requires_confirmation": False
     },
+    "task_details": {
+        "keywords": [
+            # English
+            "details", "detail", "info", "information", "describe", "show", "view", "see",
+            # French
+            "détails", "détail", "description", "voir", "montrer", "afficher", "infos", "informations",
+            # Spanish
+            "detalles", "detalle", "descripción", "información", "ver", "mostrar",
+            # Portuguese
+            "detalhes", "descrição", "informação", "ver", "mostrar",
+            # Combined with task references
+            "photo", "photos", "image", "images", "picture", "pictures"
+        ],
+        "tools": ["get_task_description_tool", "get_task_images_tool"],
+        "requires_confirmation": False
+    },
     "general": {
         "keywords": [],
         "tools": "all",  # All tools available

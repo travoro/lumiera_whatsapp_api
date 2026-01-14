@@ -554,6 +554,30 @@ async def process_inbound_message(
 
         log.info(f"📤 Response sent to {from_number} (interactive: {interactive_data is not None})")
 
+        # Check for carousel data and send as second message
+        carousel_data = response_data.get("carousel_data")
+        if carousel_data and carousel_data.get("cards"):
+            log.info(f"📸 Sending carousel with {len(carousel_data['cards'])} images")
+
+            try:
+                from src.services.dynamic_templates import dynamic_template_service
+
+                # Send carousel
+                carousel_result = dynamic_template_service.send_carousel(
+                    to_number=from_number,
+                    cards=carousel_data["cards"],
+                    body="",  # No intro text, already sent in first message
+                    cleanup=True,
+                    language=user_language
+                )
+
+                if carousel_result.get("success"):
+                    log.info(f"✅ Carousel sent successfully: {carousel_result['message_sid']}")
+                else:
+                    log.error(f"❌ Failed to send carousel: {carousel_result.get('error')}")
+            except Exception as carousel_error:
+                log.error(f"❌ Error sending carousel: {carousel_error}")
+
     except Exception as e:
         log.error(f"Error processing message: {e}")
 
