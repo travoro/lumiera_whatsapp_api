@@ -49,15 +49,25 @@ async def handle_list_tasks(
         mentioned_project_id = None
         if message_text and message_text.strip().isdigit() and last_tool_outputs:
             selection_index = int(message_text.strip()) - 1  # Convert to 0-based index
+            log.debug(f"🔢 Attempting to resolve numeric selection: '{message_text}' (index: {selection_index})")
+            log.debug(f"📦 Available tool_outputs: {[t.get('tool') for t in last_tool_outputs]}")
+
             # Find projects in last tool_outputs
             for tool_output in last_tool_outputs:
                 if tool_output.get('tool') == 'list_projects_tool':
                     output_projects = tool_output.get('output', [])
+                    log.debug(f"📋 Found list_projects_tool with {len(output_projects)} projects")
+
                     if 0 <= selection_index < len(output_projects):
                         mentioned_project_id = output_projects[selection_index].get('id')
                         project_name = output_projects[selection_index].get('nom')
-                        log.info(f"🔢 Resolved numeric selection {message_text} → {project_name} (ID: {mentioned_project_id})")
+                        log.info(f"✅ Resolved numeric selection '{message_text}' → {project_name} (ID: {mentioned_project_id})")
                         break
+                    else:
+                        log.warning(f"⚠️ Selection index {selection_index} out of range (0-{len(output_projects)-1})")
+
+            if not mentioned_project_id:
+                log.warning(f"⚠️ Could not resolve numeric selection '{message_text}' - no list_projects_tool found in tool_outputs")
 
         # Scenario 3: Extract project name from message if mentioned
         # User might say "taches pour Champigny" or just "champigny"
@@ -191,15 +201,25 @@ async def handle_update_progress(
         mentioned_project_id = None
         if message_text and message_text.strip().isdigit() and last_tool_outputs:
             selection_index = int(message_text.strip()) - 1  # Convert to 0-based index
+            log.debug(f"🔢 Attempting to resolve numeric selection: '{message_text}' (index: {selection_index})")
+            log.debug(f"📦 Available tool_outputs: {[t.get('tool') for t in last_tool_outputs]}")
+
             # Find projects in last tool_outputs
             for tool_output in last_tool_outputs:
                 if tool_output.get('tool') == 'list_projects_tool':
                     output_projects = tool_output.get('output', [])
+                    log.debug(f"📋 Found list_projects_tool with {len(output_projects)} projects")
+
                     if 0 <= selection_index < len(output_projects):
                         mentioned_project_id = output_projects[selection_index].get('id')
                         project_name = output_projects[selection_index].get('nom')
-                        log.info(f"🔢 Resolved numeric selection {message_text} → {project_name} (ID: {mentioned_project_id})")
+                        log.info(f"✅ Resolved numeric selection '{message_text}' → {project_name} (ID: {mentioned_project_id})")
                         break
+                    else:
+                        log.warning(f"⚠️ Selection index {selection_index} out of range (0-{len(output_projects)-1})")
+
+            if not mentioned_project_id:
+                log.warning(f"⚠️ Could not resolve numeric selection '{message_text}' - no list_projects_tool found in tool_outputs")
 
         # Scenario 3: Extract project name from message if mentioned
         mentioned_project_id_from_text = None

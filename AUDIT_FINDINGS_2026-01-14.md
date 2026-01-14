@@ -366,13 +366,12 @@ After fixes:
 Check if metadata was stored:
 ```sql
 SELECT
-    id,
-    direction,
     content,
+    direction,
     metadata,
     created_at
 FROM messages
-WHERE user_id = 'ed97770c-ba77-437e-a1a9-e4a8e034d1da'
+WHERE subcontractor_id = 'ed97770c-ba77-437e-a1a9-e4a8e034d1da'
 ORDER BY created_at DESC
 LIMIT 10;
 ```

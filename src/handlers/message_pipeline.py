@@ -484,17 +484,24 @@ class MessagePipeline:
                         ctx.session_id,
                         fields='content,direction,metadata'
                     )
+                    log.debug(f"📨 Loaded {len(messages)} messages from session")
+
                     # Find the most recent outbound message (only check last 5 messages)
                     recent_messages = messages[-5:] if len(messages) > 5 else messages
                     for msg in reversed(recent_messages):
                         if msg and msg.get('direction') == 'outbound':
                             last_bot_message = msg.get('content', '')
-                            last_tool_outputs = msg.get('metadata', {}).get('tool_outputs', [])
+                            metadata = msg.get('metadata', {})
+                            last_tool_outputs = metadata.get('tool_outputs', []) if metadata else []
+
                             if last_tool_outputs:
                                 log.info(f"📦 Loaded {len(last_tool_outputs)} tool outputs from last bot message")
+                                log.debug(f"📋 Tool outputs: {[t.get('tool') for t in last_tool_outputs]}")
+                            else:
+                                log.debug(f"📭 Last bot message has no tool_outputs in metadata")
                             break
                 except Exception as e:
-                    log.warning(f"Could not load last message tool_outputs: {e}")
+                    log.warning(f"⚠️ Could not load last message tool_outputs: {e}")
 
                 # Try fast path through router
                 from src.services.handlers import execute_direct_handler

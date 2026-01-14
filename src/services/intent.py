@@ -196,6 +196,9 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                 response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
                 response_text = response.content.strip()
 
+                # Log raw response for debugging
+                log.debug(f"🤖 Haiku raw response: {response_text}")
+
                 # Parse JSON response
                 try:
                     # Try to extract JSON if there's extra text (sometimes LLMs add explanation)
@@ -208,12 +211,13 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                         parsed = json.loads(json_str)
                         intent = parsed.get('intent', 'general').lower()
                         confidence = float(parsed.get('confidence', 75)) / 100.0
-                        log.debug(f"📊 Parsed JSON response: intent={intent}, confidence={confidence}")
+                        log.info(f"✅ JSON parsed successfully: intent={intent}, confidence={confidence}")
                     else:
                         raise ValueError("No JSON object found in response")
 
                 except Exception as e:
-                    log.warning(f"Failed to parse JSON response: {e}. Response: {response_text[:200]}")
+                    log.warning(f"⚠️ JSON parsing failed: {e}")
+                    log.warning(f"📝 Raw response (first 200 chars): {response_text[:200]}")
                     # Fallback to old format if JSON parsing fails
                     response_lower = response_text.lower()
                     if ":" in response_lower:
