@@ -63,7 +63,8 @@ async def handle_list_projects(
                 "tool": "list_projects_tool",
                 "input": {"user_id": user_id},
                 "output": compact_projects(projects)  # Only essential fields
-            }]
+            }],
+            "list_type": "projects"  # Metadata for robust interactive list handling
         }
 
     except Exception as e:
@@ -170,13 +171,25 @@ async def handle_list_documents(
                 "output": compact_projects(projects[:5])  # Only essential fields
             })
 
-        return {
+        # Determine list_type based on what we're showing
+        list_type = None
+        for tool_output in tool_outputs:
+            if tool_output.get('tool') == 'list_projects_tool':
+                list_type = "projects"
+                break
+
+        result = {
             "message": message,
             "escalation": False,
             "tools_called": [],
             "fast_path": True,
             "tool_outputs": tool_outputs
         }
+
+        if list_type:
+            result["list_type"] = list_type
+
+        return result
 
     except Exception as e:
         log.error(f"Error in fast path list_documents: {e}")
@@ -250,13 +263,25 @@ async def handle_report_incident(
                 "output": compact_projects(projects[:5])  # Only essential fields
             })
 
-        return {
+        # Determine list_type based on what we're showing
+        list_type = None
+        for tool_output in tool_outputs:
+            if tool_output.get('tool') == 'list_projects_tool':
+                list_type = "projects"
+                break
+
+        result = {
             "message": message,
             "escalation": False,
             "tools_called": [],
             "fast_path": True,
             "tool_outputs": tool_outputs
         }
+
+        if list_type:
+            result["list_type"] = list_type
+
+        return result
 
     except Exception as e:
         log.error(f"Error in fast path report_incident: {e}")

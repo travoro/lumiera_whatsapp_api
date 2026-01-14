@@ -4,7 +4,7 @@ import re
 from src.utils.logger import log
 
 
-def detect_numbered_list(text: str, language: str = "fr") -> Optional[List[Dict[str, Any]]]:
+def detect_numbered_list(text: str, language: str = "fr", list_type: str = "option") -> Optional[List[Dict[str, Any]]]:
     """Detect numbered lists in text and extract structured items.
 
     Looks for patterns like:
@@ -14,6 +14,7 @@ def detect_numbered_list(text: str, language: str = "fr") -> Optional[List[Dict[
     Args:
         text: Text to analyze
         language: Language code to append to IDs (e.g., "fr", "en")
+        list_type: Type of list for robust ID generation (e.g., "tasks", "projects", "option")
 
     Returns:
         List of items with id, title, description or None if no list found
@@ -76,7 +77,7 @@ def detect_numbered_list(text: str, language: str = "fr") -> Optional[List[Dict[
             title = f"{emoji} {title}"
 
         items.append({
-            "id": f"option_{number}_{language}",  # Include language suffix to prevent language detection
+            "id": f"{list_type}_{number}_{language}",  # e.g., "task_1_fr" or "project_1_fr"
             "title": title[:24],  # WhatsApp limit
             "description": description[:72] if description else None  # WhatsApp limit
         })
@@ -84,12 +85,13 @@ def detect_numbered_list(text: str, language: str = "fr") -> Optional[List[Dict[
     return items if items else None
 
 
-def extract_intro_and_list(text: str, language: str = "fr") -> Tuple[str, Optional[List[Dict[str, Any]]], str]:
+def extract_intro_and_list(text: str, language: str = "fr", list_type: str = "option") -> Tuple[str, Optional[List[Dict[str, Any]]], str]:
     """Extract intro text, list items, and outro text from response.
 
     Args:
         text: Full response text
         language: Language code to append to IDs (e.g., "fr", "en")
+        list_type: Type of list for robust ID generation (e.g., "tasks", "projects", "option")
 
     Returns:
         Tuple of (intro_text, list_items or None, outro_text)
@@ -133,7 +135,7 @@ def extract_intro_and_list(text: str, language: str = "fr") -> Tuple[str, Option
 
     # Parse list items
     list_text = '\n'.join(list_lines).strip()
-    items = detect_numbered_list(list_text, language) if list_text else None
+    items = detect_numbered_list(list_text, language, list_type) if list_text else None
 
     return intro_text, items, outro_text
 
@@ -156,12 +158,13 @@ def should_use_interactive_message(text: str) -> bool:
     return 1 <= num_items <= 10
 
 
-def format_for_interactive(text: str, language: str = "fr") -> Tuple[str, Optional[Dict[str, Any]]]:
+def format_for_interactive(text: str, language: str = "fr", list_type: str = "option") -> Tuple[str, Optional[Dict[str, Any]]]:
     """Format response for interactive WhatsApp message.
 
     Args:
         text: Agent response text
         language: Language code to append to IDs (e.g., "fr", "en")
+        list_type: Type of list for robust ID generation (e.g., "tasks", "projects", "option")
 
     Returns:
         Tuple of (message_text, interactive_data or None)
@@ -170,7 +173,7 @@ def format_for_interactive(text: str, language: str = "fr") -> Tuple[str, Option
     if not should_use_interactive_message(text):
         return text, None
 
-    intro, items, outro = extract_intro_and_list(text, language)
+    intro, items, outro = extract_intro_and_list(text, language, list_type)
 
     if not items:
         return text, None

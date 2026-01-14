@@ -183,7 +183,8 @@ async def handle_list_tasks(
                 "escalation": False,
                 "tools_called": [],
                 "fast_path": True,
-                "tool_outputs": tool_outputs
+                "tool_outputs": tool_outputs,
+                "list_type": "tasks"  # Metadata for robust interactive list handling
             }
 
         # Scenario 5: Parameters unclear - Route to full AI agent

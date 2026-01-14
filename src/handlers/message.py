@@ -187,19 +187,16 @@ async def handle_direct_action(
             # Fallback to AI if fast path fails
             return None
 
-    # Handle interactive list selections (option_1_fr, option_2_fr, etc.)
-    if action.startswith("option_"):
+    # Handle interactive list selections (task_1_fr, project_2_fr, option_3_fr, etc.)
+    # Parse action format: {list_type}_{number}_{language}
+    import re
+    list_match = re.match(r'(task|project|option)_(\d+)(?:_[a-z]{2})?', action)
+
+    if list_match:
+        list_type = list_match.group(1)
+        option_number = list_match.group(2)
         log.info(f"📋 Interactive list selection detected: {action}")
-
-        # Parse the option number (option_1 → 1 or option_1_fr → 1)
-        import re
-        match = re.match(r'option_(\d+)', action)
-        if not match:
-            log.warning(f"⚠️ Could not parse option number from: {action}")
-            return None
-
-        option_number = match.group(1)
-        log.info(f"🔢 User selected option #{option_number}")
+        log.info(f"🏷️  Parsed list_type: {list_type}, option #{option_number}")
 
         # Get the last bot message to find what was in that position
         from src.integrations.supabase import supabase_client
@@ -228,89 +225,92 @@ async def handle_direct_action(
                     log.info(f"📦 Found tool_outputs in last bot message")
                     log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
 
-                    # Check for list_tasks_tool FIRST (most specific/recent context)
-                    # Then check for list_projects_tool (less specific context)
-                    # This prioritizes task selections over project selections
-                    for tool_output in tool_outputs:
-                        if tool_output.get('tool') == 'list_tasks_tool':
-                            tasks = tool_output.get('output', [])
-                            log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
+                    # Route based on list_type parsed from action ID (robust approach)
+                    # This eliminates ambiguity when multiple tool outputs are present
 
-                            # Get the task at the selected index (1-based)
-                            index = int(option_number) - 1
-                            if 0 <= index < len(tasks):
-                                selected_task = tasks[index]
-                                task_id = selected_task.get('id')
-                                task_title = selected_task.get('title')
-                                log.info(f"✅ Resolved option_{option_number} → {task_title} (ID: {task_id[:8]}...)")
+                    if list_type == "tasks":
+                        # User selected a task from the list → Show task details
+                        for tool_output in tool_outputs:
+                            if tool_output.get('tool') == 'list_tasks_tool':
+                                tasks = tool_output.get('output', [])
+                                log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
 
-                                # Trigger task_details with the selected task
-                                from src.services.handlers import execute_direct_handler
-                                from src.integrations.supabase import supabase_client
+                                # Get the task at the selected index (1-based)
+                                index = int(option_number) - 1
+                                if 0 <= index < len(tasks):
+                                    selected_task = tasks[index]
+                                    task_id = selected_task.get('id')
+                                    task_title = selected_task.get('title')
+                                    log.info(f"✅ Resolved {list_type}_{option_number} → {task_title} (ID: {task_id[:8]}...)")
 
-                                # Get user name
-                                user_name = supabase_client.get_user_name(user_id)
+                                    # Trigger task_details with the selected task
+                                    from src.services.handlers import execute_direct_handler
+                                    from src.integrations.supabase import supabase_client
 
-                                # Call task_details handler directly with task context
-                                result = await execute_direct_handler(
-                                    intent="task_details",
-                                    user_id=user_id,
-                                    phone_number=phone_number,
-                                    user_name=user_name,
-                                    language=language,
-                                    message_text=str(option_number),  # Pass number for resolution
-                                    session_id=session_id,
-                                    last_tool_outputs=tool_outputs
-                                )
+                                    user_name = supabase_client.get_user_name(user_id)
 
-                                if result:
-                                    log.info(f"✅ Task details called for selected task")
-                                    return result
+                                    result = await execute_direct_handler(
+                                        intent="task_details",
+                                        user_id=user_id,
+                                        phone_number=phone_number,
+                                        user_name=user_name,
+                                        language=language,
+                                        message_text=str(option_number),
+                                        session_id=session_id,
+                                        last_tool_outputs=tool_outputs
+                                    )
+
+                                    if result:
+                                        log.info(f"✅ Task details called for selected task")
+                                        return result
+                                    else:
+                                        log.warning(f"⚠️ Task details handler returned None")
+                                        return None
                                 else:
-                                    log.warning(f"⚠️ Task details handler returned None")
-                                    return None
-                            else:
-                                log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
+                                    log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
+                                break
 
-                        elif tool_output.get('tool') == 'list_projects_tool':
-                            projects = tool_output.get('output', [])
-                            log.info(f"📋 Found {len(projects)} projects in tool_outputs")
+                    elif list_type == "projects" or list_type == "option":
+                        # User selected a project from the list → Show project tasks
+                        for tool_output in tool_outputs:
+                            if tool_output.get('tool') == 'list_projects_tool':
+                                projects = tool_output.get('output', [])
+                                log.info(f"📋 Found {len(projects)} projects in tool_outputs")
 
-                            # Get the project at the selected index (1-based)
-                            index = int(option_number) - 1
-                            if 0 <= index < len(projects):
-                                selected_project = projects[index]
-                                project_id = selected_project.get('id')
-                                project_name = selected_project.get('nom')
-                                log.info(f"✅ Resolved option_{option_number} → {project_name} (ID: {project_id[:8]}...)")
+                                # Get the project at the selected index (1-based)
+                                index = int(option_number) - 1
+                                if 0 <= index < len(projects):
+                                    selected_project = projects[index]
+                                    project_id = selected_project.get('id')
+                                    project_name = selected_project.get('nom')
+                                    log.info(f"✅ Resolved {list_type}_{option_number} → {project_name} (ID: {project_id[:8]}...)")
 
-                                # Trigger list_tasks with the selected project
-                                from src.services.handlers import execute_direct_handler
-                                from src.integrations.supabase import supabase_client
+                                    # Trigger list_tasks with the selected project
+                                    from src.services.handlers import execute_direct_handler
+                                    from src.integrations.supabase import supabase_client
 
-                                # Get user name
-                                user_name = supabase_client.get_user_name(user_id)
+                                    user_name = supabase_client.get_user_name(user_id)
 
-                                # Call list_tasks handler directly with project context
-                                result = await execute_direct_handler(
-                                    intent="list_tasks",
-                                    user_id=user_id,
-                                    phone_number=phone_number,
-                                    user_name=user_name,
-                                    language=language,
-                                    message_text=project_name,  # Pass project name so it can be resolved
-                                    session_id=session_id,
-                                    last_tool_outputs=tool_outputs
-                                )
+                                    result = await execute_direct_handler(
+                                        intent="list_tasks",
+                                        user_id=user_id,
+                                        phone_number=phone_number,
+                                        user_name=user_name,
+                                        language=language,
+                                        message_text=project_name,
+                                        session_id=session_id,
+                                        last_tool_outputs=tool_outputs
+                                    )
 
-                                if result:
-                                    log.info(f"✅ List tasks called for selected project")
-                                    return result
+                                    if result:
+                                        log.info(f"✅ List tasks called for selected project")
+                                        return result
+                                    else:
+                                        log.warning(f"⚠️ List tasks handler returned None")
+                                        return None
                                 else:
-                                    log.warning(f"⚠️ List tasks handler returned None")
-                                    return None
-                            else:
-                                log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
+                                    log.warning(f"⚠️ Option {option_number} out of range (0-{len(projects)-1})")
+                                break
 
                 break
 
@@ -490,8 +490,12 @@ async def process_inbound_message(
                 from src.utils.response_parser import format_for_interactive
                 from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 
-                # Format for interactive if applicable (e.g., list_projects)
-                formatted_text, interactive_data = format_for_interactive(response_text, user_language)
+                # Extract list_type from response metadata (defaults to "option" if not provided)
+                list_type = response_data.get("list_type", "option")
+                log.info(f"🏷️  List type for interactive formatting: {list_type}")
+
+                # Format for interactive if applicable (e.g., list_projects, list_tasks)
+                formatted_text, interactive_data = format_for_interactive(response_text, user_language, list_type)
 
                 send_whatsapp_message_smart(
                     to=from_number,
@@ -573,7 +577,17 @@ async def process_inbound_message(
 
         if intent in INTERACTIVE_LIST_INTENTS:
             log.info(f"📱 Intent '{intent}' expects structured data → Formatting as interactive list")
-            message_text, interactive_data = format_for_interactive(response_text, user_language)
+
+            # Infer list_type from intent (for robust option ID generation)
+            if intent in ["list_tasks", "view_tasks"]:
+                list_type = "tasks"
+            elif intent in ["list_projects", "switch_project"]:
+                list_type = "projects"
+            else:
+                list_type = "option"  # Fallback for other intents
+
+            log.info(f"🏷️  Inferred list_type from intent: {list_type}")
+            message_text, interactive_data = format_for_interactive(response_text, user_language, list_type)
         else:
             log.info(f"📱 Intent '{intent}' is conversational → Sending as plain text")
             # Agent output is normalized to string in agent.py
