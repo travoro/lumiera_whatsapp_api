@@ -136,12 +136,16 @@ async def list_projects_tool(user_id: str) -> str:
     Returns:
         A formatted string with the list of projects
     """
+    log.info(f"🔧 Tool called: list_projects_tool(user_id={user_id[:8]}...)")
+
     result = await projects.list_projects(user_id)
 
     if not result["success"]:
+        log.warning(f"❌ list_projects_tool failed: {result['message']}")
         return result["message"]
 
     if not result["data"]:
+        log.info(f"📭 list_projects_tool: No projects found")
         return "Aucun projet actif trouvé."
 
     # Format projects for display (NO technical IDs shown to users)
@@ -152,6 +156,7 @@ async def list_projects_tool(user_id: str) -> str:
             output += f"   📍 {project['location']}\n"
         output += "\n"
 
+    log.info(f"✅ list_projects_tool: Returned {len(result['data'])} projects")
     return output
 
 
@@ -170,12 +175,16 @@ async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status
     Returns:
         A formatted string with the list of tasks
     """
+    log.info(f"🔧 Tool called: list_tasks_tool(user_id={user_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}..., status={status})")
+
     result = await tasks.list_tasks(user_id, project_id, status)
 
     if not result["success"]:
+        log.warning(f"❌ list_tasks_tool failed: {result['message']}")
         return result["message"]
 
     if not result["data"]:
+        log.info(f"📭 list_tasks_tool: No tasks found")
         # Return detailed message so agent can provide helpful response
         return result["message"]
 
@@ -190,6 +199,7 @@ async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status
             output += f"   📅 Date limite: {task['due_date']}\n"
         output += "\n"
 
+    log.info(f"✅ list_tasks_tool: Returned {len(result['data'])} tasks")
     return output
 
 
@@ -204,11 +214,15 @@ async def get_task_description_tool(user_id: str, task_id: str) -> str:
     Returns:
         The task description
     """
+    log.info(f"🔧 Tool called: get_task_description_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+
     result = await tasks.get_task_description(user_id, task_id)
 
     if not result["success"]:
+        log.warning(f"❌ get_task_description_tool failed: {result['message']}")
         return result["message"]
 
+    log.info(f"✅ get_task_description_tool: Retrieved description")
     return f"Description de la tâche:\n\n{result['data']['description']}"
 
 
@@ -223,12 +237,16 @@ async def get_task_plans_tool(user_id: str, task_id: str) -> str:
     Returns:
         Information about available plans
     """
+    log.info(f"🔧 Tool called: get_task_plans_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+
     result = await tasks.get_task_plans(user_id, task_id)
 
     if not result["success"]:
+        log.warning(f"❌ get_task_plans_tool failed: {result['message']}")
         return result["message"]
 
     if not result["data"]:
+        log.info(f"📭 get_task_plans_tool: No plans found")
         return "Aucun plan trouvé pour cette tâche."
 
     output = f"{result['message']}\n\n"
@@ -236,6 +254,7 @@ async def get_task_plans_tool(user_id: str, task_id: str) -> str:
         output += f"{i}. {plan.get('name', 'Plan')}\n"
         output += f"   URL: {plan.get('url')}\n\n"
 
+    log.info(f"✅ get_task_plans_tool: Returned {len(result['data'])} plans")
     return output
 
 
@@ -250,12 +269,16 @@ async def get_task_images_tool(user_id: str, task_id: str) -> str:
     Returns:
         Information about available images
     """
+    log.info(f"🔧 Tool called: get_task_images_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+
     result = await tasks.get_task_images(user_id, task_id)
 
     if not result["success"]:
+        log.warning(f"❌ get_task_images_tool failed: {result['message']}")
         return result["message"]
 
     if not result["data"]:
+        log.info(f"📭 get_task_images_tool: No images found")
         return "Aucune image trouvée pour cette tâche."
 
     output = f"{result['message']}\n\n"
@@ -263,6 +286,7 @@ async def get_task_images_tool(user_id: str, task_id: str) -> str:
         output += f"{i}. {image.get('name', 'Image')}\n"
         output += f"   URL: {image.get('url')}\n\n"
 
+    log.info(f"✅ get_task_images_tool: Returned {len(result['data'])} images")
     return output
 
 
@@ -278,12 +302,16 @@ async def get_documents_tool(user_id: str, project_id: str, folder_id: Optional[
     Returns:
         Information about available documents
     """
+    log.info(f"🔧 Tool called: get_documents_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., folder_id={folder_id[:8] if folder_id else 'None'}...)")
+
     result = await documents.get_documents(user_id, project_id, folder_id)
 
     if not result["success"]:
+        log.warning(f"❌ get_documents_tool failed: {result['message']}")
         return result["message"]
 
     if not result["data"]:
+        log.info(f"📭 get_documents_tool: No documents found")
         return "Aucun document trouvé."
 
     output = f"{result['message']}\n\n"
@@ -292,6 +320,7 @@ async def get_documents_tool(user_id: str, project_id: str, folder_id: Optional[
         output += f"   Type: {doc['type']}\n"
         output += f"   URL: {doc['url']}\n\n"
 
+    log.info(f"✅ get_documents_tool: Returned {len(result['data'])} documents")
     return output
 
 
@@ -307,7 +336,15 @@ async def add_task_comment_tool(user_id: str, task_id: str, comment_text: str) -
     Returns:
         Success or error message
     """
+    log.info(f"🔧 Tool called: add_task_comment_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., comment_length={len(comment_text)} chars)")
+
     result = await tasks.add_task_comment(user_id, task_id, comment_text)
+
+    if result["success"]:
+        log.info(f"✅ add_task_comment_tool: Comment added successfully")
+    else:
+        log.warning(f"❌ add_task_comment_tool failed: {result['message']}")
+
     return result["message"]
 
 
@@ -322,12 +359,16 @@ async def get_task_comments_tool(user_id: str, task_id: str) -> str:
     Returns:
         All comments for the task
     """
+    log.info(f"🔧 Tool called: get_task_comments_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+
     result = await tasks.get_task_comments(user_id, task_id)
 
     if not result["success"]:
+        log.warning(f"❌ get_task_comments_tool failed: {result['message']}")
         return result["message"]
 
     if not result["data"]:
+        log.info(f"📭 get_task_comments_tool: No comments found")
         return "Aucun commentaire trouvé pour cette tâche."
 
     output = f"{result['message']}\n\n"
@@ -335,6 +376,7 @@ async def get_task_comments_tool(user_id: str, task_id: str) -> str:
         output += f"{i}. {comment.get('author', 'Utilisateur')}: {comment.get('text')}\n"
         output += f"   Date: {comment.get('created_at')}\n\n"
 
+    log.info(f"✅ get_task_comments_tool: Returned {len(result['data'])} comments")
     return output
 
 
@@ -358,12 +400,18 @@ async def submit_incident_report_tool(
     Returns:
         Success message with incident ID or error message
     """
+    log.info(f"🔧 Tool called: submit_incident_report_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., title={title[:50]}..., images={len(image_urls)})")
+
     result = await incidents.submit_incident_report(
         user_id, project_id, title, description, image_urls
     )
 
     if result["success"]:
-        return f"{result['message']} ID de l'incident: {result['data']['incident_id']}"
+        incident_id = result['data']['incident_id']
+        log.info(f"✅ submit_incident_report_tool: Incident created (ID: {incident_id[:8]}...)")
+        return f"{result['message']} ID de l'incident: {incident_id}"
+
+    log.warning(f"❌ submit_incident_report_tool failed: {result['message']}")
     return result["message"]
 
 
@@ -385,9 +433,17 @@ async def update_incident_report_tool(
     Returns:
         Success or error message
     """
+    log.info(f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})")
+
     result = await incidents.update_incident_report(
         user_id, incident_id, additional_text, additional_images
     )
+
+    if result["success"]:
+        log.info(f"✅ update_incident_report_tool: Incident updated successfully")
+    else:
+        log.warning(f"❌ update_incident_report_tool failed: {result['message']}")
+
     return result["message"]
 
 
@@ -411,9 +467,17 @@ async def update_task_progress_tool(
     Returns:
         Success or error message
     """
+    log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status={status}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
+
     result = await tasks.update_task_progress(
         user_id, task_id, status, progress_note, image_urls
     )
+
+    if result["success"]:
+        log.info(f"✅ update_task_progress_tool: Task progress updated to {status}")
+    else:
+        log.warning(f"❌ update_task_progress_tool failed: {result['message']}")
+
     return result["message"]
 
 
@@ -428,7 +492,15 @@ async def mark_task_complete_tool(user_id: str, task_id: str) -> str:
     Returns:
         Success or error message
     """
+    log.info(f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+
     result = await tasks.mark_task_complete(user_id, task_id)
+
+    if result["success"]:
+        log.info(f"✅ mark_task_complete_tool: Task marked as complete")
+    else:
+        log.warning(f"❌ mark_task_complete_tool failed: {result['message']}")
+
     return result["message"]
 
 
@@ -444,6 +516,8 @@ async def set_language_tool(user_id: str, phone_number: str, language: str) -> s
     Returns:
         Success or error message
     """
+    log.info(f"🔧 Tool called: set_language_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language})")
+
     # Normalize language input to ISO 639-1 code
     # Handles both ISO codes ("fr", "en") and full names ("french", "english")
     normalized_language = _normalize_language_input(language)
@@ -454,7 +528,10 @@ async def set_language_tool(user_id: str, phone_number: str, language: str) -> s
     )
 
     if result:
+        log.info(f"✅ set_language_tool: Language changed to {normalized_language}")
         return f"Langue modifiée en: {normalized_language}"
+
+    log.warning(f"❌ set_language_tool failed to update language")
     return "Erreur lors du changement de langue."
 
 
@@ -476,6 +553,8 @@ async def escalate_to_human_tool(
     Returns:
         Success or error message
     """
+    log.info(f"🔧 Tool called: escalate_to_human_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language}, reason={reason[:100]}...)")
+
     # Import execution context to set escalation flag
     from src.agent.agent import execution_context
 
@@ -491,6 +570,7 @@ async def escalate_to_human_tool(
         # Set flag to indicate escalation occurred
         execution_context["escalation_occurred"] = True
         execution_context["tools_called"].append("escalate_to_human_tool")
+        log.info(f"✅ escalate_to_human_tool: Escalation created (ID: {escalation_id[:8]}...)")
         log.info("🚨 Escalation flag set: is_escalation will be True")
 
         # ALWAYS return French - translation to user language happens in pipeline
@@ -498,6 +578,7 @@ async def escalate_to_human_tool(
         success_message = get_translation("fr", "escalation_success", "en")
         return success_message if success_message else "✅ Votre demande a été transmise à l'équipe administrative."
 
+    log.warning(f"❌ escalate_to_human_tool failed to create escalation")
     return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
 
 
@@ -531,6 +612,8 @@ async def remember_user_context_tool(
         - User says "Call me in the morning" → remember_user_context(user_id, "preferred_contact_time", "morning", "preference")
         - User discussing "Building ABC project" → remember_user_context(user_id, "current_project_name", "Building ABC", "state")
     """
+    log.info(f"🔧 Tool called: remember_user_context_tool(user_id={user_id[:8]}..., key={key}, value={value[:50]}..., type={context_type})")
+
     success = await user_context_service.set_context(
         subcontractor_id=user_id,
         key=key,
@@ -541,7 +624,10 @@ async def remember_user_context_tool(
     )
 
     if success:
+        log.info(f"✅ remember_user_context_tool: Context saved ({key}={value[:30]}...)")
         return f"✅ Remembered: {key} = {value}"
+
+    log.warning(f"❌ remember_user_context_tool failed to save context")
     return f"❌ Could not remember context"
 
 
@@ -564,9 +650,12 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
     import json
     from src.actions import projects
 
+    log.info(f"🔧 Tool called: find_project_by_name(user_id={user_id[:8]}..., project_name={project_name})")
+
     result = await projects.list_projects(user_id)
 
     if not result["success"] or not result["data"]:
+        log.warning(f"❌ find_project_by_name: No projects found for user")
         return json.dumps({
             "success": False,
             "error": "no_projects",
@@ -581,6 +670,7 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
         project_nom = project.get("nom", "").lower()
         # Exact match
         if project_nom == project_name_lower:
+            log.info(f"✅ find_project_by_name: Exact match found - {project['nom']} (ID: {project['id'][:8]}...)")
             return json.dumps({
                 "success": True,
                 "project_id": project["id"],
@@ -593,6 +683,7 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
 
     # Single partial match found
     if len(matches) == 1:
+        log.info(f"✅ find_project_by_name: Partial match found - {matches[0]['nom']} (ID: {matches[0]['id'][:8]}...)")
         return json.dumps({
             "success": True,
             "project_id": matches[0]["id"],
@@ -602,6 +693,7 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
 
     # Multiple matches - return list for disambiguation
     elif len(matches) > 1:
+        log.info(f"📋 find_project_by_name: Multiple matches found ({len(matches)} projects)")
         return json.dumps({
             "success": False,
             "error": "multiple_matches",
@@ -611,6 +703,7 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
 
     # No matches
     else:
+        log.warning(f"❌ find_project_by_name: No matches found for '{project_name}'")
         return json.dumps({
             "success": False,
             "error": "not_found",
