@@ -440,6 +440,8 @@ async def process_inbound_message(
 
                 # Send response with interactive formatting
                 log.info(f"📱 Formatting direct action response for potential interactive list")
+
+                # Import formatting utilities
                 from src.utils.response_parser import format_for_interactive
                 from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 
@@ -519,6 +521,10 @@ async def process_inbound_message(
         # - report_incident: Conversational guidance flow
         # - update_progress: Conversational feedback
         # - general: AI conversational response (may include suggestions, but not structured data)
+
+        # Import formatting utilities
+        from src.utils.response_parser import format_for_interactive
+        from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 
         if intent in INTERACTIVE_LIST_INTENTS:
             log.info(f"📱 Intent '{intent}' expects structured data → Formatting as interactive list")
