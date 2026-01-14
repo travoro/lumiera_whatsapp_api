@@ -253,26 +253,26 @@ RÈGLES CRITIQUES :
                             context_section += f"Bot: {content}\n"
                     context_section += "\n"
 
-                prompt = f"""Classify this message into ONE intent with confidence:
+                prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
-- list_projects (user wants to see their projects/chantiers)
-- list_tasks (user wants to see tasks/tâches for a project)
-- report_incident (user wants to report a problem/incident)
-- update_progress (user wants to update task progress/progression)
-- escalate (user wants to speak with human/admin/help)
-- general (anything else - questions, clarifications, complex requests)
+- list_projects (l'utilisateur veut voir ses projets/chantiers)
+- list_tasks (l'utilisateur veut voir les tâches pour un projet)
+- report_incident (l'utilisateur veut signaler un problème/incident)
+- update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
+- escalate (l'utilisateur veut parler à un humain/admin/aide)
+- general (tout le reste - questions, clarifications, demandes complexes)
 
-IMPORTANT CONTEXT RULES:
-- If bot asked "which project/chantier for tasks" and user answers with project name → list_tasks:90 (user still wants tasks)
-- If bot is showing task list and user is selecting a specific task → general:85 (needs full context)
-- If bot asked question about incident/progress and user answering → keep same intent as conversation topic with high confidence (85-90)
-- For simple project name after bot asked about tasks → list_tasks:90 (fast path can handle it)
-- When user is clearly answering a bot question, return HIGHER confidence (85-95) to enable fast path
+RÈGLES DE CONTEXTE IMPORTANTES :
+- Si le bot a demandé "quel projet/chantier pour les tâches" et l'utilisateur répond avec un nom de projet → list_tasks:90 (l'utilisateur veut toujours les tâches)
+- Si le bot montre une liste de tâches et l'utilisateur sélectionne une tâche spécifique → general:85 (nécessite le contexte complet)
+- Si le bot a posé une question sur un incident/progression et l'utilisateur répond → garder le même intent que le sujet de conversation avec haute confiance (85-90)
+- Pour un simple nom de projet après que le bot a demandé les tâches → list_tasks:90 (le fast path peut le gérer)
+- Quand l'utilisateur répond clairement à une question du bot, retourne une confiance PLUS ÉLEVÉE (85-95) pour activer le fast path
 {context_section}
-Current message: {message}
+Message actuel : {message}
 
-Return ONLY the intent name and confidence (0-100) in format: intent:confidence
-Example: greeting:95"""
+Retourne SEULEMENT le nom de l'intent et la confiance (0-100) au format : intent:confidence
+Exemple : greeting:95"""
 
                 response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
                 response_text = response.content.strip().lower()
