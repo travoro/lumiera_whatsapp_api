@@ -392,13 +392,39 @@ class LumieraAgent:
                 tool_outputs = []
 
                 for action, tool_result in intermediate_steps:
-                    # Store STRUCTURED data only (not display strings)
-                    # Keep tool outputs strictly structured
-                    tool_output_entry = {
-                        "tool": action.tool,
-                        "input": action.tool_input,
-                        "output": tool_result  # Raw structured data from tool
-                    }
+                    # For list_tasks_tool, fetch structured data from action layer
+                    # (tool_result is a formatted string, but we need structured data)
+                    if action.tool == "list_tasks_tool":
+                        # Re-fetch structured data from actions layer
+                        from src.actions import tasks as task_actions
+                        from src.utils.metadata_helpers import compact_tasks
+
+                        project_id = action.tool_input.get("project_id")
+                        user_id_input = action.tool_input.get("user_id")
+
+                        if project_id and user_id_input:
+                            task_result = await task_actions.list_tasks(user_id_input, project_id)
+                            if task_result.get("success") and task_result.get("data"):
+                                structured_output = compact_tasks(task_result["data"])
+                                log.info(f"   🗜️ Stored structured data for list_tasks_tool: {len(structured_output)} tasks")
+                            else:
+                                structured_output = []
+                        else:
+                            structured_output = []
+
+                        tool_output_entry = {
+                            "tool": action.tool,
+                            "input": action.tool_input,
+                            "output": structured_output  # Structured data, not string
+                        }
+                    else:
+                        # For other tools, store as-is
+                        tool_output_entry = {
+                            "tool": action.tool,
+                            "input": action.tool_input,
+                            "output": tool_result
+                        }
+
                     tool_outputs.append(tool_output_entry)
 
                 if tool_outputs:

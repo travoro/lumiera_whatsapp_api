@@ -34,7 +34,9 @@ def compact_tasks(tasks: List[Dict]) -> List[Dict]:
     Returns:
         Compact task list with only id, title, status, progress
     """
-    return [
+    from src.utils.logger import log
+
+    compact = [
         {
             "id": t.get("id"),
             "title": t.get("title"),
@@ -43,6 +45,12 @@ def compact_tasks(tasks: List[Dict]) -> List[Dict]:
         }
         for t in tasks
     ]
+
+    # DEBUG: Log first task to see what's being stored
+    if compact:
+        log.info(f"   🗜️ compact_tasks: first task id={compact[0].get('id')}, title={compact[0].get('title')}")
+
+    return compact
 
 
 def compact_documents(documents: List[Dict]) -> List[Dict]:

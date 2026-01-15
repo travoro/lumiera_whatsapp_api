@@ -161,51 +161,101 @@ class PlanRadarClient:
         return plans
 
     async def get_task_images(self, task_id: str, project_id: str, task_uuid: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get images attached to a task.
+        """Get all attachments (images, documents, etc.) attached to a task.
 
         Args:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
             task_uuid: Deprecated - task_id is now UUID by default, kept for backward compatibility
 
+        Returns:
+            List of all attachments (images, PDFs, documents, etc.)
+
         Note: PlanRadar attachments endpoint requires UUID
         """
         # Use task_uuid if provided (backward compatibility), otherwise use task_id (which is now UUID)
         uuid_to_use = task_uuid if task_uuid else task_id
-        log.info(f"📷 get_task_images called: task_uuid={uuid_to_use[:8]}..., project_id={project_id[:8]}...")
+        log.info(f"📎 get_task_images called (returns all attachments): task_uuid={uuid_to_use[:8]}..., project_id={project_id[:8]}...")
 
         # Use UUID for attachments endpoint (required by PlanRadar API)
         result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{uuid_to_use}/attachments")
 
         if result and result.get("data"):
             attachments = result.get("data", [])
-            # Get image URLs from included section (JSON:API format)
+            # Get all attachment URLs from included section (JSON:API format)
             included = result.get("included", [])
 
-            images = []
+            all_attachments = []
             for att in attachments:
-                # Find corresponding image data in included section
+                # Find corresponding attachment data in included section
                 att_id = att.get("id")
-                attachable_type = att.get("attributes", {}).get("attachable-type", "")
+                att_title = att.get("attributes", {}).get("title", "")
 
-                # Look for image in included section
+                # Look for attachment in included section
                 for inc in included:
-                    if inc.get("id") == att_id and "image" in inc.get("type", "").lower():
+                    if inc.get("id") == att_id:
+                        inc_type = inc.get("type", "").lower()
                         inc_attributes = inc.get("attributes", {})
-                        images.append({
-                            "id": att_id,
-                            "type": inc.get("type"),
-                            "title": att.get("attributes", {}).get("title"),
-                            "url": inc_attributes.get("image-url"),
-                            "thumbnail_url": inc_attributes.get("image-url-thumb"),
-                            "content_type": inc_attributes.get("image-content-type"),
-                            "file_size": inc_attributes.get("image-file-size"),
-                            "metadata": inc_attributes.get("metadata"),
-                        })
+
+                        # Handle images
+                        if "image" in inc_type:
+                            all_attachments.append({
+                                "id": att_id,
+                                "type": "image",
+                                "title": att_title,
+                                "url": inc_attributes.get("image-url"),
+                                "thumbnail_url": inc_attributes.get("image-url-thumb"),
+                                "content_type": inc_attributes.get("image-content-type"),
+                                "file_size": inc_attributes.get("image-file-size"),
+                                "metadata": inc_attributes.get("metadata"),
+                            })
+                        # Handle documents (PDFs, etc.)
+                        elif "document" in inc_type:
+                            # Debug: log all attributes for document to find URL field
+                            log.info(f"   📄 Document attachment '{att_title}' attributes: {list(inc_attributes.keys())}")
+
+                            # Try multiple possible URL field names
+                            doc_url = (inc_attributes.get("document-url") or
+                                      inc_attributes.get("url") or
+                                      inc_attributes.get("file-url"))
+
+                            if not doc_url:
+                                log.warning(f"   ⚠️ No URL found for document '{att_title}'. Available fields: {list(inc_attributes.keys())}")
+
+                            all_attachments.append({
+                                "id": att_id,
+                                "type": "document",
+                                "title": att_title,
+                                "url": doc_url,
+                                "content_type": inc_attributes.get("document-content-type") or inc_attributes.get("content-type"),
+                                "file_size": inc_attributes.get("document-file-size") or inc_attributes.get("file-size"),
+                                "metadata": inc_attributes.get("metadata"),
+                            })
+                        # Handle any other attachment types
+                        else:
+                            log.debug(f"   Unknown attachment type: {inc_type}, attempting to extract URL")
+                            # Try to find any URL field
+                            url = None
+                            for key, value in inc_attributes.items():
+                                if "url" in key.lower() and value:
+                                    url = value
+                                    break
+
+                            if url:
+                                all_attachments.append({
+                                    "id": att_id,
+                                    "type": inc_type,
+                                    "title": att_title,
+                                    "url": url,
+                                    "content_type": inc_attributes.get("content-type"),
+                                    "file_size": inc_attributes.get("file-size"),
+                                    "metadata": inc_attributes.get("metadata"),
+                                })
                         break
 
-            log.info(f"   ✅ Retrieved {len(images)} images (from {len(attachments)} total attachments)")
-            return images
+            log.info(f"   ✅ Retrieved {len(all_attachments)} attachments (from {len(attachments)} total)")
+            log.info(f"   Types: {', '.join(set(att.get('type', 'unknown') for att in all_attachments))}")
+            return all_attachments
 
         log.info(f"   ℹ️ No attachments found")
         return []

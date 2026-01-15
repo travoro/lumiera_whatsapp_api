@@ -72,9 +72,15 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
         formatted_tasks = []
         for task in tasks:
             attributes = task.get("attributes", {})
+            uuid_val = attributes.get("uuid")
+            short_id_val = task.get("id")
+
+            # DEBUG: Log what we're getting from PlanRadar
+            log.info(f"   📊 Task from PlanRadar: short_id={short_id_val}, uuid={uuid_val}, has_uuid={uuid_val is not None}")
+
             formatted_tasks.append({
-                "id": attributes.get("uuid"),  # Use UUID as primary ID (latest API standard)
-                "short_id": task.get("id"),  # Keep short ID for backward compatibility
+                "id": uuid_val,  # Use UUID as primary ID (latest API standard)
+                "short_id": short_id_val,  # Keep short ID for backward compatibility
                 "title": attributes.get("subject", "Sans titre"),
                 "status": attributes.get("status-id", "unknown"),
                 "priority": attributes.get("priority", "normal"),
@@ -249,14 +255,17 @@ async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] =
 
 
 async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
-    """Get images attached to a task.
+    """Get all attachments (images, documents, etc.) attached to a task.
 
     Args:
         user_id: The user ID
         task_id: The task UUID (primary identifier, latest API standard)
         project_id: Optional project ID (fetched from context if not provided)
+
+    Returns:
+        Dict with success status and list of all attachments (images, PDFs, documents, etc.)
     """
-    log.info(f"📷 get_task_images action: user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}...")
+    log.info(f"📎 get_task_images action: user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}...")
     try:
         # Get project_id from active context if not provided
         if not project_id:
@@ -279,22 +288,22 @@ async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] 
             return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
         log.info(f"   ✅ PlanRadar project ID: {planradar_project_id[:8]}...")
 
-        log.info(f"   🌐 Calling PlanRadar API for task images")
-        # task_id is now UUID, pass it directly to get_task_images
-        images = await planradar_client.get_task_images(task_id, planradar_project_id, task_uuid=task_id)
+        log.info(f"   🌐 Calling PlanRadar API for task attachments")
+        # task_id is now UUID, pass it directly to get_task_images (now returns all attachments)
+        attachments = await planradar_client.get_task_images(task_id, planradar_project_id, task_uuid=task_id)
 
         # Log action
         await supabase_client.save_action_log(
             user_id=user_id,
             action_name="get_task_images",
             parameters={"task_id": task_id},
-            result={"count": len(images)}
+            result={"count": len(attachments)}
         )
 
         return {
             "success": True,
-            "message": f"{len(images)} image(s) trouvée(s).",
-            "data": images
+            "message": f"{len(attachments)} pièce(s) jointe(s) trouvée(s).",
+            "data": attachments
         }
 
     except Exception as e:

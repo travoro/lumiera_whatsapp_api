@@ -224,20 +224,27 @@ async def handle_direct_action(
         elif list_type in ["project", "projects", "option"]:
             target_tool = 'list_projects_tool'
 
+        log.info(f"🔍 Searching for {target_tool} in last {len(messages)} messages")
+
         tool_outputs = None
-        for msg in reversed(messages):
+        for idx, msg in enumerate(reversed(messages)):
+            log.debug(f"   Message {idx}: direction={msg.get('direction')}, has_metadata={msg.get('metadata') is not None}")
             if msg and msg.get('direction') == 'outbound':
                 metadata = msg.get('metadata', {})
                 msg_tool_outputs = metadata.get('tool_outputs', []) if metadata else []
+                log.debug(f"   Message {idx} tool_outputs: {[t.get('tool') if isinstance(t, dict) else 'invalid' for t in msg_tool_outputs]}")
 
                 if msg_tool_outputs:
                     # Check if this message has the tool we're looking for
                     has_target_tool = any(t.get('tool') == target_tool for t in msg_tool_outputs if isinstance(t, dict))
                     if has_target_tool:
                         tool_outputs = msg_tool_outputs
-                        log.info(f"📦 Found tool_outputs with {target_tool}")
+                        log.info(f"📦 Found tool_outputs with {target_tool} in message {idx}")
                         log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
                         break
+
+        if not tool_outputs:
+            log.warning(f"❌ Could not find {target_tool} in conversation history")
 
         if tool_outputs:
             # Route based on list_type parsed from action ID (robust approach)
@@ -247,22 +254,69 @@ async def handle_direct_action(
                 # User selected a task from the list → Show task details
                 for tool_output in tool_outputs:
                     if tool_output.get('tool') == 'list_tasks_tool':
-                        tasks = tool_output.get('output', [])
-                        log.info(f"📋 Found {len(tasks)} tasks in tool_outputs")
+                        tasks_output = tool_output.get('output', [])
+
+                        # DEFENSIVE: Handle both old (string) and new (structured list) formats
+                        if isinstance(tasks_output, str):
+                            # Old format: formatted string - cannot use for selection
+                            # Need to re-fetch tasks from database
+                            log.warning(f"⚠️ Found old string format in tool_outputs (length: {len(tasks_output)})")
+                            log.warning(f"   Re-fetching structured task data from database...")
+
+                            from src.actions import tasks as task_actions
+                            from src.services.project_context import project_context_service
+
+                            # Get active project
+                            project_id = await project_context_service.get_active_project(user_id)
+                            if not project_id:
+                                log.error(f"   ❌ No active project to re-fetch tasks")
+                                return None
+
+                            # Re-fetch tasks
+                            task_result = await task_actions.list_tasks(user_id, project_id)
+                            if task_result.get("success") and task_result.get("data"):
+                                from src.utils.metadata_helpers import compact_tasks
+                                tasks = compact_tasks(task_result["data"])
+                                log.info(f"   ✅ Re-fetched {len(tasks)} tasks from database")
+                            else:
+                                log.error(f"   ❌ Failed to re-fetch tasks")
+                                return None
+                        elif isinstance(tasks_output, list):
+                            # New format: structured list of dicts
+                            tasks = tasks_output
+                            log.info(f"📋 Found {len(tasks)} tasks in tool_outputs (structured format)")
+                        else:
+                            log.error(f"❌ Unexpected tool_output format: {type(tasks_output)}")
+                            return None
 
                         # Get the task at the selected index (1-based)
                         index = int(option_number) - 1
                         if 0 <= index < len(tasks):
                             selected_task = tasks[index]
+
+                            # Ensure selected_task is a dict
+                            if not isinstance(selected_task, dict):
+                                log.error(f"❌ selected_task is not a dict: {type(selected_task)}")
+                                return None
+
                             task_id = selected_task.get('id')
                             task_title = selected_task.get('title')
-                            log.info(f"✅ Resolved {list_type}_{option_number} → {task_title} (ID: {task_id[:8]}...)")
+                            log.info(f"✅ Resolved {list_type}_{option_number} → {task_title} (ID: {task_id[:8] if task_id else 'NONE'}...)")
 
                             # Trigger task_details with the selected task
                             from src.services.handlers import execute_direct_handler
                             from src.integrations.supabase import supabase_client
 
                             user_name = supabase_client.get_user_name(user_id)
+
+                            # Pass updated tool_outputs with structured tasks data (not old string format)
+                            updated_tool_outputs = [
+                                {
+                                    'tool': 'list_tasks_tool',
+                                    'input': {},
+                                    'output': tasks  # Use the structured tasks we just retrieved
+                                }
+                            ]
 
                             result = await execute_direct_handler(
                                 intent="task_details",
@@ -272,7 +326,7 @@ async def handle_direct_action(
                                 language=language,
                                 message_text=str(option_number),
                                 session_id=session_id,
-                                last_tool_outputs=tool_outputs
+                                last_tool_outputs=updated_tool_outputs
                             )
 
                             if result:
@@ -443,16 +497,22 @@ async def process_inbound_message(
                 language=user_language,
             )
 
+            log.info(f"📋 Direct response received: type={type(direct_response)}, is_dict={isinstance(direct_response, dict)}")
+
             if direct_response:
                 # Handle both string and dict responses (backward compatible)
                 if isinstance(direct_response, dict):
                     response_message = direct_response.get("message", "")
                     tool_outputs = direct_response.get("tool_outputs", [])
                     carousel_data = direct_response.get("carousel_data")
+                    log.info(f"📦 Dict response keys: {list(direct_response.keys())}")
+                    log.info(f"   has carousel_data key: {'carousel_data' in direct_response}")
+                    log.info(f"   carousel_data value: {carousel_data}")
                 else:
                     response_message = direct_response
                     tool_outputs = []
                     carousel_data = None
+                    log.info(f"📝 String response (no carousel_data)")
 
                 log.info(f"✅ Direct action '{action_id}' executed successfully")
                 log.info(f"🔤 Handler response (French): {response_message[:100]}...")
@@ -524,31 +584,67 @@ async def process_inbound_message(
 
                 log.info(f"📤 Direct action response sent (interactive: {interactive_data is not None})")
 
-                # Send carousel images as a separate message if available
+                # Send attachments one by one as separate messages
+                log.info(f"🔍 Checking for carousel_data: {carousel_data is not None}")
+                if carousel_data:
+                    log.info(f"   carousel_data keys: {list(carousel_data.keys())}")
+                    log.info(f"   Has cards: {carousel_data.get('cards') is not None}")
+                    if carousel_data.get('cards'):
+                        log.info(f"   Number of cards: {len(carousel_data.get('cards'))}")
+
                 if carousel_data and carousel_data.get("cards"):
-                    log.info(f"🖼️ Sending {len(carousel_data['cards'])} images as carousel")
+                    cards = carousel_data["cards"]
+                    log.info(f"📎 Sending {len(cards)} attachments one by one")
 
-                    # Extract image URLs from carousel cards
-                    image_urls = []
-                    for card in carousel_data["cards"]:
-                        if card.get("media_url"):
-                            image_urls.append(card["media_url"])
+                    try:
+                        from src.integrations.twilio import twilio_client
+                        import time
 
-                    if image_urls:
-                        # WhatsApp supports up to 10 media items per message
-                        image_urls = image_urls[:10]
-                        log.info(f"📷 Sending {len(image_urls)} images: {image_urls[0][:50]}...")
+                        for idx, card in enumerate(cards, 1):
+                            media_url = card.get('media_url')
+                            if not media_url:
+                                log.warning(f"   ⚠️ Attachment {idx}: No media_url, skipping")
+                                continue
 
-                        # Send images in a separate message
-                        # WhatsApp will automatically create a carousel/gallery from multiple media_url
-                        twilio_client.send_message(
-                            to=from_number,
-                            body="",  # Empty body - images only
-                            media_url=image_urls
-                        )
+                            log.info(f"   📤 Sending attachment {idx}/{len(cards)}: {media_url[:80]}...")
 
-                        log.info(f"✅ Carousel images sent successfully")
+                            # Send each attachment as a separate message
+                            message_sid = twilio_client.send_message(
+                                to=from_number,
+                                body=" ",  # Just space, no text
+                                media_url=[media_url]
+                            )
 
+                            if message_sid:
+                                log.info(f"   ✅ Attachment {idx} sent: {message_sid}")
+                            else:
+                                log.error(f"   ❌ Failed to send attachment {idx}")
+
+                            # Small delay between messages to avoid rate limits
+                            if idx < len(cards):
+                                time.sleep(0.3)
+
+                        log.info(f"✅ All {len(cards)} attachments sent successfully")
+
+                    except Exception as attachment_error:
+                        log.error(f"❌ Error sending attachments: {attachment_error}", exc_info=True)
+                else:
+                    log.info(f"ℹ️ No attachments to send")
+
+                return
+            else:
+                # Direct action handler returned None (failed)
+                # Don't fall back to pipeline - send error instead
+                log.error(f"❌ Direct action '{action_id}' failed - handler returned None")
+
+                error_msg = "Désolé, une erreur s'est produite lors du traitement de votre demande. Veuillez réessayer."
+                if user_language != "fr":
+                    error_msg = await translation_service.translate_from_french(error_msg, user_language)
+
+                from src.integrations.twilio import twilio_client
+                twilio_client.send_message(from_number, error_msg)
+
+                log.info(f"📤 Sent error message to user for failed direct action")
                 return
 
         # === PHASE 2: CORE PROCESSING - USE PIPELINE ===
@@ -653,32 +749,49 @@ async def process_inbound_message(
 
         log.info(f"📤 Response sent to {from_number} (interactive: {interactive_data is not None})")
 
-        # Check for carousel data and send as second message
+        # Check for attachments and send one by one as separate messages
         carousel_data = response_data.get("carousel_data")
         if carousel_data and carousel_data.get("cards"):
-            log.info(f"📸 Sending carousel with {len(carousel_data['cards'])} images")
+            cards = carousel_data["cards"]
+            log.info(f"📎 Sending {len(cards)} attachments one by one")
 
             try:
-                from src.services.dynamic_templates import dynamic_template_service
+                from src.integrations.twilio import twilio_client
+                import time
 
-                # Send carousel
-                carousel_result = dynamic_template_service.send_carousel(
-                    to_number=from_number,
-                    cards=carousel_data["cards"],
-                    body="",  # No intro text, already sent in first message
-                    cleanup=True,
-                    language=user_language
-                )
+                for idx, card in enumerate(cards, 1):
+                    media_url = card.get('media_url')
+                    if not media_url:
+                        log.warning(f"   ⚠️ Attachment {idx}: No media_url, skipping")
+                        continue
 
-                if carousel_result.get("success"):
-                    log.info(f"✅ Carousel sent successfully: {carousel_result['message_sid']}")
-                else:
-                    log.error(f"❌ Failed to send carousel: {carousel_result.get('error')}")
-            except Exception as carousel_error:
-                log.error(f"❌ Error sending carousel: {carousel_error}")
+                    log.info(f"   📤 Sending attachment {idx}/{len(cards)}: {media_url[:80]}...")
+
+                    # Send each attachment as a separate message
+                    message_sid = twilio_client.send_message(
+                        to=from_number,
+                        body=" ",  # Just space, no text
+                        media_url=[media_url]
+                    )
+
+                    if message_sid:
+                        log.info(f"   ✅ Attachment {idx} sent: {message_sid}")
+                    else:
+                        log.error(f"   ❌ Failed to send attachment {idx}")
+
+                    # Small delay between messages to avoid rate limits
+                    if idx < len(cards):
+                        time.sleep(0.3)
+
+                log.info(f"✅ All {len(cards)} attachments sent successfully")
+
+            except Exception as attachment_error:
+                log.error(f"❌ Error sending attachments: {attachment_error}", exc_info=True)
 
     except Exception as e:
         log.error(f"Error processing message: {e}")
+        import traceback
+        log.error(f"Traceback: {traceback.format_exc()}")
 
         # Send error message to user
         try:

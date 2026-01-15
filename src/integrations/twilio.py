@@ -49,6 +49,9 @@ class TwilioClient:
 
             if media_url:
                 message_params["media_url"] = media_url
+                log.info(f"📎 Adding {len(media_url)} media URLs to message")
+                for idx, url in enumerate(media_url):
+                    log.info(f"   Media {idx+1}: {url[:80]}")
 
             message = self.client.messages.create(**message_params)
 

@@ -364,9 +364,9 @@ async def handle_task_details(
 ) -> Dict[str, Any]:
     """Handle task details intent with context-aware task selection.
 
-    Displays task description and photos in two separate messages:
-    1. Text message with description
-    2. Carousel with up to 10 images (if images exist)
+    Displays task description and attachments:
+    1. Text message with description and attachment count
+    2. Each attachment sent as a separate message (up to 10 attachments)
 
     Supports:
     - Numeric selection from task list (e.g., "2")
@@ -440,8 +440,12 @@ async def handle_task_details(
 
         # Get structured data from actions layer
         # selected_task_id is now UUID (latest API standard)
+        log.info(f"📥 Fetching task description and images for task {selected_task_id[:8]}...")
         desc_result = await task_actions.get_task_description(user_id, selected_task_id)
         images_result = await task_actions.get_task_images(user_id, selected_task_id)
+
+        log.info(f"📊 Description result: success={desc_result.get('success')}, has_data={desc_result.get('data') is not None}")
+        log.info(f"📊 Images result: success={images_result.get('success')}, data_count={len(images_result.get('data', []))}")
 
         # If we don't have task_title yet (used active context), get it from desc_result
         if not task_title and desc_result.get("success"):
@@ -464,36 +468,75 @@ async def handle_task_details(
                 "input": {"task_id": selected_task_id},
                 "output": {"description": description[:200]}  # Truncate for metadata
             })
+            log.info(f"✅ Added description to message ({len(description)} chars)")
         else:
             message += "\n\n📄 Aucune description disponible pour cette tâche."
+            log.warning(f"⚠️ No description available")
 
-        # Prepare carousel data for images
+        # Prepare attachment data for sending
+        log.info(f"🔍 Preparing attachment data...")
+        log.info(f"   images_result['success'] = {images_result.get('success')}")
+        log.info(f"   images_result['data'] = {images_result.get('data')}")
+
         carousel_data = None
         if images_result["success"] and images_result["data"]:
-            images = images_result["data"][:10]  # WhatsApp limit: 10 cards
+            all_attachments = images_result["data"][:10]  # Limit to 10 attachments
 
-            carousel_data = {
-                "cards": [
-                    {
-                        "media_url": img.get("url"),
-                        "media_type": img.get("type", "image/jpeg")
-                    }
-                    for img in images
-                ]
-            }
+            log.info(f"📎 Preparing {len(all_attachments)} attachments")
+            for idx, att in enumerate(all_attachments, 1):
+                url = att.get('url', 'MISSING')
+                att_type = att.get('type', 'unknown')
+                log.info(f"   Attachment {idx}: type={att_type}, url={url[:80] if url != 'MISSING' and url else 'NONE'}...")
 
-            # Store images in tool_outputs
-            tool_outputs.append({
-                "tool": "get_task_images_tool",
-                "input": {"task_id": selected_task_id},
-                "output": {"count": len(images), "urls": [img.get("url") for img in images[:3]]}
-            })
+            # FILTER OUT attachments without URLs (e.g., PDFs that PlanRadar doesn't provide URLs for)
+            attachments_with_urls = [att for att in all_attachments if att.get("url")]
+            attachments_without_urls = [att for att in all_attachments if not att.get("url")]
 
-            message += f"\n\n📷 {len(images)} photo(s) disponible(s) (voir carrousel ci-dessous)"
+            if attachments_without_urls:
+                log.warning(f"   ⚠️ Skipping {len(attachments_without_urls)} attachments without URLs:")
+                for att in attachments_without_urls:
+                    log.warning(f"      - {att.get('type')}: {att.get('title')}")
+
+            if attachments_with_urls:
+                carousel_data = {
+                    "cards": [
+                        {
+                            "media_url": att.get("url"),
+                            "media_type": att.get("content_type", "application/octet-stream")
+                        }
+                        for att in attachments_with_urls
+                    ]
+                }
+
+                log.info(f"📦 Attachment data created with {len(carousel_data['cards'])} items (sendable)")
+
+                # Store attachments in tool_outputs (only those with URLs)
+                tool_outputs.append({
+                    "tool": "get_task_images_tool",
+                    "input": {"task_id": selected_task_id},
+                    "output": {"count": len(attachments_with_urls), "urls": [att.get("url") for att in attachments_with_urls[:3]]}
+                })
+
+            # Adapt message based on number of attachments
+            attachment_count = len(all_attachments)
+            sendable_count = len(attachments_with_urls) if attachments_with_urls else 0
+
+            if attachment_count == 1:
+                message += "\n\n📎 1 pièce jointe disponible"
+            else:
+                message += f"\n\n📎 {attachment_count} pièces jointes disponibles"
+
+            # Warn if some attachments can't be sent
+            if sendable_count < attachment_count:
+                unsendable_count = attachment_count - sendable_count
+                message += f"\n⚠️ {unsendable_count} pièce(s) jointe(s) ne peuvent pas être envoyées via WhatsApp"
+
+            log.info(f"✅ Added attachment count to message: {attachment_count} total ({sendable_count} sendable)")
         else:
-            message += "\n\n📷 Aucune photo disponible pour cette tâche."
+            message += "\n\n📎 Aucune pièce jointe disponible pour cette tâche."
+            log.warning(f"⚠️ No attachments to display (success={images_result.get('success')}, has_data={bool(images_result.get('data'))})")
 
-        return {
+        result = {
             "message": message,
             "escalation": False,
             "tools_called": ["get_task_description_tool", "get_task_images_tool"],
@@ -501,6 +544,15 @@ async def handle_task_details(
             "tool_outputs": tool_outputs,
             "carousel_data": carousel_data  # NEW: carousel data for image display
         }
+
+        log.info(f"📦 Returning result:")
+        log.info(f"   message length: {len(result['message'])}")
+        log.info(f"   has carousel_data: {result['carousel_data'] is not None}")
+        if result['carousel_data']:
+            log.info(f"   carousel_data cards: {len(result['carousel_data'].get('cards', []))}")
+        log.info(f"   tool_outputs count: {len(result['tool_outputs'])}")
+
+        return result
 
     except Exception as e:
         log.error(f"Error in fast path task_details: {e}")

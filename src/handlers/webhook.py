@@ -1,5 +1,6 @@
 """Twilio webhook handlers for FastAPI."""
 from fastapi import APIRouter, Form, Request, HTTPException
+from fastapi.responses import Response
 from typing import Optional
 from src.handlers.message import process_inbound_message
 from src.integrations.twilio import twilio_client
@@ -75,15 +76,15 @@ async def whatsapp_webhook(
             button_text=ButtonText,
         )
 
-        # Return empty TwiML response
-        return {"status": "ok"}
+        # Return empty response (Twilio expects empty or TwiML, not JSON)
+        return Response(content="", status_code=200)
 
     except HTTPException:
         raise
     except Exception as e:
         log.error(f"Error in webhook handler: {e}")
         # Don't expose internal errors to Twilio
-        return {"status": "error"}
+        return Response(content="", status_code=200)
 
 
 @router.get("/webhook/whatsapp")
