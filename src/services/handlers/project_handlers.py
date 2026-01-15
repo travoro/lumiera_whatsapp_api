@@ -123,69 +123,50 @@ async def handle_list_documents(
 
             # Get PlanRadar project ID from database
             from src.integrations.supabase import supabase_client
-            planradar_project_id = supabase_client.get_planradar_project_id(project_id)
+            project = await supabase_client.get_project(project_id, user_id=user_id)
 
-            if not planradar_project_id:
-                message += "❌ Impossible de récupérer les plans pour ce chantier."
-                log.error(f"   ❌ No PlanRadar project ID found for project {project_id}")
+            if not project:
+                message += "❌ Impossible de récupérer les informations du projet."
+                log.error(f"   ❌ Project not found in database: {project_id}")
             else:
-                # Fetch all components for this project
-                from src.integrations.planradar import planradar_client
-                components = await planradar_client.get_project_components(planradar_project_id)
+                planradar_project_id = project.get("planradar_project_id")
 
-                if not components:
-                    message += get_translation("fr", "list_documents_no_documents")
+                if not planradar_project_id:
+                    message += "❌ Ce projet n'est pas lié à PlanRadar."
+                    log.error(f"   ❌ No PlanRadar project ID for project {project_id}")
                 else:
-                    # Fetch plans for each component
-                    all_plans = []
-                    for component in components:
-                        component_id = component.get("id")
-                        component_name = component.get("attributes", {}).get("name", "Composant")
+                    # Fetch all documents (plans) using unified method
+                    from src.integrations.planradar import planradar_client
+                    plans = await planradar_client.get_project_documents(planradar_project_id)
 
-                        plans = await planradar_client.get_component_plans(planradar_project_id, component_id)
-                        for plan in plans:
-                            plan["component_name"] = component_name
-                            all_plans.append(plan)
-
-                    if not all_plans:
+                    if not plans:
                         message += get_translation("fr", "list_documents_no_documents")
                     else:
-                        # Filter out plans without URLs
-                        plans_with_urls = [p for p in all_plans if p.get("url")]
-                        plans_without_urls = [p for p in all_plans if not p.get("url")]
+                        plan_count = len(plans)
+                        message += f"📐 {plan_count} plan(s) disponible(s)\n\n"
 
-                        if plans_without_urls:
-                            log.warning(f"   ⚠️ Skipping {len(plans_without_urls)} plans without URLs")
+                        # Prepare carousel_data for sending plans as attachments
+                        carousel_data = {
+                            "cards": [
+                                {
+                                    "media_url": plan.get("url"),
+                                    "media_type": plan.get("content_type", "image/png")
+                                }
+                                for plan in plans
+                            ]
+                        }
 
-                        if plans_with_urls:
-                            plan_count = len(plans_with_urls)
-                            message += f"📐 {plan_count} plan(s) disponible(s)\n\n"
+                        # Show preview of plans in message
+                        for i, plan in enumerate(plans[:5], 1):  # Show max 5 in text
+                            component = plan.get("component_name", "")
+                            plan_name = plan.get("name", "Plan")
+                            message += f"{i}. 📐 {plan_name}"
+                            if component:
+                                message += f" ({component})"
+                            message += "\n"
 
-                            # Prepare carousel_data for sending plans as attachments
-                            carousel_data = {
-                                "cards": [
-                                    {
-                                        "media_url": plan.get("url"),
-                                        "media_type": plan.get("content_type", "image/png")
-                                    }
-                                    for plan in plans_with_urls
-                                ]
-                            }
-
-                            # Show preview of plans in message
-                            for i, plan in enumerate(plans_with_urls[:5], 1):  # Show max 5 in text
-                                component = plan.get("component_name", "")
-                                plan_name = plan.get("name", "Plan")
-                                message += f"{i}. 📐 {plan_name}"
-                                if component:
-                                    message += f" ({component})"
-                                message += "\n"
-
-                            if len(plans_with_urls) > 5:
-                                message += f"\n... et {len(plans_with_urls) - 5} autre(s) plan(s)\n"
-
-                        if plans_without_urls:
-                            message += f"\n⚠️ {len(plans_without_urls)} plan(s) ne peuvent pas être envoyés via WhatsApp"
+                        if len(plans) > 5:
+                            message += f"\n... et {len(plans) - 5} autre(s) plan(s)\n"
 
             message += "\n" + get_translation("fr", "list_documents_footer")
 

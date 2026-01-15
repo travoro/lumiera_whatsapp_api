@@ -369,6 +369,64 @@ class PlanRadarClient:
         log.info(f"   ℹ️ No plans found")
         return []
 
+    async def get_project_documents(
+        self,
+        project_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Get all documents (plans) for a project by fetching all components and their plans.
+
+        This is a unified method that:
+        1. Fetches all components for the project
+        2. For each component, fetches all its plans
+        3. Returns all plans with URLs, filtered and ready to send
+
+        Args:
+            project_id: The PlanRadar project ID
+
+        Returns:
+            List of all plans across all components, with URLs and metadata
+        """
+        log.info(f"📚 get_project_documents called: project_id={project_id[:8]}...")
+
+        try:
+            # Step 1: Fetch all components for this project
+            components = await self.get_project_components(project_id)
+
+            if not components:
+                log.info(f"   ℹ️ No components found for project")
+                return []
+
+            # Step 2: Fetch plans for each component
+            all_plans = []
+            for component in components:
+                component_id = component.get("id")
+                component_name = component.get("attributes", {}).get("name", "Composant")
+
+                plans = await self.get_component_plans(project_id, component_id)
+                for plan in plans:
+                    plan["component_name"] = component_name
+                    all_plans.append(plan)
+
+            if not all_plans:
+                log.info(f"   ℹ️ No plans found across all components")
+                return []
+
+            # Step 3: Filter plans with valid URLs
+            plans_with_urls = [p for p in all_plans if p.get("url")]
+            plans_without_urls = [p for p in all_plans if not p.get("url")]
+
+            if plans_without_urls:
+                log.warning(f"   ⚠️ Filtered out {len(plans_without_urls)} plans without URLs:")
+                for p in plans_without_urls[:3]:  # Show first 3
+                    log.warning(f"      - {p.get('name')} ({p.get('component_name')})")
+
+            log.info(f"   ✅ Retrieved {len(plans_with_urls)} sendable plans (filtered {len(plans_without_urls)} without URLs)")
+            return plans_with_urls
+
+        except Exception as e:
+            log.error(f"   ❌ Error fetching project documents: {e}")
+            return []
+
     async def add_task_comment(
         self,
         task_id: str,
