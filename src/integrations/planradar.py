@@ -2,6 +2,7 @@
 from typing import Optional, List, Dict, Any
 import httpx
 import base64
+import uuid
 from src.config import settings
 from src.utils.logger import log
 
@@ -725,9 +726,13 @@ class PlanRadarClient:
                     filename = f"image.{ext}"
 
                 # Use correct JSON:API format from PlanRadar documentation
+                # Generate a unique UUID for this attachment
+                attachment_uuid = str(uuid.uuid4())
+
                 data = {
                     "data": {
                         "attributes": {
+                            "uuid": attachment_uuid,
                             "attachment": data_uri,
                             "attachment-name": filename,
                             "caption": caption
