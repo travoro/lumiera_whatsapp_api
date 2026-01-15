@@ -306,7 +306,9 @@ async def handle_direct_action(
                 "tool_outputs": result.get("tool_outputs", []),
                 "agent_used": result.get("agent_used")
             }
-            # Pass through list_type if present (for interactive lists)
+            # Pass through response_type and list_type if present (for interactive lists)
+            if result.get("response_type"):
+                response["response_type"] = result["response_type"]
             if result.get("list_type"):
                 response["list_type"] = result["list_type"]
             return response
@@ -348,12 +350,17 @@ async def handle_direct_action(
         target_tool = None
         if list_type in ["task", "tasks"]:
             target_tool = 'list_tasks_tool'
-        elif list_type in ["project", "projects", "option"]:
+        elif list_type in ["project", "projects"]:
             target_tool = 'list_projects_tool'
+        elif list_type == "option":
+            # Option could be from list_projects_tool OR get_active_task_context_tool (progress update confirmation)
+            # We'll search for both and check which one we find
+            target_tool = None  # Will check both
 
-        log.info(f"🔍 Searching for {target_tool} in last {len(messages)} messages")
+        log.info(f"🔍 Searching for tool_outputs in last {len(messages)} messages (target_tool: {target_tool or 'ANY'})")
 
         tool_outputs = None
+        found_tool_name = None
         for idx, msg in enumerate(reversed(messages)):
             log.debug(f"   Message {idx}: direction={msg.get('direction')}, has_metadata={msg.get('metadata') is not None}")
             if msg and msg.get('direction') == 'outbound':
@@ -362,16 +369,31 @@ async def handle_direct_action(
                 log.debug(f"   Message {idx} tool_outputs: {[t.get('tool') if isinstance(t, dict) else 'invalid' for t in msg_tool_outputs]}")
 
                 if msg_tool_outputs:
-                    # Check if this message has the tool we're looking for
-                    has_target_tool = any(t.get('tool') == target_tool for t in msg_tool_outputs if isinstance(t, dict))
-                    if has_target_tool:
-                        tool_outputs = msg_tool_outputs
-                        log.info(f"📦 Found tool_outputs with {target_tool} in message {idx}")
-                        log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
-                        break
+                    if target_tool:
+                        # Check if this message has the specific tool we're looking for
+                        has_target_tool = any(t.get('tool') == target_tool for t in msg_tool_outputs if isinstance(t, dict))
+                        if has_target_tool:
+                            tool_outputs = msg_tool_outputs
+                            found_tool_name = target_tool
+                            log.info(f"📦 Found tool_outputs with {target_tool} in message {idx}")
+                            log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
+                            break
+                    else:
+                        # For "option" type, check if it has list_projects_tool OR get_active_task_context_tool
+                        tools_in_msg = [t.get('tool') for t in msg_tool_outputs if isinstance(t, dict)]
+                        if 'get_active_task_context_tool' in tools_in_msg:
+                            tool_outputs = msg_tool_outputs
+                            found_tool_name = 'get_active_task_context_tool'
+                            log.info(f"📦 Found tool_outputs with get_active_task_context_tool (progress update confirmation) in message {idx}")
+                            break
+                        elif 'list_projects_tool' in tools_in_msg:
+                            tool_outputs = msg_tool_outputs
+                            found_tool_name = 'list_projects_tool'
+                            log.info(f"📦 Found tool_outputs with list_projects_tool in message {idx}")
+                            break
 
         if not tool_outputs:
-            log.warning(f"❌ Could not find {target_tool} in conversation history")
+            log.warning(f"❌ Could not find {target_tool or 'relevant tool'} in conversation history")
 
         if tool_outputs:
             # Route based on list_type parsed from action ID (robust approach)
@@ -465,6 +487,21 @@ async def handle_direct_action(
                         else:
                             log.warning(f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})")
                         break
+
+            elif list_type == "option" and found_tool_name == 'get_active_task_context_tool':
+                # For "option" type from progress update, handle differently
+                log.info(f"📋 Option selection detected - checking if from progress update")
+                # User selected an option from confirmation (1=Yes, 2=No)
+                option_text = "Oui, c'est ça" if option_number == "1" else "Non, changer de tâche"
+
+                # Route to progress update agent
+                return await handle_direct_action(
+                    action="update_progress",
+                    user_id=user_id,
+                    phone_number=phone_number,
+                    language=language,
+                    message_body=option_text
+                )
 
             elif list_type in ["project", "projects", "option"]:
                 # User selected a project from the list → Show project tasks

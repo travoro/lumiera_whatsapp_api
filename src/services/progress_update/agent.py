@@ -191,9 +191,24 @@ class ProgressUpdateAgent:
                 "chat_history": chat_history or []
             })
 
+            log.info(f"🤖 Agent result output type: {type(result['output'])}")
+            log.info(f"🤖 Agent result output: {result['output'][:200] if isinstance(result['output'], str) else str(result['output'])[:200]}")
+
+            # Extract message text from result
+            # Opus 4.5 sometimes returns structured output [{"text": "..."}] instead of plain string
+            output = result["output"]
+            if isinstance(output, list) and len(output) > 0 and isinstance(output[0], dict) and "text" in output[0]:
+                message_text = output[0]["text"]
+                log.info(f"📝 Extracted text from structured output: {message_text[:100]}")
+            elif isinstance(output, str):
+                message_text = output
+            else:
+                log.warning(f"⚠️ Unexpected output format: {type(output)}")
+                message_text = str(output)
+
             response = {
                 "success": True,
-                "message": result["output"],
+                "message": message_text,
                 "agent_used": "progress_update",
                 "response_type": "text"  # Default to plain text
             }
@@ -215,15 +230,24 @@ class ProgressUpdateAgent:
                     log.info("🔧 Agent called escalate_to_human_tool → Setting escalation flag")
                     break
 
-                # Case 2: Task list available
+                # Case 2: Task confirmation or task list
                 elif tool_name == 'get_active_task_context_tool':
                     log.info(f"🔍 Checking get_active_task_context_tool observation")
                     log.info(f"   Has 'Show the user this list': {'Show the user this list' in observation}")
+                    log.info(f"   Has 'CONFIRMATION NEEDED': {'CONFIRMATION NEEDED' in observation}")
                     log.info(f"   Has 'Number': {'Number' in observation}")
                     log.info(f"   Observation preview: {observation[:200]}")
 
+                    # Check if this is a CONFIRMATION (Yes/No options)
+                    if 'CONFIRMATION NEEDED' in observation:
+                        # This is a confirmation, not a task list
+                        response["response_type"] = "interactive_list"
+                        response["list_type"] = "option"  # Use "option" not "tasks"
+                        log.info(f"✅ Detected confirmation → response_type=interactive_list, list_type=option")
+                        break
+
                     # Check if observation contains task list with IDs
-                    if 'Show the user this list' in observation and 'Number' in observation:
+                    elif 'Show the user this list' in observation and 'Number' in observation:
                         # Extract task list from observation
                         import re
 

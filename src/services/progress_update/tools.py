@@ -27,7 +27,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
         active_task_id = await project_context_service.get_active_task(user_id)
 
         if active_task_id:
-            # User has active task - get details
+            # User has active task - get details and ASK FOR CONFIRMATION
             task = await supabase_client.get_task(active_task_id)
             if task:
                 project_id = task.get("project_id")
@@ -39,7 +39,22 @@ async def get_active_task_context_tool(user_id: str) -> str:
                     planradar_project_id = project.get("planradar_project_id")
                     project_name = project.get("name", "Unknown Project")
 
-                    return f"✅ ACTIVE CONTEXT FOUND:\nTask: {task_title}\nProject: {project_name}\nTask ID: {active_task_id}\nPlanRadar Project ID: {planradar_project_id}\n\nUSE start_progress_update_session_tool with these IDs immediately!"
+                    return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+Task: {task_title}
+Project: {project_name}
+Task ID: {active_task_id}
+PlanRadar Project ID: {planradar_project_id}
+
+AGENT INSTRUCTIONS - This is a CONFIRMATION, not a task list!
+Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le projet {project_name} ?
+
+1. Oui, c'est ça
+2. Non, changer de tâche/projet"
+
+IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
+- If user says 1 or "oui": USE start_progress_update_session_tool with task_id={active_task_id}, project_id={planradar_project_id}
+- If user says 2 or "non": Call get_active_task_context_tool again to show task list
+- NEVER say "session", "prête", "active", "contexte" - too technical!"""
 
         # Check for active project (7 hour expiration)
         active_project_id = await project_context_service.get_active_project(user_id)
@@ -64,6 +79,30 @@ async def get_active_task_context_tool(user_id: str) -> str:
                     log.info(f"📊 Extracted tasks: {len(tasks)} tasks found")
 
                     if tasks:
+                        # SPECIAL CASE: If only ONE task, ask for confirmation instead of showing list
+                        if len(tasks) == 1:
+                            task_title = tasks[0].get('title', 'No title')
+                            task_id = tasks[0].get('id')
+
+                            log.info(f"📌 Only 1 task found - showing confirmation instead of list")
+                            return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+Task: {task_title}
+Project: {project_name}
+Task ID: {task_id}
+PlanRadar Project ID: {planradar_project_id}
+
+AGENT INSTRUCTIONS - This is a CONFIRMATION, not a task list!
+Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le projet {project_name} ?
+
+1. Oui, c'est ça
+2. Non, changer de tâche/projet"
+
+IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
+- If user says 1 or "oui": USE start_progress_update_session_tool with task_id={task_id}, project_id={planradar_project_id}
+- If user says 2 or "non": Show list of ALL available tasks/projects
+- NEVER say "session", "prête", "active", "contexte" - too technical!"""
+
+                        # MULTIPLE TASKS: Show list for selection
                         log.info(f"✅ Building task list for user display")
                         # Format task list - SIMPLE format for user display
                         task_list_display = "\n".join([
@@ -77,8 +116,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
                             for idx, task in enumerate(tasks[:10], 1)
                         ])
 
-                        result_text = f"""⚠️ Active project: {project_name}
-But NO active task selected.
+                        result_text = f"""✅ Active project: {project_name}
 
 Show the user this list (SIMPLE FORMAT, no IDs visible):
 {task_list_display}
@@ -86,8 +124,11 @@ Show the user this list (SIMPLE FORMAT, no IDs visible):
 Task ID mapping (for your use only, don't show to user):
 {task_id_mapping}
 
-ASK the user: "Quelle tâche souhaitez-vous mettre à jour ?"
-When they select by number or name, use the ID mapping above with start_progress_update_session_tool (task_id, project_id={planradar_project_id})"""
+AGENT INSTRUCTIONS:
+1. Say: "Pour quelle tâche du projet {project_name} ?"
+2. Show the task list above (just numbers and titles, no formatting)
+3. When user selects by number, use start_progress_update_session_tool with the task_id from mapping above and project_id={planradar_project_id}
+4. Be simple and friendly - no technical terms"""
 
                         log.info(f"🎯 Tool returning task list with {len(tasks)} tasks")
                         log.info(f"📝 First task: {tasks[0].get('title', 'No title')}")

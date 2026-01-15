@@ -610,10 +610,19 @@ class PlanRadarClient:
             comment_text: The comment text to add
         """
         log.info(f"💬 add_task_comment called: task_id={task_id[:8]}..., project_id={project_id[:8]}..., comment_length={len(comment_text)}")
+
+        # Use correct JSON:API format from PlanRadar documentation
+        # Endpoint: /comment (singular, not /comments plural!)
+        # Field: "comment" (not "text")
         data = {
-            "text": comment_text,
+            "data": {
+                "attributes": {
+                    "comment": comment_text
+                }
+            }
         }
-        result = await self._request("POST", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comments", data=data)
+
+        result = await self._request("POST", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comment", data=data)
         success = result is not None
         if success:
             log.info(f"   ✅ Comment added successfully")
