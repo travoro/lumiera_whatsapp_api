@@ -73,6 +73,18 @@ RÈGLES IMPORTANTES :
    - Confirme chaque action effectuée
    - Résume à la fin
 
+**IMPORTANT - Format des listes de tâches** :
+   - Quand tu présentes des tâches à l'utilisateur, utilise un format SIMPLE avec des nombres :
+   1. Tâche A
+   2. Tâche B
+   3. Tâche C
+   - PAS de tirets, PAS de [ID: xxx], juste le numéro et le titre
+   - Exemple correct :
+     Tâches disponibles :
+     1. Installer l'électricité
+     2. Réparer la fuite
+     3. Peindre le mur
+
 9. **Gestion des erreurs** :
    - Si tu rencontres une erreur technique (tool qui échoue), dis : "Désolé, je rencontre un problème technique. 😔"
    - Propose IMMÉDIATEMENT : "Souhaitez-vous parler avec quelqu'un de l'équipe ?"
@@ -178,11 +190,42 @@ class ProgressUpdateAgent:
                 "chat_history": chat_history or []
             })
 
-            return {
+            response = {
                 "success": True,
                 "message": result["output"],
                 "agent_used": "progress_update"
             }
+
+            # Check if agent called get_active_task_context_tool and got a task list
+            # If so, extract structured data for interactive list
+            intermediate_steps = result.get("intermediate_steps", [])
+            for action, observation in intermediate_steps:
+                if hasattr(action, 'tool') and action.tool == 'get_active_task_context_tool':
+                    # Check if observation contains task list
+                    if 'Available tasks:' in observation and '[ID:' in observation:
+                        # Extract tasks from observation
+                        import re
+                        task_pattern = r'(\d+)\.\s+(.+?)\s+-\s+(.+?)\s+\[ID:\s+([a-f0-9-]+)\]'
+                        matches = re.findall(task_pattern, observation)
+
+                        if matches:
+                            # Build tool_outputs with task data
+                            tasks_data = []
+                            for idx, title, status, task_id in matches:
+                                tasks_data.append({
+                                    "id": task_id,
+                                    "title": title,
+                                    "status": status
+                                })
+
+                            response["tool_outputs"] = [{
+                                "tool": "get_active_task_context_tool",
+                                "output": {"tasks": tasks_data}
+                            }]
+                            response["list_type"] = "tasks"
+                            break
+
+            return response
 
         except Exception as e:
             log.error(f"Error in progress update agent: {e}")

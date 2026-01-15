@@ -301,11 +301,15 @@ async def handle_direct_action(
         )
 
         if result.get("success"):
-            return {
+            response = {
                 "message": result["message"],
-                "tool_outputs": [],
+                "tool_outputs": result.get("tool_outputs", []),
                 "agent_used": result.get("agent_used")
             }
+            # Pass through list_type if present (for interactive lists)
+            if result.get("list_type"):
+                response["list_type"] = result["list_type"]
+            return response
         else:
             # Fallback to full AI if specialized agent fails
             return None
@@ -790,7 +794,7 @@ async def process_inbound_message(
 
         # Intent-driven response formatting
         # Only format as interactive lists for specific intents where we expect structured data
-        INTERACTIVE_LIST_INTENTS = {"greeting", "list_projects", "list_tasks"}
+        INTERACTIVE_LIST_INTENTS = {"greeting", "list_projects", "list_tasks", "update_progress"}
 
         # These intents have structured, limited-size outputs suitable for WhatsApp interactive lists (max 10 items):
         # - greeting: Fixed menu (6 items)
@@ -812,10 +816,14 @@ async def process_inbound_message(
             log.info(f"📱 Intent '{intent}' expects structured data → Formatting as interactive list")
 
             # Infer list_type from intent (for robust option ID generation)
+            # Check if response already has list_type (from specialized agents)
             if intent in ["list_tasks", "view_tasks"]:
                 list_type = "tasks"
             elif intent in ["list_projects", "switch_project"]:
                 list_type = "projects"
+            elif intent == "update_progress":
+                # For update_progress, check if response has list_type (agent may return tasks list)
+                list_type = "tasks"  # Default to tasks for progress update
             else:
                 list_type = "option"  # Fallback for other intents
 
