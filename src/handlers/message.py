@@ -361,12 +361,16 @@ async def handle_direct_action(
 
         tool_outputs = None
         found_tool_name = None
+        previous_intent = None  # Track the intent that generated the list
+
         for idx, msg in enumerate(reversed(messages)):
             log.debug(f"   Message {idx}: direction={msg.get('direction')}, has_metadata={msg.get('metadata') is not None}")
             if msg and msg.get('direction') == 'outbound':
                 metadata = msg.get('metadata', {})
                 msg_tool_outputs = metadata.get('tool_outputs', []) if metadata else []
+                msg_intent = metadata.get('intent') if metadata else None  # Get the intent
                 log.debug(f"   Message {idx} tool_outputs: {[t.get('tool') if isinstance(t, dict) else 'invalid' for t in msg_tool_outputs]}")
+                log.debug(f"   Message {idx} intent: {msg_intent}")
 
                 if msg_tool_outputs:
                     if target_tool:
@@ -375,8 +379,10 @@ async def handle_direct_action(
                         if has_target_tool:
                             tool_outputs = msg_tool_outputs
                             found_tool_name = target_tool
+                            previous_intent = msg_intent  # Capture the intent
                             log.info(f"📦 Found tool_outputs with {target_tool} in message {idx}")
                             log.info(f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}")
+                            log.info(f"🎯 Previous intent: {previous_intent}")
                             break
                     else:
                         # For "option" type, check if it has list_projects_tool OR get_active_task_context_tool
@@ -384,12 +390,16 @@ async def handle_direct_action(
                         if 'get_active_task_context_tool' in tools_in_msg:
                             tool_outputs = msg_tool_outputs
                             found_tool_name = 'get_active_task_context_tool'
+                            previous_intent = msg_intent  # Capture the intent
                             log.info(f"📦 Found tool_outputs with get_active_task_context_tool (progress update confirmation) in message {idx}")
+                            log.info(f"🎯 Previous intent: {previous_intent}")
                             break
                         elif 'list_projects_tool' in tools_in_msg:
                             tool_outputs = msg_tool_outputs
                             found_tool_name = 'list_projects_tool'
+                            previous_intent = msg_intent  # Capture the intent
                             log.info(f"📦 Found tool_outputs with list_projects_tool in message {idx}")
+                            log.info(f"🎯 Previous intent: {previous_intent}")
                             break
 
         if not tool_outputs:
@@ -400,7 +410,59 @@ async def handle_direct_action(
             # This eliminates ambiguity when multiple tool outputs are present
 
             if list_type in ["task", "tasks"]:
-                # User selected a task from the list → Show task details
+                # Check if this selection is from progress update intent
+                if previous_intent == "update_progress":
+                    log.info(f"📋 Task selection from update_progress intent → Routing to progress update flow")
+
+                    # Extract task from tool_outputs
+                    for tool_output in tool_outputs:
+                        if tool_output.get('tool') == 'list_tasks_tool':
+                            tasks_output = tool_output.get('output', [])
+
+                            # Handle both formats
+                            if isinstance(tasks_output, str):
+                                # Re-fetch
+                                from src.actions import tasks as task_actions
+                                from src.services.project_context import project_context_service
+
+                                project_id = await project_context_service.get_active_project(user_id)
+                                if not project_id:
+                                    log.error(f"❌ No active project to re-fetch tasks")
+                                    return None
+
+                                task_result = await task_actions.list_tasks(user_id, project_id)
+                                if task_result.get("success") and task_result.get("data"):
+                                    from src.utils.metadata_helpers import compact_tasks
+                                    tasks = compact_tasks(task_result["data"])
+                                else:
+                                    log.error(f"❌ Failed to re-fetch tasks")
+                                    return None
+                            else:
+                                tasks = tasks_output
+
+                            # Get the selected task
+                            index = int(option_number) - 1
+                            if 0 <= index < len(tasks):
+                                selected_task = tasks[index]
+                                task_id = selected_task.get('id')
+                                task_title = selected_task.get('title')
+
+                                log.info(f"✅ Selected task for progress update: {task_title} (ID: {task_id[:8]}...)")
+
+                                # Route to progress update with selected task
+                                return await handle_direct_action(
+                                    action="update_progress",
+                                    user_id=user_id,
+                                    phone_number=phone_number,
+                                    language=language,
+                                    message_body=task_title
+                                )
+                            else:
+                                log.warning(f"⚠️ Task index {index} out of range")
+                                return None
+                            break
+
+                # Default: User selected a task from the list → Show task details
                 for tool_output in tool_outputs:
                     if tool_output.get('tool') == 'list_tasks_tool':
                         tasks_output = tool_output.get('output', [])

@@ -805,6 +805,10 @@ class MessagePipeline:
             # Build metadata for outbound message
             outbound_metadata = {}
 
+            # Store the intent that generated this response (for list selection routing)
+            if ctx.intent:
+                outbound_metadata["intent"] = ctx.intent
+
             # Add escalation metadata if applicable (handled by save_message)
             # Add tool outputs metadata if any (for short-term memory)
             if ctx.tool_outputs:
