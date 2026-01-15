@@ -85,7 +85,7 @@ Once they respond, extract the corresponding task_id from the list above and use
 
     except Exception as e:
         log.error(f"Error in get_active_task_context_tool: {e}")
-        return f"Erreur lors de la vérification du contexte : {str(e)}"
+        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate using escalate_to_human_tool."
 
 
 @tool
@@ -140,7 +140,7 @@ async def get_progress_update_context_tool(user_id: str) -> str:
 
     except Exception as e:
         log.error(f"Error in get_progress_update_context_tool: {e}")
-        return f"Erreur : {str(e)}"
+        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate using escalate_to_human_tool."
 
 
 @tool
@@ -180,7 +180,7 @@ async def add_progress_image_tool(
 
     except Exception as e:
         log.error(f"Error adding progress image: {e}")
-        return f"❌ Erreur : {str(e)}"
+        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique lors de l'ajout de la photo. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
@@ -219,7 +219,7 @@ async def add_progress_comment_tool(
 
     except Exception as e:
         log.error(f"Error adding progress comment: {e}")
-        return f"❌ Erreur : {str(e)}"
+        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique lors de l'ajout du commentaire. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
@@ -265,7 +265,7 @@ async def mark_task_complete_tool(user_id: str) -> str:
 
     except Exception as e:
         log.error(f"Error marking task complete: {e}")
-        return f"❌ Erreur : {str(e)}"
+        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour marquer la tâche comme terminée. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
@@ -303,4 +303,4 @@ async def start_progress_update_session_tool(
 
     except Exception as e:
         log.error(f"Error starting progress update session: {e}")
-        return f"❌ Erreur : {str(e)}"
+        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour démarrer la session. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."

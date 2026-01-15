@@ -12,6 +12,7 @@ from src.services.progress_update.tools import (
     mark_task_complete_tool,
     start_progress_update_session_tool
 )
+from src.agent.tools import escalate_to_human_tool
 from src.services.project_context import project_context_service
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
@@ -72,6 +73,11 @@ RÈGLES IMPORTANTES :
    - Confirme chaque action effectuée
    - Résume à la fin
 
+9. **Gestion des erreurs** :
+   - Si tu rencontres une erreur technique (tool qui échoue), dis : "Désolé, je rencontre un problème technique. 😔"
+   - Propose IMMÉDIATEMENT : "Souhaitez-vous parler avec quelqu'un de l'équipe ?"
+   - Utilise escalate_to_human_tool avec reason="Erreur technique lors de la mise à jour de progression"
+
 OUTILS DISPONIBLES :
 - get_active_task_context_tool : Vérifier le contexte actif (projet/tâche) - UTILISE CECI EN PREMIER!
 - get_progress_update_context_tool : Voir l'état de la session de mise à jour
@@ -79,6 +85,7 @@ OUTILS DISPONIBLES :
 - add_progress_image_tool : Ajouter une photo
 - add_progress_comment_tool : Ajouter un commentaire
 - mark_task_complete_tool : Marquer comme terminé
+- escalate_to_human_tool : Escalader vers un humain en cas d'erreur ou si l'utilisateur demande
 
 Historique de conversation :
 {chat_history}
@@ -108,7 +115,8 @@ class ProgressUpdateAgent:
             start_progress_update_session_tool,
             add_progress_image_tool,
             add_progress_comment_tool,
-            mark_task_complete_tool
+            mark_task_complete_tool,
+            escalate_to_human_tool
         ]
 
         # Create prompt
