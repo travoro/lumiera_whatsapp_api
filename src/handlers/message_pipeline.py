@@ -168,8 +168,8 @@ class MessagePipeline:
             # Stage 9: Save to database
             await self._persist_messages(ctx)
 
-            # Return final response (including detected language!)
-            return Result.ok({
+            # Return final response (including detected language and response metadata!)
+            response_data = {
                 "message": ctx.response_text,
                 "escalation": ctx.escalation,
                 "tools_called": ctx.tools_called,
@@ -177,7 +177,15 @@ class MessagePipeline:
                 "intent": ctx.intent,
                 "confidence": ctx.confidence,
                 "detected_language": ctx.user_language  # Include detected language!
-            })
+            }
+
+            # Include response_type and list_type if present (from specialized agents)
+            if hasattr(ctx, 'response_type') and ctx.response_type:
+                response_data["response_type"] = ctx.response_type
+            if hasattr(ctx, 'list_type') and ctx.list_type:
+                response_data["list_type"] = ctx.list_type
+
+            return Result.ok(response_data)
 
         except LumieraException as e:
             log.error(f"Pipeline error: {e}")
@@ -548,6 +556,8 @@ class MessagePipeline:
                         ctx.tools_called = specialized_result.get("tools_called", [])
                         ctx.tool_outputs = specialized_result.get("tool_outputs", [])
                         ctx.agent_used = specialized_result.get("agent_used")
+                        ctx.response_type = specialized_result.get("response_type")  # For formatting decisions
+                        ctx.list_type = specialized_result.get("list_type")  # For interactive lists
                         return Result.ok(None)
                     else:
                         log.warning(f"❌ No specialized routing found - parameters unclear")

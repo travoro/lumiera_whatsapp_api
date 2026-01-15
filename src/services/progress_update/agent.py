@@ -193,37 +193,84 @@ class ProgressUpdateAgent:
             response = {
                 "success": True,
                 "message": result["output"],
-                "agent_used": "progress_update"
+                "agent_used": "progress_update",
+                "response_type": "text"  # Default to plain text
             }
 
-            # Check if agent called get_active_task_context_tool and got a task list
-            # If so, extract structured data for interactive list
+            # Analyze intermediate_steps to determine response type
             intermediate_steps = result.get("intermediate_steps", [])
+
             for action, observation in intermediate_steps:
-                if hasattr(action, 'tool') and action.tool == 'get_active_task_context_tool':
-                    # Check if observation contains task list
-                    if 'Available tasks:' in observation and '[ID:' in observation:
-                        # Extract tasks from observation
+                if not hasattr(action, 'tool'):
+                    continue
+
+                tool_name = action.tool
+
+                # Case 1: Escalation called
+                if tool_name == 'escalate_to_human_tool':
+                    response["escalation"] = True
+                    response["response_type"] = "escalation"
+                    log.info("🔧 Agent called escalate_to_human_tool → Setting escalation flag")
+                    break
+
+                # Case 2: Task list available
+                elif tool_name == 'get_active_task_context_tool':
+                    # Check if observation contains task list with IDs
+                    if 'Show the user this list' in observation and 'Number' in observation:
+                        # Extract task list from observation
                         import re
-                        task_pattern = r'(\d+)\.\s+(.+?)\s+-\s+(.+?)\s+\[ID:\s+([a-f0-9-]+)\]'
-                        matches = re.findall(task_pattern, observation)
 
-                        if matches:
-                            # Build tool_outputs with task data
-                            tasks_data = []
-                            for idx, title, status, task_id in matches:
-                                tasks_data.append({
-                                    "id": task_id,
-                                    "title": title,
-                                    "status": status
-                                })
+                        # Extract user-facing task list (simple format)
+                        user_list_match = re.search(r'Show the user this list.*?:\n((?:\d+\..+\n?)+)', observation, re.DOTALL)
 
-                            response["tool_outputs"] = [{
-                                "tool": "get_active_task_context_tool",
-                                "output": {"tasks": tasks_data}
-                            }]
-                            response["list_type"] = "tasks"
-                            break
+                        # Extract ID mapping
+                        id_mapping_match = re.search(r'Task ID mapping.*?:\n((?:Number \d+.*\n?)+)', observation, re.DOTALL)
+
+                        if user_list_match and id_mapping_match:
+                            user_list = user_list_match.group(1).strip()
+                            id_mapping = id_mapping_match.group(1).strip()
+
+                            # Parse ID mapping: "Number 1 = ID abc-123"
+                            id_pattern = r'Number (\d+) = ID ([a-f0-9-]+)'
+                            id_matches = re.findall(id_pattern, id_mapping)
+
+                            # Parse user list: "1. Task title"
+                            task_pattern = r'(\d+)\.\s+(.+?)(?:\n|$)'
+                            task_matches = re.findall(task_pattern, user_list)
+
+                            if id_matches and task_matches:
+                                # Build task data
+                                tasks_data = []
+                                id_map = dict(id_matches)  # {number: id}
+
+                                for num, title in task_matches:
+                                    task_id = id_map.get(num)
+                                    if task_id:
+                                        tasks_data.append({
+                                            "id": task_id,
+                                            "title": title.strip()
+                                        })
+
+                                if tasks_data:
+                                    response["tool_outputs"] = [{
+                                        "tool": "get_active_task_context_tool",
+                                        "output": {"tasks": tasks_data}
+                                    }]
+                                    response["list_type"] = "tasks"
+                                    response["response_type"] = "interactive_list"
+                                    log.info(f"📋 Extracted {len(tasks_data)} tasks for interactive list")
+                                    break
+
+                    # Case 3: No tasks available, but agent provided numbered options
+                    elif 'NO tasks found' in observation or 'aucune tâche disponible' in observation.lower():
+                        response["response_type"] = "no_tasks_available"
+                        log.info("⚠️ No tasks available in project")
+
+                # Case 4: Session started - could show action menu
+                elif tool_name == 'start_progress_update_session_tool':
+                    if 'Session de mise à jour démarrée' in observation:
+                        response["response_type"] = "session_started"
+                        log.info("✅ Progress update session started")
 
             return response
 

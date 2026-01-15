@@ -812,26 +812,55 @@ async def process_inbound_message(
         from src.utils.response_parser import format_for_interactive
         from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 
-        if intent in INTERACTIVE_LIST_INTENTS:
-            log.info(f"📱 Intent '{intent}' expects structured data → Formatting as interactive list")
+        # Check if specialized agent provided response_type metadata
+        response_type = response_data.get("response_type", None)
 
-            # Infer list_type from intent (for robust option ID generation)
-            # Check if response already has list_type (from specialized agents)
+        # Decision logic based on response_type (from specialized agents) or intent
+        if response_type == "interactive_list":
+            # Agent explicitly indicated this should be interactive
+            log.info(f"📱 Agent response_type=interactive_list → Formatting as interactive")
+            list_type = response_data.get("list_type", "option")
+            log.info(f"🏷️  List type: {list_type}")
+            message_text, interactive_data = format_for_interactive(response_text, user_language, list_type)
+
+        elif response_type == "escalation":
+            # Agent escalated to human
+            log.info(f"🔧 Agent response_type=escalation → Plain text with escalation flag")
+            message_text = response_text
+            interactive_data = None
+
+        elif response_type == "no_tasks_available":
+            # No tasks available - agent provided options but they're informational
+            log.info(f"⚠️ Agent response_type=no_tasks_available → Plain text (no interactive)")
+            message_text = response_text
+            interactive_data = None
+
+        elif response_type == "session_started":
+            # Session started - could format action menu as interactive
+            log.info(f"✅ Agent response_type=session_started → Plain text (action menu)")
+            message_text = response_text
+            interactive_data = None
+
+        elif intent in INTERACTIVE_LIST_INTENTS:
+            # Fallback: Intent-based detection (for non-specialized agents)
+            log.info(f"📱 Intent '{intent}' in INTERACTIVE_LIST_INTENTS → Formatting as interactive list")
+
+            # Infer list_type from intent
             if intent in ["list_tasks", "view_tasks"]:
                 list_type = "tasks"
             elif intent in ["list_projects", "switch_project"]:
                 list_type = "projects"
             elif intent == "update_progress":
-                # For update_progress, check if response has list_type (agent may return tasks list)
-                list_type = "tasks"  # Default to tasks for progress update
+                list_type = "tasks"
             else:
-                list_type = "option"  # Fallback for other intents
+                list_type = "option"
 
             log.info(f"🏷️  Inferred list_type from intent: {list_type}")
             message_text, interactive_data = format_for_interactive(response_text, user_language, list_type)
+
         else:
+            # Default: Plain text
             log.info(f"📱 Intent '{intent}' is conversational → Sending as plain text")
-            # Agent output is normalized to string in agent.py
             message_text = response_text
             interactive_data = None
 
