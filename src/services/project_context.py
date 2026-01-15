@@ -11,11 +11,11 @@ class ProjectContextService:
     Tracks which project a subcontractor is currently working on,
     with automatic expiration after 7 hours of inactivity.
 
-    Also tracks active task with 1-hour expiration.
+    Also tracks active task with 24-hour expiration (full work day).
     """
 
     PROJECT_EXPIRATION_HOURS = 7
-    TASK_EXPIRATION_HOURS = 1
+    TASK_EXPIRATION_HOURS = 24  # 24 hours - users work on tasks throughout the day
 
     def __init__(self):
         """Initialize project context service."""

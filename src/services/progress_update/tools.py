@@ -44,11 +44,35 @@ async def get_active_task_context_tool(user_id: str) -> str:
         active_project_id = await project_context_service.get_active_project(user_id)
 
         if active_project_id:
-            # User has active project but no active task
+            # User has active project but no active task - LIST TASKS
             project = await supabase_client.get_project(active_project_id, user_id=user_id)
             if project:
                 project_name = project.get("name", "Unknown Project")
-                return f"⚠️ Active project found: {project_name} (ID: {active_project_id})\nBut NO active task. Ask user which task to update."
+                planradar_project_id = project.get("planradar_project_id")
+
+                # Get tasks for this project
+                tasks = await supabase_client.list_tasks(
+                    user_id=user_id,
+                    project_id=active_project_id
+                )
+
+                if tasks:
+                    # Format task list with IDs for agent to use
+                    task_list = "\n".join([
+                        f"{idx}. {task.get('title', 'No title')} - {task.get('status', 'Unknown status')} [ID: {task.get('id')}]"
+                        for idx, task in enumerate(tasks[:10], 1)  # Limit to 10
+                    ])
+
+                    return f"""⚠️ Active project: {project_name}
+But NO active task selected.
+
+Available tasks:
+{task_list}
+
+ASK the user to select a task by number (1-{min(len(tasks), 10)}) or name.
+Once they respond, extract the corresponding task_id from the list above and use start_progress_update_session_tool with task_id and project_id={planradar_project_id}"""
+                else:
+                    return f"⚠️ Active project: {project_name}\nBut NO tasks found for this project. Ask user if they want to select a different project."
 
         # No active context
         return "❌ No active project or task context. Ask user to select a project first, then a task."
