@@ -96,7 +96,7 @@ class ProgressUpdateAgent:
     def __init__(self):
         """Initialize progress update agent."""
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",  # Use Sonnet for better UX
+            model="claude-opus-4-5-20251101",  # Use Opus 4.5 (Sonnet 3.5 not working)
             api_key=settings.anthropic_api_key,
             temperature=0.3,  # Slightly creative for natural conversation
         )
