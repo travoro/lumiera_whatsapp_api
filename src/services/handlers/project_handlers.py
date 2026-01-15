@@ -137,7 +137,25 @@ async def handle_list_documents(
                 else:
                     # Fetch all documents (plans) using unified method
                     from src.integrations.planradar import planradar_client
-                    plans = await planradar_client.get_project_documents(planradar_project_id)
+                    log.info(f"🔍 DEBUG: About to call get_project_documents")
+                    log.info(f"   Project name: {project_name}")
+                    log.info(f"   Project ID (database): {project_id}")
+                    log.info(f"   PlanRadar project ID: {planradar_project_id}")
+
+                    try:
+                        plans = await planradar_client.get_project_documents(planradar_project_id)
+
+                        log.info(f"🔍 DEBUG: get_project_documents returned")
+                        log.info(f"   Type: {type(plans)}")
+                        log.info(f"   Count: {len(plans) if plans else 0}")
+                        if plans:
+                            log.info(f"   First plan keys: {list(plans[0].keys())}")
+                            log.info(f"   First plan sample: {plans[0]}")
+                    except Exception as pr_error:
+                        log.error(f"❌ Exception calling get_project_documents: {pr_error}")
+                        import traceback
+                        log.error(f"   Traceback: {traceback.format_exc()}")
+                        plans = []
 
                     if not plans:
                         message = f"Aucun plan disponible pour le chantier {project_name}."
@@ -201,7 +219,9 @@ async def handle_list_documents(
         return result
 
     except Exception as e:
-        log.error(f"Error in fast path list_documents: {e}")
+        log.error(f"❌ Error in fast path list_documents: {e}")
+        import traceback
+        log.error(f"   Traceback: {traceback.format_exc()}")
         # Return None to trigger fallback to full agent
         return None
 
