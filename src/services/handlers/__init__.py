@@ -15,7 +15,7 @@ from src.services.handlers.project_handlers import (
     handle_list_documents,
     handle_report_incident
 )
-from src.services.handlers.task_handlers import handle_list_tasks, handle_update_progress, handle_task_details
+from src.services.handlers.task_handlers import handle_list_tasks, handle_task_details
 from src.utils.logger import log
 
 
@@ -29,7 +29,7 @@ INTENT_HANDLERS = {
     "view_documents": handle_list_documents,  # Same handler as list_documents
     "escalate": handle_escalation,
     "report_incident": handle_report_incident,
-    "update_progress": handle_update_progress,
+    # NOTE: update_progress removed from fast path - now handled by specialized agent in message.py
     # Add more handlers as needed
 }
 
@@ -94,5 +94,4 @@ __all__ = [
     "handle_report_incident",
     "handle_list_tasks",
     "handle_task_details",
-    "handle_update_progress",
 ]
