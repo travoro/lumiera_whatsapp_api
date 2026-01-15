@@ -337,31 +337,78 @@ class PlanRadarClient:
             plans = result.get("data", [])
             included = result.get("included", [])
 
+            log.info(f"   📊 Processing {len(plans)} plan(s) from data, {len(included)} items in included")
+
+            # Log included section IDs for debugging
+            if included:
+                included_ids = [inc.get("id") for inc in included]
+                log.info(f"   📦 Included section IDs: {included_ids}")
+
             # Extract plan URLs from included section
             all_plans = []
             for plan in plans:
                 plan_id = plan.get("id")
+                plan_type = plan.get("type")
                 plan_attributes = plan.get("attributes", {})
+                plan_relationships = plan.get("relationships", {})
+                log.info(f"   🔍 Plan {plan_id[:8]}... type={plan_type}")
+                log.info(f"      attributes: {list(plan_attributes.keys())}")
+                log.info(f"      relationships: {list(plan_relationships.keys())}")
 
-                # Find corresponding data in included section
-                for inc in included:
-                    if inc.get("id") == plan_id:
-                        inc_attributes = inc.get("attributes", {})
+                # Try to extract URL directly from plan attributes first
+                # PlanRadar plans use: original-url, plan-thumb-big-url, plan-thumb-small-url
+                direct_url = (plan_attributes.get("original-url") or
+                             plan_attributes.get("plan-thumb-big-url") or
+                             plan_attributes.get("plan-thumb-small-url") or
+                             plan_attributes.get("image-url") or
+                             plan_attributes.get("url") or
+                             plan_attributes.get("file-url"))
 
-                        # Extract plan URL (could be image-url or other field)
-                        plan_url = (inc_attributes.get("image-url") or
-                                   inc_attributes.get("url") or
-                                   inc_attributes.get("file-url"))
+                if direct_url:
+                    log.info(f"   ✅ Found URL directly in plan attributes")
+                    all_plans.append({
+                        "id": plan_id,
+                        "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
+                        "url": direct_url,
+                        "thumbnail_url": plan_attributes.get("image-url-thumb"),
+                        "content_type": plan_attributes.get("content-type") or plan_attributes.get("image-content-type"),
+                        "attributes": plan_attributes
+                    })
+                else:
+                    # Find corresponding data in included section
+                    found_in_included = False
+                    for inc in included:
+                        inc_id = inc.get("id")
+                        inc_type = inc.get("type")
+                        log.info(f"   🔎 Checking included item: id={inc_id[:8] if inc_id else 'None'}..., type={inc_type}")
 
-                        all_plans.append({
-                            "id": plan_id,
-                            "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
-                            "url": plan_url,
-                            "thumbnail_url": inc_attributes.get("image-url-thumb"),
-                            "content_type": inc_attributes.get("content-type") or inc_attributes.get("image-content-type"),
-                            "attributes": plan_attributes
-                        })
-                        break
+                        if inc_id == plan_id:
+                            inc_attributes = inc.get("attributes", {})
+                            log.info(f"   📦 Found in included: type={inc_type}, attributes={list(inc_attributes.keys())[:10]}")
+
+                            # Extract plan URL (could be image-url or other field)
+                            plan_url = (inc_attributes.get("image-url") or
+                                       inc_attributes.get("url") or
+                                       inc_attributes.get("file-url"))
+
+                            if plan_url:
+                                log.info(f"   ✅ Found URL in included section")
+                            else:
+                                log.warning(f"   ⚠️ No URL found in included section. Available keys: {list(inc_attributes.keys())}")
+
+                            all_plans.append({
+                                "id": plan_id,
+                                "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
+                                "url": plan_url,
+                                "thumbnail_url": inc_attributes.get("image-url-thumb"),
+                                "content_type": inc_attributes.get("content-type") or inc_attributes.get("image-content-type"),
+                                "attributes": plan_attributes
+                            })
+                            found_in_included = True
+                            break
+
+                    if not found_in_included:
+                        log.warning(f"   ⚠️ Plan {plan_id} not found in included section")
 
             log.info(f"   ✅ Retrieved {len(all_plans)} plans")
             return all_plans

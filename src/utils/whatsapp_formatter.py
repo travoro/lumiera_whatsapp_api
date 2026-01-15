@@ -38,7 +38,7 @@ TRANSLATIONS = {
         "list_tasks_select_project": "\nDites-moi pour quel chantier vous souhaitez voir les tâches.",
         "task_details_header": "📋 Détails de la tâche : {task_title}",
         "list_documents_header": "Voici vos documents. 📄\n\n",
-        "list_documents_project_context": "Pour le chantier **{project_name}** :\n\n",
+        "list_documents_project_context": "Pour le chantier {project_name} :\n\n",
         "list_documents_no_documents": "Aucun document disponible pour ce chantier.",
         "list_documents_footer": "\n\nDites-moi si vous souhaitez voir les documents d'un autre chantier.",
         "list_documents_select_project": "\nDites-moi pour quel chantier vous souhaitez voir les documents.",
