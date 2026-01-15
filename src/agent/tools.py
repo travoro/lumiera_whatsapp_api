@@ -771,7 +771,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
     from src.utils.whatsapp_formatter import get_translation
     import json
 
-    @tool
+    @tool("list_projects_tool")
     async def list_projects_tool() -> str:
         """List all active construction projects (chantiers) for the user.
 
@@ -803,7 +803,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         log.info(f"✅ list_projects_tool: Returned {len(result['data'])} projects")
         return output
 
-    @tool
+    @tool("list_tasks_tool")
     async def list_tasks_tool(project_id: Optional[str] = None, status: Optional[str] = None) -> str:
         """List tasks for a specific project.
 
@@ -854,7 +854,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         log.info(f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)")
         return output
 
-    @tool
+    @tool("get_task_description_tool")
     async def get_task_description_tool(task_id: str) -> str:
         """Get the detailed description of a specific task.
 
