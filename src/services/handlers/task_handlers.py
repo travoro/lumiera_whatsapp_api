@@ -528,17 +528,43 @@ async def handle_task_details(
                     log.warning(f"      - {att.get('type')}: {att.get('title')}")
 
             if attachments_with_urls:
-                carousel_data = {
-                    "cards": [
-                        {
-                            "media_url": att.get("url"),
-                            "media_type": att.get("content_type", "application/octet-stream")
-                        }
-                        for att in attachments_with_urls
-                    ]
-                }
+                # Create carousel data with unique media names to avoid filename collisions
+                cards = []
+                for idx, att in enumerate(attachments_with_urls, 1):
+                    # Generate unique media_name from title, ID, or index
+                    media_name = att.get("title", "").strip()
+
+                    # If no title, extract UUID from URL or use attachment ID
+                    if not media_name:
+                        att_id = att.get("id", "")
+                        if att_id:
+                            # Use first 8 chars of ID for brevity
+                            media_name = f"attachment_{att_id[:8]}"
+                        else:
+                            # Last resort: extract UUID from URL
+                            url = att.get("url", "")
+                            import re
+                            uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', url)
+                            if uuid_match:
+                                media_name = f"attachment_{uuid_match.group(1)[:8]}"
+                            else:
+                                # Absolute fallback: use index
+                                media_name = f"attachment_{idx}"
+
+                    # Clean filename (remove file extension if present, we'll add it back based on content type)
+                    media_name = media_name.replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.pdf', '')
+
+                    cards.append({
+                        "media_url": att.get("url"),
+                        "media_type": att.get("content_type", "application/octet-stream"),
+                        "media_name": media_name
+                    })
+
+                carousel_data = {"cards": cards}
 
                 log.info(f"📦 Attachment data created with {len(carousel_data['cards'])} items (sendable)")
+                for idx, card in enumerate(cards, 1):
+                    log.info(f"   Card {idx}: media_name='{card.get('media_name')}', type={card.get('media_type')}")
 
                 # Store attachments in tool_outputs (only those with URLs)
                 tool_outputs.append({
