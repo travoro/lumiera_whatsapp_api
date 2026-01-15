@@ -427,8 +427,8 @@ class TwilioClient:
             if filename:
                 # Save with the actual filename in /tmp
                 import re
-                # Sanitize filename for filesystem
-                safe_filename = re.sub(r'[^\w\s\-\.]', '_', filename)
+                # Sanitize filename for filesystem and URLs (no spaces!)
+                safe_filename = re.sub(r'[^\w\-\.]', '_', filename)
                 # Ensure the file has the proper extension
                 if not safe_filename.endswith(extension):
                     safe_filename += extension
