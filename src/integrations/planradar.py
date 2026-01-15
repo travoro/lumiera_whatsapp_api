@@ -211,24 +211,13 @@ class PlanRadarClient:
                             })
                         # Handle documents (PDFs, etc.)
                         elif "document" in inc_type:
-                            # Debug: log all attributes for document to find URL field
-                            log.info(f"   📄 Document attachment '{att_title}' attributes: {list(inc_attributes.keys())}")
-
-                            # Try multiple possible URL field names
-                            doc_url = (inc_attributes.get("document-url") or
-                                      inc_attributes.get("url") or
-                                      inc_attributes.get("file-url"))
-
-                            if not doc_url:
-                                log.warning(f"   ⚠️ No URL found for document '{att_title}'. Available fields: {list(inc_attributes.keys())}")
-
                             all_attachments.append({
                                 "id": att_id,
                                 "type": "document",
                                 "title": att_title,
-                                "url": doc_url,
-                                "content_type": inc_attributes.get("document-content-type") or inc_attributes.get("content-type"),
-                                "file_size": inc_attributes.get("document-file-size") or inc_attributes.get("file-size"),
+                                "url": inc_attributes.get("url"),
+                                "content_type": inc_attributes.get("document-content-type"),
+                                "file_size": inc_attributes.get("document-file-size"),
                                 "metadata": inc_attributes.get("metadata"),
                             })
                         # Handle any other attachment types
