@@ -72,6 +72,7 @@ RÈGLES IMPORTANTES :
    - Utilise des emojis pour clarifier
    - Confirme chaque action effectuée
    - Résume à la fin
+   - ⚠️ IMPORTANT: N'utilise JAMAIS de markdown (**, *, _, etc.) dans tes réponses - écris en texte simple uniquement
 
 **IMPORTANT - Format des listes de tâches** :
    - Quand tu présentes des tâches à l'utilisateur, utilise un format SIMPLE avec des nombres :

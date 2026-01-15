@@ -58,6 +58,7 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             else:
                 raise  # Re-raise other exceptions
 
+        # Check if we have tasks after filtering
         if not tasks:
             project_name = project.get("nom", "ce projet")
             return {
@@ -69,26 +70,50 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
 
         # Format tasks for display
         # PlanRadar uses JSON:API format with attributes nested
+        # Filter out resolved/closed tasks (status 3=Resolved, 5=Closed, 6=Rejected)
         formatted_tasks = []
         for task in tasks:
             attributes = task.get("attributes", {})
             uuid_val = attributes.get("uuid")
             short_id_val = task.get("id")
+            status_id = attributes.get("status-id")
+            progress = attributes.get("progress", 0)
 
-            # DEBUG: Log what we're getting from PlanRadar
-            log.info(f"   📊 Task from PlanRadar: short_id={short_id_val}, uuid={uuid_val}, has_uuid={uuid_val is not None}")
+            # DEBUG: Log full status info
+            log.info(f"   📊 Task {short_id_val}: status-id={status_id} (type: {type(status_id).__name__}), progress={progress}%")
+
+            # Skip resolved, closed, or rejected tasks
+            # Only show: 1=Open, 2=In-Progress, 4=Feedback
+            if status_id in [3, 5, 6]:
+                log.info(f"   ⏭️  Skipping task {short_id_val} - status {status_id} (resolved/closed/rejected)")
+                continue
+
+            # Also skip tasks with 100% progress that might not have status updated yet
+            if progress == 100:
+                log.info(f"   ⏭️  Skipping task {short_id_val} - 100% complete")
+                continue
 
             formatted_tasks.append({
                 "id": uuid_val,  # Use UUID as primary ID (latest API standard)
                 "short_id": short_id_val,  # Keep short ID for backward compatibility
                 "title": attributes.get("subject", "Sans titre"),
-                "status": attributes.get("status-id", "unknown"),
+                "status": status_id,
                 "priority": attributes.get("priority", "normal"),
                 "due_date": attributes.get("due-date"),
                 "progress": attributes.get("progress", 0),
                 "sequential_id": attributes.get("sequential-id"),
                 "project_id": attributes.get("project-id") or planradar_project_id,  # Store project_id for API calls
             })
+
+        # Check if filtering removed all tasks
+        if not formatted_tasks:
+            project_name = project.get("nom", "ce projet")
+            return {
+                "success": True,
+                "message": f"Le projet '{project_name}' n'a actuellement aucune tâche active. "
+                          f"Toutes les tâches ont été complétées ou fermées. 🎉",
+                "data": []
+            }
 
         # Update active project context (set or touch activity)
         project_name = project.get("nom")
@@ -106,9 +131,10 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             result={"count": len(formatted_tasks)}
         )
 
+        log.info(f"📊 Returning {len(formatted_tasks)} active tasks (filtered out resolved/closed)")
         return {
             "success": True,
-            "message": f"{len(formatted_tasks)} tâche(s) trouvée(s).",
+            "message": f"{len(formatted_tasks)} tâche(s) active(s) trouvée(s).",
             "data": formatted_tasks
         }
 

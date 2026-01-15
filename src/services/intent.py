@@ -92,9 +92,7 @@ INTENTS = {
             # Spanish
             "detalles", "detalle", "descripción", "información", "ver", "mostrar",
             # Portuguese
-            "detalhes", "descrição", "informação", "ver", "mostrar",
-            # Combined with task references
-            "photo", "photos", "image", "images", "picture", "pictures"
+            "detalhes", "descrição", "informação", "ver", "mostrar"
         ],
         "tools": ["get_task_description_tool", "get_task_images_tool"],
         "requires_confirmation": False

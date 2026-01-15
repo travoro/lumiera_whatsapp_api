@@ -49,9 +49,9 @@ async def get_active_task_context_tool(user_id: str) -> str:
             from src.integrations.planradar import planradar_client
             task = await planradar_client.get_task(active_task_id, planradar_project_id)
             if task:
-                task_data = task.get("data", {})
-                task_attrs = task_data.get("attributes", {})
-                task_title = task_attrs.get("subject", "Unknown Task")
+                # get_task already returns the "data" object, not full response
+                attributes = task.get("attributes", {})
+                task_title = attributes.get("subject") or task.get("title", "Unknown Task")
 
                 return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
@@ -187,9 +187,9 @@ async def get_progress_update_context_tool(user_id: str) -> str:
 
         task_title = "Unknown"
         if task:
-            task_data = task.get("data", {})
-            task_attrs = task_data.get("attributes", {})
-            task_title = task_attrs.get("subject", "Unknown")
+            # get_task already returns the "data" object, not full response
+            attributes = task.get("attributes", {})
+            task_title = attributes.get("subject") or task.get("title", "Unknown")
 
         output = f"📋 Session de mise à jour active :\n"
         output += f"Tâche : {task_title}\n"
@@ -376,9 +376,9 @@ async def start_progress_update_session_tool(
 
             task_title = "Unknown Task"
             if task:
-                task_data = task.get("data", {})
-                task_attrs = task_data.get("attributes", {})
-                task_title = task_attrs.get("subject", "Unknown Task")
+                # get_task already returns the "data" object, not full response
+                attributes = task.get("attributes", {})
+                task_title = attributes.get("subject") or task.get("title", "Unknown Task")
 
             return f"✅ Session de mise à jour démarrée pour : {task_title}\n\nQue souhaitez-vous faire ?\n1. 📸 Ajouter une photo\n2. 💬 Laisser un commentaire\n3. ✅ Marquer comme terminé"
         else:

@@ -757,12 +757,18 @@ class PlanRadarClient:
                     data=data
                 )
 
-                if result:
-                    log.info(f"   ✅ Image uploaded successfully")
-                    return True
-                else:
-                    log.error(f"   ❌ Failed to upload image")
-                    return False
+                # Check for rate limiting or errors
+                if result and isinstance(result, dict):
+                    if result.get("_rate_limited"):
+                        log.error(f"   ❌ Rate limit exceeded - please wait before uploading more images")
+                        return False
+                    # Success if result has data
+                    if "data" in result or result.get("id"):
+                        log.info(f"   ✅ Image uploaded successfully")
+                        return True
+
+                log.error(f"   ❌ Failed to upload image")
+                return False
 
         except Exception as e:
             log.error(f"   ❌ Error processing image: {e}")
@@ -784,22 +790,32 @@ class PlanRadarClient:
             project_id: The PlanRadar project ID
             additional_text: Optional comment text to add
             additional_images: Optional list of image URLs to attach (will be downloaded and converted to base64)
+
+        Returns:
+            True if all operations succeeded, False if any failed
         """
+        success = True
+
         # Add comment if text provided
         if additional_text:
-            await self.add_task_comment(task_id, project_id, additional_text)
+            comment_result = await self.add_task_comment(task_id, project_id, additional_text)
+            if not comment_result:
+                success = False
 
         # Add images if provided
         if additional_images:
             for idx, image_url in enumerate(additional_images, 1):
-                await self._upload_image_attachment(
+                upload_result = await self._upload_image_attachment(
                     task_id,
                     project_id,
                     image_url,
                     caption=f"Progress update image {idx}"
                 )
+                if not upload_result:
+                    log.error(f"❌ Failed to upload image {idx}/{len(additional_images)}")
+                    success = False
 
-        return True
+        return success
 
     async def update_task_progress(
         self,
