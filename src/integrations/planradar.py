@@ -366,12 +366,24 @@ class PlanRadarClient:
 
                 if direct_url:
                     log.info(f"   ✅ Found URL directly in plan attributes")
+
+                    # Extract content type for plans (PlanRadar uses planfile-content-type)
+                    content_type = (plan_attributes.get("planfile-content-type") or
+                                   plan_attributes.get("content-type") or
+                                   plan_attributes.get("image-content-type"))
+
+                    # Default to PDF if filename suggests it's a PDF
+                    if not content_type:
+                        plan_name = plan_attributes.get("name", "")
+                        if plan_name.lower().endswith('.pdf'):
+                            content_type = "application/pdf"
+
                     all_plans.append({
                         "id": plan_id,
                         "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
                         "url": direct_url,
-                        "thumbnail_url": plan_attributes.get("image-url-thumb"),
-                        "content_type": plan_attributes.get("content-type") or plan_attributes.get("image-content-type"),
+                        "thumbnail_url": plan_attributes.get("image-url-thumb") or plan_attributes.get("plan-thumb-small-url"),
+                        "content_type": content_type,
                         "attributes": plan_attributes
                     })
                 else:
