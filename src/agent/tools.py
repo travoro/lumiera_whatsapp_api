@@ -598,7 +598,7 @@ async def escalate_to_human_tool(
         # ALWAYS return French - translation to user language happens in pipeline
         from src.utils.whatsapp_formatter import get_translation
         success_message = get_translation("fr", "escalation_success", "en")
-        return success_message if success_message else "✅ Votre demande a été transmise à l'équipe administrative."
+        return success_message if success_message else "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu."
 
     log.warning(f"❌ escalate_to_human_tool failed to create escalation")
     return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
@@ -1222,7 +1222,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
 
             # ALWAYS return French - translation to user language happens in pipeline
             success_message = get_translation("fr", "escalation_success", "en")
-            return success_message if success_message else "✅ Votre demande a été transmise à l'équipe administrative."
+            return success_message if success_message else "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu."
 
         log.warning(f"❌ escalate_to_human_tool failed to create escalation")
         return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."

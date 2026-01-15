@@ -16,7 +16,7 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Vous avez {count} chantiers actifs :\n\n",
         "projects_found_singular": "Voici votre chantier actif :",
         "projects_found_plural": "Voici vos chantiers actifs :",
-        "escalation_success": "✅ Votre demande a été transmise à l'équipe administrative. Un membre de l'équipe vous contactera sous peu.",
+        "escalation_success": "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu.",
         "report_incident": "Je vais vous aider à signaler un incident. 🚨\n\nPour créer un rapport d'incident, j'ai besoin de :\n1. 📸 Au moins une photo du problème\n2. 📝 Une description écrite ou audio de ce qui s'est passé\n3. 🏗️ Le chantier concerné, si ce n'est pas le chantier {chantier_nom}\n\nVous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas.",
         "menu_items": [
             {"title": "🏗️ Voir mes chantiers", "id": "view_sites_fr", "description": ""},
