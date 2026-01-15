@@ -58,7 +58,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
                 )
 
                 if tasks_result.get("success"):
-                    tasks = tasks_result.get("tasks", [])
+                    tasks = tasks_result.get("data", [])  # list_tasks returns "data", not "tasks"
 
                     if tasks:
                         # Format task list - SIMPLE format for user display
