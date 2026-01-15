@@ -1,6 +1,7 @@
 """PlanRadar API client for project and task management."""
 from typing import Optional, List, Dict, Any
 import httpx
+import base64
 from src.config import settings
 from src.utils.logger import log
 
@@ -680,6 +681,80 @@ class PlanRadarClient:
             return result["data"].get("id")
         return None
 
+    async def _upload_image_attachment(
+        self,
+        task_id: str,
+        project_id: str,
+        image_url: str,
+        caption: str = "Progress update image"
+    ) -> bool:
+        """Helper method to download and upload an image to PlanRadar.
+
+        Args:
+            task_id: The task UUID
+            project_id: The PlanRadar project ID
+            image_url: URL of the image to download and upload
+            caption: Optional caption for the image
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            log.info(f"📸 Downloading image from {image_url[:100]}...")
+
+            # Download image
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(image_url)
+                if response.status_code != 200:
+                    log.error(f"   ❌ Failed to download image: {response.status_code}")
+                    return False
+
+                image_data = response.content
+                content_type = response.headers.get("content-type", "image/jpeg")
+                log.info(f"   ✅ Downloaded {len(image_data)} bytes ({content_type})")
+
+                # Encode to base64
+                base64_data = base64.b64encode(image_data).decode('utf-8')
+                data_uri = f"data:{content_type};base64,{base64_data}"
+
+                # Extract filename from URL or use default
+                filename = image_url.split('/')[-1].split('?')[0] or "image.jpg"
+                if '.' not in filename:
+                    # Add extension based on content type
+                    ext = content_type.split('/')[-1].split(';')[0]
+                    filename = f"image.{ext}"
+
+                # Use correct JSON:API format from PlanRadar documentation
+                data = {
+                    "data": {
+                        "attributes": {
+                            "attachment": data_uri,
+                            "attachment-name": filename,
+                            "caption": caption
+                        }
+                    }
+                }
+
+                log.info(f"   📤 Uploading to PlanRadar (filename: {filename})...")
+                result = await self._request(
+                    "POST",
+                    f"{self.account_id}/projects/{project_id}/tickets/{task_id}/attachments",
+                    data=data
+                )
+
+                if result:
+                    log.info(f"   ✅ Image uploaded successfully")
+                    return True
+                else:
+                    log.error(f"   ❌ Failed to upload image")
+                    return False
+
+        except Exception as e:
+            log.error(f"   ❌ Error processing image: {e}")
+            import traceback
+            log.error(f"   Traceback: {traceback.format_exc()}")
+            return False
+
     async def update_incident_report(
         self,
         task_id: str,
@@ -687,22 +762,26 @@ class PlanRadarClient:
         additional_text: Optional[str] = None,
         additional_images: Optional[List[str]] = None,
     ) -> bool:
-        """Update an existing incident report with additional information."""
+        """Update an existing incident report with additional information.
+
+        Args:
+            task_id: The task UUID
+            project_id: The PlanRadar project ID
+            additional_text: Optional comment text to add
+            additional_images: Optional list of image URLs to attach (will be downloaded and converted to base64)
+        """
         # Add comment if text provided
         if additional_text:
             await self.add_task_comment(task_id, project_id, additional_text)
 
         # Add images if provided
         if additional_images:
-            for image_url in additional_images:
-                data = {
-                    "url": image_url,
-                    "type": "image",
-                }
-                await self._request(
-                    "POST",
-                    f"{self.account_id}/projects/{project_id}/tickets/{task_id}/attachments",
-                    data=data
+            for idx, image_url in enumerate(additional_images, 1):
+                await self._upload_image_attachment(
+                    task_id,
+                    project_id,
+                    image_url,
+                    caption=f"Progress update image {idx}"
                 )
 
         return True
@@ -758,17 +837,14 @@ class PlanRadarClient:
         if progress_note:
             await self.add_task_comment(task_id, project_id, progress_note)
 
-        # Add progress images
+        # Add progress images using helper method
         if image_urls:
-            for image_url in image_urls:
-                data = {
-                    "url": image_url,
-                    "type": "image",
-                }
-                await self._request(
-                    "POST",
-                    f"{self.account_id}/projects/{project_id}/tickets/{task_id}/attachments",
-                    data=data
+            for idx, image_url in enumerate(image_urls, 1):
+                await self._upload_image_attachment(
+                    task_id,
+                    project_id,
+                    image_url,
+                    caption=f"Progress image {idx}"
                 )
 
         return True
