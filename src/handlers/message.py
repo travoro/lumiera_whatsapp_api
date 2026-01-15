@@ -150,14 +150,20 @@ async def handle_direct_action(
     user_id: str,
     phone_number: str,
     language: str,
+    message_body: Optional[str] = None,
+    media_url: Optional[str] = None,
+    media_type: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Handle direct action execution without AI agent.
 
     Args:
-        action: The action to execute (e.g., "view_sites", "talk_team")
+        action: The action to execute (e.g., "view_sites", "talk_team", "update_progress")
         user_id: User's ID
         phone_number: User's WhatsApp phone number
         language: User's language code
+        message_body: Optional message text content
+        media_url: Optional media URL (for images, voice, etc.)
+        media_type: Optional media type
 
     Returns:
         Dict with 'message' and optional 'tool_outputs' if action was handled,

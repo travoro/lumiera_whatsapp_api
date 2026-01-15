@@ -526,11 +526,35 @@ class MessagePipeline:
                     log.info(f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)")
                     return Result.ok(None)
                 else:
-                    log.warning(f"❌ Fast path returned None - parameters unclear")
-                    log.info(f"🤖 Falling back to full AI agent to resolve ambiguity")
-                    log.info(f"   Intent: {ctx.intent}")
-                    log.info(f"   Message: '{ctx.message_in_french}'")
-                    log.info(f"   AI will use conversation history to understand user intent")
+                    log.warning(f"❌ Fast path returned None - checking for specialized routing")
+
+                    # Check for specialized routing in message.py before falling back to Opus
+                    from src.handlers.message import handle_direct_action
+
+                    specialized_result = await handle_direct_action(
+                        action=ctx.intent,
+                        user_id=ctx.user_id,
+                        phone_number=ctx.from_number,
+                        language=ctx.user_language,
+                        message_body=ctx.message_in_french,
+                        media_url=ctx.media_url,
+                        media_type=ctx.media_type
+                    )
+
+                    if specialized_result:
+                        log.info(f"✅ Specialized routing succeeded for intent: {ctx.intent}")
+                        ctx.response_text = specialized_result.get("message")
+                        ctx.escalation = specialized_result.get("escalation", False)
+                        ctx.tools_called = specialized_result.get("tools_called", [])
+                        ctx.tool_outputs = specialized_result.get("tool_outputs", [])
+                        ctx.agent_used = specialized_result.get("agent_used")
+                        return Result.ok(None)
+                    else:
+                        log.warning(f"❌ No specialized routing found - parameters unclear")
+                        log.info(f"🤖 Falling back to full AI agent to resolve ambiguity")
+                        log.info(f"   Intent: {ctx.intent}")
+                        log.info(f"   Message: '{ctx.message_in_french}'")
+                        log.info(f"   AI will use conversation history to understand user intent")
 
             # Fallback to full agent
             log.info(f"⚙️ Using full agent (Opus)")
