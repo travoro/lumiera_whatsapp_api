@@ -276,6 +276,99 @@ class PlanRadarClient:
         # PlanRadar uses JSON:API format with nested "data" array
         return result.get("data", []) if result else []
 
+    async def get_project_components(
+        self,
+        project_id: str,
+        last_sync_date: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get all components of a project.
+
+        Args:
+            project_id: The PlanRadar project ID
+            last_sync_date: Optional Unix timestamp - only components created after this will be returned
+
+        Returns:
+            List of components for the project
+        """
+        log.info(f"🏗️ get_project_components called: project_id={project_id[:8]}...")
+        endpoint = f"{self.account_id}/projects/{project_id}/components/project_components"
+        params = {}
+        if last_sync_date:
+            params["last_sync_date"] = last_sync_date
+
+        result = await self._request("GET", endpoint, params=params)
+        # Check for rate limit error
+        if result and result.get("_rate_limited"):
+            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+        # PlanRadar uses JSON:API format with nested "data" array
+        components = result.get("data", []) if result else []
+        log.info(f"   ✅ Retrieved {len(components)} components")
+        return components
+
+    async def get_component_plans(
+        self,
+        project_id: str,
+        component_id: str,
+        is_simple: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Get all plans of a component.
+
+        Args:
+            project_id: The PlanRadar project ID
+            component_id: The component ID
+            is_simple: If True, retrieves simple plan versions data
+
+        Returns:
+            List of plans for the component
+        """
+        log.info(f"📐 get_component_plans called: project_id={project_id[:8]}..., component_id={component_id[:8]}...")
+        endpoint = f"{self.account_id}/projects/{project_id}/components/{component_id}/plans"
+        params = {}
+        if is_simple:
+            params["is_simple"] = "true"
+
+        result = await self._request("GET", endpoint, params=params)
+        # Check for rate limit error
+        if result and result.get("_rate_limited"):
+            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+
+        # PlanRadar uses JSON:API format
+        if result and result.get("data"):
+            plans = result.get("data", [])
+            included = result.get("included", [])
+
+            # Extract plan URLs from included section
+            all_plans = []
+            for plan in plans:
+                plan_id = plan.get("id")
+                plan_attributes = plan.get("attributes", {})
+
+                # Find corresponding data in included section
+                for inc in included:
+                    if inc.get("id") == plan_id:
+                        inc_attributes = inc.get("attributes", {})
+
+                        # Extract plan URL (could be image-url or other field)
+                        plan_url = (inc_attributes.get("image-url") or
+                                   inc_attributes.get("url") or
+                                   inc_attributes.get("file-url"))
+
+                        all_plans.append({
+                            "id": plan_id,
+                            "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
+                            "url": plan_url,
+                            "thumbnail_url": inc_attributes.get("image-url-thumb"),
+                            "content_type": inc_attributes.get("content-type") or inc_attributes.get("image-content-type"),
+                            "attributes": plan_attributes
+                        })
+                        break
+
+            log.info(f"   ✅ Retrieved {len(all_plans)} plans")
+            return all_plans
+
+        log.info(f"   ℹ️ No plans found")
+        return []
+
     async def add_task_comment(
         self,
         task_id: str,

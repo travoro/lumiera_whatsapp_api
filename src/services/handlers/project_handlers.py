@@ -101,11 +101,18 @@ async def handle_list_documents(
                 "tool_outputs": []
             }
 
+        # Scenario 2: Single project available - Auto-select it
+        if not current_project_id and len(projects) == 1:
+            current_project_id = projects[0].get('id')
+            project_name = projects[0].get('nom')
+            log.info(f"✅ Auto-selected single available project: {project_name} (ID: {current_project_id[:8]}...)")
+
         # Use centralized translations (ALWAYS French)
         message = get_translation("fr", "list_documents_header")
         tool_outputs = []
+        carousel_data = None
 
-        # Scenario 2: Has current project in context
+        # Scenario 3: Has current project in context or auto-selected
         if current_project_id:
             # Find the current project
             current_project = next((p for p in projects if str(p.get('id')) == current_project_id), None)
@@ -114,47 +121,73 @@ async def handle_list_documents(
 
             message += get_translation("fr", "list_documents_project_context").format(project_name=project_name)
 
-            # Call LangChain tool for LangSmith tracing
-            log.debug(f"🔧 Calling get_documents_tool via LangChain for LangSmith tracing")
-            _ = await get_documents_tool.ainvoke({
-                "user_id": user_id,
-                "project_id": project_id
-            })
+            # Get PlanRadar project ID from database
+            from src.integrations.supabase import supabase_client
+            planradar_project_id = supabase_client.get_planradar_project_id(project_id)
 
-            # Also get structured data from actions layer (for metadata)
-            doc_result = await document_actions.get_documents(user_id, project_id)
-
-            if not doc_result["success"]:
-                # Use the specific error message (e.g., rate limit, API error)
-                message += doc_result.get("message", get_translation("fr", "list_documents_no_documents"))
-            elif not doc_result["data"]:
-                # Success but no documents found
-                message += get_translation("fr", "list_documents_no_documents")
+            if not planradar_project_id:
+                message += "❌ Impossible de récupérer les plans pour ce chantier."
+                log.error(f"   ❌ No PlanRadar project ID found for project {project_id}")
             else:
-                documents = doc_result["data"]
-                # Store documents data in tool_outputs
-                tool_outputs.append({
-                    "tool": "list_documents_tool",
-                    "input": {"user_id": user_id, "project_id": project_id},
-                    "output": compact_documents(documents)  # Only essential fields
-                })
+                # Fetch all components for this project
+                from src.integrations.planradar import planradar_client
+                components = await planradar_client.get_project_components(planradar_project_id)
 
-                for i, doc in enumerate(documents[:10], 1):  # Limit to 10 documents
-                    doc_type = doc.get('type', 'document')
-                    doc_name = doc.get('name', 'Untitled')
+                if not components:
+                    message += get_translation("fr", "list_documents_no_documents")
+                else:
+                    # Fetch plans for each component
+                    all_plans = []
+                    for component in components:
+                        component_id = component.get("id")
+                        component_name = component.get("attributes", {}).get("name", "Composant")
 
-                    # Document type emoji
-                    type_emoji = {
-                        'pdf': '📕',
-                        'image': '🖼️',
-                        'plan': '📐',
-                        'contract': '📋',
-                        'invoice': '🧾'
-                    }.get(doc_type, '📄')
+                        plans = await planradar_client.get_component_plans(planradar_project_id, component_id)
+                        for plan in plans:
+                            plan["component_name"] = component_name
+                            all_plans.append(plan)
 
-                    message += f"{i}. {type_emoji} {doc_name}\n"
+                    if not all_plans:
+                        message += get_translation("fr", "list_documents_no_documents")
+                    else:
+                        # Filter out plans without URLs
+                        plans_with_urls = [p for p in all_plans if p.get("url")]
+                        plans_without_urls = [p for p in all_plans if not p.get("url")]
 
-            message += get_translation("fr", "list_documents_footer")
+                        if plans_without_urls:
+                            log.warning(f"   ⚠️ Skipping {len(plans_without_urls)} plans without URLs")
+
+                        if plans_with_urls:
+                            plan_count = len(plans_with_urls)
+                            message += f"📐 {plan_count} plan(s) disponible(s)\n\n"
+
+                            # Prepare carousel_data for sending plans as attachments
+                            carousel_data = {
+                                "cards": [
+                                    {
+                                        "media_url": plan.get("url"),
+                                        "media_type": plan.get("content_type", "image/png")
+                                    }
+                                    for plan in plans_with_urls
+                                ]
+                            }
+
+                            # Show preview of plans in message
+                            for i, plan in enumerate(plans_with_urls[:5], 1):  # Show max 5 in text
+                                component = plan.get("component_name", "")
+                                plan_name = plan.get("name", "Plan")
+                                message += f"{i}. 📐 {plan_name}"
+                                if component:
+                                    message += f" ({component})"
+                                message += "\n"
+
+                            if len(plans_with_urls) > 5:
+                                message += f"\n... et {len(plans_with_urls) - 5} autre(s) plan(s)\n"
+
+                        if plans_without_urls:
+                            message += f"\n⚠️ {len(plans_without_urls)} plan(s) ne peuvent pas être envoyés via WhatsApp"
+
+            message += "\n" + get_translation("fr", "list_documents_footer")
 
         # Scenario 3: Has projects but no current project in context
         else:
@@ -188,6 +221,9 @@ async def handle_list_documents(
 
         if list_type:
             result["list_type"] = list_type
+
+        if carousel_data:
+            result["carousel_data"] = carousel_data
 
         return result
 
