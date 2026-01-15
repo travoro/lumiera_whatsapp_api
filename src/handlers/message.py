@@ -633,19 +633,10 @@ async def process_inbound_message(
 
                 return
             else:
-                # Direct action handler returned None (failed)
-                # Don't fall back to pipeline - send error instead
-                log.error(f"❌ Direct action '{action_id}' failed - handler returned None")
-
-                error_msg = "Désolé, une erreur s'est produite lors du traitement de votre demande. Veuillez réessayer."
-                if user_language != "fr":
-                    error_msg = await translation_service.translate_from_french(error_msg, user_language)
-
-                from src.integrations.twilio import twilio_client
-                twilio_client.send_message(from_number, error_msg)
-
-                log.info(f"📤 Sent error message to user for failed direct action")
-                return
+                # Direct action handler returned None - fallback to AI pipeline
+                log.warning(f"⚠️ Direct action '{action_id}' returned None - falling back to AI pipeline")
+                log.info(f"   Handler could not resolve parameters, letting AI agent handle it")
+                # Don't return - continue to pipeline processing below
 
         # === PHASE 2: CORE PROCESSING - USE PIPELINE ===
         from src.handlers.message_pipeline import message_pipeline

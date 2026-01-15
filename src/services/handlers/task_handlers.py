@@ -103,20 +103,50 @@ async def handle_list_tasks(
         # Use mentioned project if found, otherwise use active context
         selected_project_id = mentioned_project_id or current_project_id
 
+        # Scenario 3c: Single project available - Auto-select it
+        if not selected_project_id and len(projects) == 1:
+            selected_project_id = projects[0].get('id')
+            project_name = projects[0].get('nom')
+            log.info(f"✅ Auto-selected single available project: {project_name} (ID: {selected_project_id[:8]}...)")
+
+        # Scenario 3d: Multiple projects available - Show project picker
+        if not selected_project_id and len(projects) > 1:
+            log.info(f"📋 Multiple projects available ({len(projects)}) - Showing project picker")
+            message = get_translation("fr", "list_projects_header")
+
+            tool_outputs = []
+            tool_outputs.append({
+                "tool": "list_projects_tool",
+                "input": {"user_id": user_id},
+                "output": compact_projects(projects)
+            })
+
+            for i, project in enumerate(projects, 1):
+                message += f"{i}. 🏗️ {project.get('nom')}\n"
+
+            message += "\n" + get_translation("fr", "list_projects_footer")
+
+            return {
+                "message": message,
+                "escalation": False,
+                "tools_called": [],
+                "fast_path": True,
+                "tool_outputs": tool_outputs,
+                "list_type": "projects"
+            }
+
         # Log parameter resolution result
         if selected_project_id:
-            resolution_method = "mentioned" if mentioned_project_id else "active_context"
+            resolution_method = (
+                "mentioned" if mentioned_project_id
+                else "active_context" if current_project_id
+                else "auto_selected"
+            )
             log.info(f"✅ Parameter resolution successful: project_id={selected_project_id[:8]}... (method: {resolution_method})")
-        else:
-            log.warning(f"⚠️ Parameter resolution FAILED: No project context available")
-            log.debug(f"   - mentioned_project_id: {mentioned_project_id}")
-            log.debug(f"   - current_project_id: {current_project_id}")
-            log.debug(f"   - message_text: '{message_text}'")
-            log.debug(f"   - available_projects: {len(projects)}")
 
         tool_outputs = []
 
-        # Scenario 4: Has selected project (from message or context)
+        # Scenario 4: Has selected project (from message or context or auto-select)
         if selected_project_id:
             # Use header for showing tasks
             message = get_translation("fr", "list_tasks_header")
