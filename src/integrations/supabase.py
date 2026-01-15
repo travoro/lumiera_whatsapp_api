@@ -765,25 +765,9 @@ class SupabaseClient:
             log.error(f"Error getting recent messages: {e}")
             return []
 
-    async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Get task details by ID.
-
-        Args:
-            task_id: Task ID
-
-        Returns:
-            Task dict or None
-        """
-        try:
-            response = self.client.table("tasks").select("*").eq("id", task_id).execute()
-
-            if response.data:
-                return response.data[0]
-            return None
-
-        except Exception as e:
-            log.error(f"Error getting task: {e}")
-            return None
+    # REMOVED: get_task() method
+    # Tasks are stored in PlanRadar, not in Supabase.
+    # Use planradar_client.get_task(task_id, project_id) instead.
 
 
 # Global instance

@@ -27,19 +27,33 @@ async def get_active_task_context_tool(user_id: str) -> str:
         active_task_id = await project_context_service.get_active_task(user_id)
 
         if active_task_id:
-            # User has active task - get details and ASK FOR CONFIRMATION
-            task = await supabase_client.get_task(active_task_id)
+            # User has active task - get project_id from user context
+            user = supabase_client.get_user(user_id)
+            if not user:
+                return "❌ No user context found. Please try again."
+
+            # Get active project ID from user context
+            active_project_id = user.get("active_project_id")
+            if not active_project_id:
+                return "❌ No active project context. Please select a project first."
+
+            # Get project details to find PlanRadar project ID
+            project = await supabase_client.get_project(active_project_id, user_id=user_id)
+            if not project:
+                return "❌ Project not found. Please select a project first."
+
+            planradar_project_id = project.get("planradar_project_id")
+            project_name = project.get("name", "Unknown Project")
+
+            # Now get task details from PlanRadar using the project ID
+            from src.integrations.planradar import planradar_client
+            task = await planradar_client.get_task(active_task_id, planradar_project_id)
             if task:
-                project_id = task.get("project_id")
-                task_title = task.get("title", "Unknown Task")
+                task_data = task.get("data", {})
+                task_attrs = task_data.get("attributes", {})
+                task_title = task_attrs.get("subject", "Unknown Task")
 
-                # Get project to find PlanRadar project ID
-                project = await supabase_client.get_project(project_id, user_id=user_id)
-                if project:
-                    planradar_project_id = project.get("planradar_project_id")
-                    project_name = project.get("name", "Unknown Project")
-
-                    return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+                return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
 Project: {project_name}
 Task ID: {active_task_id}
@@ -167,13 +181,18 @@ async def get_progress_update_context_tool(user_id: str) -> str:
         if not session:
             return "Aucune session de mise à jour active. Demandez à l'utilisateur pour quelle tâche il souhaite mettre à jour la progression."
 
-        # Get task details
-        task = await supabase_client.get_task(session["task_id"])
-        if not task:
-            return "Erreur : Tâche non trouvée."
+        # Get task details from PlanRadar
+        from src.integrations.planradar import planradar_client
+        task = await planradar_client.get_task(session["task_id"], session["project_id"])
+
+        task_title = "Unknown"
+        if task:
+            task_data = task.get("data", {})
+            task_attrs = task_data.get("attributes", {})
+            task_title = task_attrs.get("subject", "Unknown")
 
         output = f"📋 Session de mise à jour active :\n"
-        output += f"Tâche : {task.get('title', 'Unknown')}\n"
+        output += f"Tâche : {task_title}\n"
         output += f"Projet ID : {session['project_id']}\n\n"
         output += f"Actions déjà effectuées :\n"
         output += f"- Photos ajoutées : {session['images_uploaded']}\n"
@@ -351,9 +370,15 @@ async def start_progress_update_session_tool(
         )
 
         if session_id:
-            # Get task details
-            task = await supabase_client.get_task(task_id)
-            task_title = task.get("title", "Unknown Task") if task else "Unknown Task"
+            # Get task details from PlanRadar
+            from src.integrations.planradar import planradar_client
+            task = await planradar_client.get_task(task_id, project_id)
+
+            task_title = "Unknown Task"
+            if task:
+                task_data = task.get("data", {})
+                task_attrs = task_data.get("attributes", {})
+                task_title = task_attrs.get("subject", "Unknown Task")
 
             return f"✅ Session de mise à jour démarrée pour : {task_title}\n\nQue souhaitez-vous faire ?\n1. 📸 Ajouter une photo\n2. 💬 Laisser un commentaire\n3. ✅ Marquer comme terminé"
         else:

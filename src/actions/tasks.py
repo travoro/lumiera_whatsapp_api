@@ -426,19 +426,20 @@ async def update_task_progress(
         Result dict with success status and message
     """
     try:
-        # Get task to find project_id
-        task = await supabase_client.get_task(task_id)
-        if not task:
+        # Get user to find active project context
+        user = supabase_client.get_user(user_id)
+        if not user:
             return {
                 "success": False,
-                "message": "Tâche non trouvée."
+                "message": "Utilisateur non trouvé."
             }
 
-        project_id = task.get("project_id")
+        # Get active project ID
+        project_id = user.get("active_project_id")
         if not project_id:
             return {
                 "success": False,
-                "message": "Projet non trouvé pour cette tâche."
+                "message": "Aucun projet actif. Veuillez sélectionner un projet d'abord."
             }
 
         # Get project to find planradar_project_id
