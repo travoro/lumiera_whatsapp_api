@@ -702,22 +702,45 @@ class PlanRadarClient:
         self,
         task_id: str,
         project_id: str,
-        status: str,
+        status_id: int,  # 1=Open, 2=In-Progress, 3=Resolved, etc.
+        progress: Optional[int] = None,  # 0-100
         progress_note: Optional[str] = None,
         image_urls: Optional[List[str]] = None,
     ) -> bool:
         """Update task progress with status, notes, and images.
 
+        According to PlanRadar API docs:
+        - Status IDs: 1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected
+        - Use PUT method with JSON:API format
+
         Args:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
-            status: New status for the task
+            status_id: Status ID (1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected)
+            progress: Progress percentage (0-100)
             progress_note: Optional progress note
             image_urls: Optional list of image URLs
+
+        Returns:
+            True if successful
         """
-        # Update status
-        data = {"status": status}
-        result = await self._request("PATCH", f"{self.account_id}/projects/{project_id}/tickets/{task_id}", data=data)
+        # Update status and progress using JSON:API format
+        data = {
+            "data": {
+                "attributes": {
+                    "status-id": status_id
+                }
+            }
+        }
+
+        if progress is not None:
+            data["data"]["attributes"]["progress"] = progress
+
+        result = await self._request(
+            "PUT",
+            f"{self.account_id}/projects/{project_id}/tickets/{task_id}",
+            data=data
+        )
 
         if not result:
             return False
@@ -741,15 +764,45 @@ class PlanRadarClient:
 
         return True
 
-    async def mark_task_complete(self, task_id: str, project_id: str) -> bool:
-        """Mark a task as complete.
+    async def mark_task_complete(
+        self,
+        task_id: str,
+        project_id: str,
+        set_progress_100: bool = True
+    ) -> bool:
+        """Mark a task as complete (Resolved status).
+
+        According to PlanRadar API docs:
+        - Status ID 3 = Resolved (task done)
+        - Use PUT method with JSON:API format
 
         Args:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
+            set_progress_100: If True, also set progress to 100%
+
+        Returns:
+            True if successful
         """
-        data = {"status": "completed"}
-        result = await self._request("PATCH", f"{self.account_id}/projects/{project_id}/tickets/{task_id}", data=data)
+        # Use correct JSON:API format
+        data = {
+            "data": {
+                "attributes": {
+                    "status-id": 3,  # 3 = Resolved (task done)
+                }
+            }
+        }
+
+        # Optionally set progress to 100%
+        if set_progress_100:
+            data["data"]["attributes"]["progress"] = 100
+
+        # Use PUT method (not PATCH)
+        result = await self._request(
+            "PUT",
+            f"{self.account_id}/projects/{project_id}/tickets/{task_id}",
+            data=data
+        )
         return result is not None
 
 

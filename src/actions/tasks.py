@@ -407,15 +407,61 @@ async def get_task_comments(user_id: str, task_id: str, project_id: Optional[str
 async def update_task_progress(
     user_id: str,
     task_id: str,
-    status: str,
+    status_id: int,  # 1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected
+    progress: Optional[int] = None,  # 0-100 percentage
     progress_note: Optional[str] = None,
     image_urls: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Update task progress with status, notes, and images."""
+    """Update task progress with status, progress percentage, notes, and images.
+
+    Args:
+        user_id: User ID
+        task_id: Task ID (PlanRadar UUID)
+        status_id: Status ID (1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected)
+        progress: Optional progress percentage (0-100)
+        progress_note: Optional progress note
+        image_urls: Optional list of image URLs
+
+    Returns:
+        Result dict with success status and message
+    """
     try:
+        # Get task to find project_id
+        task = await supabase_client.get_task(task_id)
+        if not task:
+            return {
+                "success": False,
+                "message": "Tâche non trouvée."
+            }
+
+        project_id = task.get("project_id")
+        if not project_id:
+            return {
+                "success": False,
+                "message": "Projet non trouvé pour cette tâche."
+            }
+
+        # Get project to find planradar_project_id
+        project = await supabase_client.get_project(project_id, user_id=user_id)
+        if not project:
+            return {
+                "success": False,
+                "message": "Projet non trouvé."
+            }
+
+        planradar_project_id = project.get("planradar_project_id")
+        if not planradar_project_id:
+            return {
+                "success": False,
+                "message": "Ce projet n'est pas lié à PlanRadar."
+            }
+
+        # Update via PlanRadar with correct parameters
         success = await planradar_client.update_task_progress(
             task_id=task_id,
-            status=status,
+            project_id=planradar_project_id,
+            status_id=status_id,
+            progress=progress,
             progress_note=progress_note,
             image_urls=image_urls,
         )
@@ -432,16 +478,32 @@ async def update_task_progress(
             action_name="update_task_progress",
             parameters={
                 "task_id": task_id,
-                "status": status,
+                "status_id": status_id,
+                "progress": progress,
                 "has_note": bool(progress_note),
                 "image_count": len(image_urls) if image_urls else 0,
             },
             result={"success": True}
         )
 
+        # Status name mapping for user-friendly message
+        status_names = {
+            1: "Ouvert",
+            2: "En cours",
+            3: "Résolu",
+            4: "Feedback",
+            5: "Fermé",
+            6: "Rejeté"
+        }
+        status_name = status_names.get(status_id, "Inconnu")
+
+        message = f"Progression de la tâche mise à jour : {status_name}"
+        if progress is not None:
+            message += f" ({progress}%)"
+
         return {
             "success": True,
-            "message": "Progression de la tâche mise à jour avec succès."
+            "message": message
         }
 
     except Exception as e:

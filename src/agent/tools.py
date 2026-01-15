@@ -474,30 +474,34 @@ async def update_incident_report_tool(
 async def update_task_progress_tool(
     user_id: str,
     task_id: str,
-    status: str,
+    status_id: int,  # 1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected
+    progress: Optional[int] = None,  # 0-100 percentage
     progress_note: Optional[str] = None,
     image_urls: Optional[List[str]] = None,
 ) -> str:
-    """Update task progress with status, optional notes, and optional images.
+    """Update task progress with status, optional progress percentage, notes, and images.
 
     Args:
         user_id: The ID of the user updating the task
         task_id: The ID of the task to update
-        status: New status for the task (e.g., 'in_progress', 'completed')
+        status_id: Status ID (1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected)
+        progress: Optional progress percentage (0-100)
         progress_note: Optional progress note
         image_urls: Optional list of image URLs showing progress
 
     Returns:
         Success or error message
     """
-    log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status={status}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
+    status_names = {1: "Open", 2: "In-Progress", 3: "Resolved", 4: "Feedback", 5: "Closed", 6: "Rejected"}
+    status_name = status_names.get(status_id, f"ID:{status_id}")
+    log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
 
     result = await tasks.update_task_progress(
-        user_id, task_id, status, progress_note, image_urls
+        user_id, task_id, status_id, progress, progress_note, image_urls
     )
 
     if result["success"]:
-        log.info(f"✅ update_task_progress_tool: Task progress updated to {status}")
+        log.info(f"✅ update_task_progress_tool: Task progress updated to status_id {status_id} ({status_name})")
     else:
         log.warning(f"❌ update_task_progress_tool failed: {result['message']}")
 
@@ -1111,15 +1115,17 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
     @tool
     async def update_task_progress_tool(
         task_id: str,
-        status: str,
+        status_id: int,  # 1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected
+        progress: Optional[int] = None,  # 0-100 percentage
         progress_note: Optional[str] = None,
         image_urls: Optional[List[str]] = None,
     ) -> str:
-        """Update task progress with status, optional notes, and optional images.
+        """Update task progress with status, optional progress percentage, notes, and images.
 
         Args:
             task_id: The ID of the task to update
-            status: New status for the task (e.g., 'in_progress', 'completed')
+            status_id: Status ID (1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected)
+            progress: Optional progress percentage (0-100)
             progress_note: Optional progress note
             image_urls: Optional list of image URLs showing progress
 
@@ -1127,15 +1133,17 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status={status}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
+        status_names = {1: "Open", 2: "In-Progress", 3: "Resolved", 4: "Feedback", 5: "Closed", 6: "Rejected"}
+        status_name = status_names.get(status_id, f"ID:{status_id}")
+        log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
         get_execution_context().record_tool_call("update_task_progress_tool")
 
         result = await tasks.update_task_progress(
-            user_id, task_id, status, progress_note, image_urls
+            user_id, task_id, status_id, progress, progress_note, image_urls
         )
 
         if result["success"]:
-            log.info(f"✅ update_task_progress_tool: Task progress updated to {status}")
+            log.info(f"✅ update_task_progress_tool: Task progress updated to status_id {status_id} ({status_name})")
         else:
             log.warning(f"❌ update_task_progress_tool failed: {result['message']}")
 
