@@ -146,7 +146,8 @@ class ProgressUpdateAgent:
             tools=self.tools,
             verbose=True,
             max_iterations=10,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            return_intermediate_steps=True  # CRITICAL: Need this to analyze tool calls!
         )
 
         log.info("✅ Progress Update Agent initialized")
