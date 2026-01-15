@@ -84,11 +84,8 @@ async def handle_direct_action(
         )
 
         if result:
-            # Return structured response with tool_outputs from fast path
-            return {
-                "message": result.get("message"),
-                "tool_outputs": result.get("tool_outputs", [])
-            }
+            # Return full structured response from handler (including list_type)
+            return result
         else:
             # Fallback to AI if fast path fails
             return None
@@ -110,11 +107,8 @@ async def handle_direct_action(
         )
 
         if result:
-            # Return structured response with tool_outputs from fast path
-            return {
-                "message": result.get("message"),
-                "tool_outputs": result.get("tool_outputs", [])
-            }
+            # Return full structured response from handler (including list_type, carousel_data, etc.)
+            return result
         else:
             # Fallback to AI if fast path fails
             return None
@@ -152,11 +146,8 @@ async def handle_direct_action(
         )
 
         if result:
-            # Return structured response with tool_outputs from fast path
-            return {
-                "message": result.get("message"),
-                "tool_outputs": result.get("tool_outputs", [])
-            }
+            # Return full structured response from handler (including list_type, carousel_data, etc.)
+            return result
         else:
             # Fallback to AI if fast path fails
             return None
@@ -178,11 +169,8 @@ async def handle_direct_action(
         )
 
         if result:
-            # Return structured response with tool_outputs from fast path
-            return {
-                "message": result.get("message"),
-                "tool_outputs": result.get("tool_outputs", [])
-            }
+            # Return full structured response from handler (including list_type, carousel_data, etc.)
+            return result
         else:
             # Fallback to AI if fast path fails
             return None
