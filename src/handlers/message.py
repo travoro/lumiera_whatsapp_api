@@ -814,6 +814,9 @@ async def process_inbound_message(
 
         # Check if specialized agent provided response_type metadata
         response_type = response_data.get("response_type", None)
+        log.info(f"🎯 Handler received response_type: {response_type}")
+        log.info(f"   list_type: {response_data.get('list_type')}")
+        log.info(f"   intent: {intent}")
 
         # Decision logic based on response_type (from specialized agents) or intent
         if response_type == "interactive_list":

@@ -182,8 +182,10 @@ class MessagePipeline:
             # Include response_type and list_type if present (from specialized agents)
             if hasattr(ctx, 'response_type') and ctx.response_type:
                 response_data["response_type"] = ctx.response_type
+                log.info(f"📦 Pipeline forwarding response_type: {ctx.response_type}")
             if hasattr(ctx, 'list_type') and ctx.list_type:
                 response_data["list_type"] = ctx.list_type
+                log.info(f"📦 Pipeline forwarding list_type: {ctx.list_type}")
 
             return Result.ok(response_data)
 

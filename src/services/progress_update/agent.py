@@ -199,6 +199,7 @@ class ProgressUpdateAgent:
 
             # Analyze intermediate_steps to determine response type
             intermediate_steps = result.get("intermediate_steps", [])
+            log.info(f"🔍 Analyzing {len(intermediate_steps)} intermediate steps")
 
             for action, observation in intermediate_steps:
                 if not hasattr(action, 'tool'):
@@ -215,6 +216,11 @@ class ProgressUpdateAgent:
 
                 # Case 2: Task list available
                 elif tool_name == 'get_active_task_context_tool':
+                    log.info(f"🔍 Checking get_active_task_context_tool observation")
+                    log.info(f"   Has 'Show the user this list': {'Show the user this list' in observation}")
+                    log.info(f"   Has 'Number': {'Number' in observation}")
+                    log.info(f"   Observation preview: {observation[:200]}")
+
                     # Check if observation contains task list with IDs
                     if 'Show the user this list' in observation and 'Number' in observation:
                         # Extract task list from observation
@@ -230,6 +236,9 @@ class ProgressUpdateAgent:
                             user_list = user_list_match.group(1).strip()
                             id_mapping = id_mapping_match.group(1).strip()
 
+                            log.info(f"📋 Extracted user list: {user_list[:100]}")
+                            log.info(f"🔗 Extracted ID mapping: {id_mapping[:100]}")
+
                             # Parse ID mapping: "Number 1 = ID abc-123"
                             id_pattern = r'Number (\d+) = ID ([a-f0-9-]+)'
                             id_matches = re.findall(id_pattern, id_mapping)
@@ -237,6 +246,8 @@ class ProgressUpdateAgent:
                             # Parse user list: "1. Task title"
                             task_pattern = r'(\d+)\.\s+(.+?)(?:\n|$)'
                             task_matches = re.findall(task_pattern, user_list)
+
+                            log.info(f"🔢 ID matches: {len(id_matches)}, Task matches: {len(task_matches)}")
 
                             if id_matches and task_matches:
                                 # Build task data
@@ -271,6 +282,12 @@ class ProgressUpdateAgent:
                     if 'Session de mise à jour démarrée' in observation:
                         response["response_type"] = "session_started"
                         log.info("✅ Progress update session started")
+
+            log.info(f"✅ Returning response with response_type: {response.get('response_type')}")
+            if response.get("list_type"):
+                log.info(f"   list_type: {response.get('list_type')}")
+            if response.get("tool_outputs"):
+                log.info(f"   tool_outputs: {len(response.get('tool_outputs'))} items")
 
             return response
 

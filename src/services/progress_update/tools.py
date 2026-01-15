@@ -57,10 +57,14 @@ async def get_active_task_context_tool(user_id: str) -> str:
                     project_id=active_project_id
                 )
 
+                log.info(f"📋 list_tasks result: success={tasks_result.get('success')}, data_length={len(tasks_result.get('data', []))}")
+
                 if tasks_result.get("success"):
                     tasks = tasks_result.get("data", [])  # list_tasks returns "data", not "tasks"
+                    log.info(f"📊 Extracted tasks: {len(tasks)} tasks found")
 
                     if tasks:
+                        log.info(f"✅ Building task list for user display")
                         # Format task list - SIMPLE format for user display
                         task_list_display = "\n".join([
                             f"{idx}. {task.get('title', 'No title')}"
@@ -73,7 +77,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
                             for idx, task in enumerate(tasks[:10], 1)
                         ])
 
-                        return f"""⚠️ Active project: {project_name}
+                        result_text = f"""⚠️ Active project: {project_name}
 But NO active task selected.
 
 Show the user this list (SIMPLE FORMAT, no IDs visible):
@@ -84,6 +88,10 @@ Task ID mapping (for your use only, don't show to user):
 
 ASK the user: "Quelle tâche souhaitez-vous mettre à jour ?"
 When they select by number or name, use the ID mapping above with start_progress_update_session_tool (task_id, project_id={planradar_project_id})"""
+
+                        log.info(f"🎯 Tool returning task list with {len(tasks)} tasks")
+                        log.info(f"📝 First task: {tasks[0].get('title', 'No title')}")
+                        return result_text
                     else:
                         return f"⚠️ Active project: {project_name}\nBut NO tasks found for this project. Ask user if they want to select a different project."
                 else:
