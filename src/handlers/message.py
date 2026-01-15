@@ -551,19 +551,54 @@ async def handle_direct_action(
                         break
 
             elif list_type == "option" and found_tool_name == 'get_active_task_context_tool':
-                # For "option" type from progress update, handle differently
-                log.info(f"📋 Option selection detected - checking if from progress update")
-                # User selected an option from confirmation (1=Yes, 2=No)
-                option_text = "Oui, c'est ça" if option_number == "1" else "Non, changer de tâche"
+                # For "option" type from progress update confirmation
+                log.info(f"📋 Option selection detected from progress update confirmation")
 
-                # Route to progress update agent
-                return await handle_direct_action(
-                    action="update_progress",
-                    user_id=user_id,
-                    phone_number=phone_number,
-                    language=language,
-                    message_body=option_text
-                )
+                # Extract confirmation data from tool_outputs
+                confirmation_data = None
+                for tool_output in tool_outputs:
+                    if tool_output.get('tool') == 'get_active_task_context_tool':
+                        output = tool_output.get('output', {})
+                        if 'confirmation' in output:
+                            confirmation_data = output['confirmation']
+                            log.info(f"   Found confirmation data: {confirmation_data}")
+                            break
+
+                if not confirmation_data:
+                    log.error(f"❌ No confirmation data found in tool_outputs")
+                    return None
+
+                # User selected an option from confirmation (1=Yes, 2=No)
+                if option_number == "1":
+                    # User confirmed - start progress update session directly
+                    log.info(f"✅ User confirmed task - starting progress update session")
+                    log.info(f"   Task ID: {confirmation_data.get('task_id')}")
+                    log.info(f"   Project ID: {confirmation_data.get('project_id')}")
+
+                    from src.services.progress_update.tools import start_progress_update_session_tool
+
+                    # Start session directly
+                    result_text = await start_progress_update_session_tool.ainvoke({
+                        "user_id": user_id,
+                        "task_id": confirmation_data.get('task_id'),
+                        "project_id": confirmation_data.get('project_id')
+                    })
+
+                    return {
+                        "message": result_text,
+                        "tool_outputs": [],
+                        "agent_used": "progress_update"
+                    }
+                else:
+                    # User said no - route back to agent to show task list
+                    log.info(f"❌ User declined - routing back to show task list")
+                    return await handle_direct_action(
+                        action="update_progress",
+                        user_id=user_id,
+                        phone_number=phone_number,
+                        language=language,
+                        message_body="Non, changer de tâche"
+                    )
 
             elif list_type in ["project", "projects", "option"]:
                 # User selected a project from the list → Show project tasks

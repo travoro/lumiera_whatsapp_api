@@ -241,9 +241,30 @@ class ProgressUpdateAgent:
                     # Check if this is a CONFIRMATION (Yes/No options)
                     if 'CONFIRMATION NEEDED' in observation:
                         # This is a confirmation, not a task list
+                        # Extract task_id and project_id from observation for routing
+                        import re
+
+                        task_id_match = re.search(r'Task ID: ([a-f0-9-]+)', observation)
+                        project_id_match = re.search(r'PlanRadar Project ID: ([a-f0-9-]+)', observation)
+                        task_title_match = re.search(r'Task: (.+)', observation)
+
+                        confirmation_data = {}
+                        if task_id_match:
+                            confirmation_data["task_id"] = task_id_match.group(1)
+                        if project_id_match:
+                            confirmation_data["project_id"] = project_id_match.group(1)
+                        if task_title_match:
+                            confirmation_data["task_title"] = task_title_match.group(1).strip()
+
+                        # Add tool_outputs so message history search can find this
+                        response["tool_outputs"] = [{
+                            "tool": "get_active_task_context_tool",
+                            "output": {"confirmation": confirmation_data}
+                        }]
                         response["response_type"] = "interactive_list"
                         response["list_type"] = "option"  # Use "option" not "tasks"
                         log.info(f"✅ Detected confirmation → response_type=interactive_list, list_type=option")
+                        log.info(f"   Confirmation data: {confirmation_data}")
                         break
 
                     # Check if observation contains task list with IDs
