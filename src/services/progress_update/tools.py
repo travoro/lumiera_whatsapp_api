@@ -5,6 +5,7 @@ from src.services.progress_update.state import progress_update_state
 from src.services.project_context import project_context_service
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
+from src.actions.tasks import list_tasks
 from src.utils.logger import log
 
 
@@ -51,19 +52,22 @@ async def get_active_task_context_tool(user_id: str) -> str:
                 planradar_project_id = project.get("planradar_project_id")
 
                 # Get tasks for this project
-                tasks = await supabase_client.list_tasks(
+                tasks_result = await list_tasks(
                     user_id=user_id,
                     project_id=active_project_id
                 )
 
-                if tasks:
-                    # Format task list with IDs for agent to use
-                    task_list = "\n".join([
-                        f"{idx}. {task.get('title', 'No title')} - {task.get('status', 'Unknown status')} [ID: {task.get('id')}]"
-                        for idx, task in enumerate(tasks[:10], 1)  # Limit to 10
-                    ])
+                if tasks_result.get("success"):
+                    tasks = tasks_result.get("tasks", [])
 
-                    return f"""⚠️ Active project: {project_name}
+                    if tasks:
+                        # Format task list with IDs for agent to use
+                        task_list = "\n".join([
+                            f"{idx}. {task.get('title', 'No title')} - {task.get('status', 'Unknown status')} [ID: {task.get('id')}]"
+                            for idx, task in enumerate(tasks[:10], 1)  # Limit to 10
+                        ])
+
+                        return f"""⚠️ Active project: {project_name}
 But NO active task selected.
 
 Available tasks:
@@ -71,8 +75,10 @@ Available tasks:
 
 ASK the user to select a task by number (1-{min(len(tasks), 10)}) or name.
 Once they respond, extract the corresponding task_id from the list above and use start_progress_update_session_tool with task_id and project_id={planradar_project_id}"""
+                    else:
+                        return f"⚠️ Active project: {project_name}\nBut NO tasks found for this project. Ask user if they want to select a different project."
                 else:
-                    return f"⚠️ Active project: {project_name}\nBut NO tasks found for this project. Ask user if they want to select a different project."
+                    return f"⚠️ Active project: {project_name}\nError retrieving tasks: {tasks_result.get('message', 'Unknown error')}. Ask user to provide task name or number."
 
         # No active context
         return "❌ No active project or task context. Ask user to select a project first, then a task."
