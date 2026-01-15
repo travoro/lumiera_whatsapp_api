@@ -727,6 +727,64 @@ class SupabaseClient:
             log.warning(f"Error logging intent classification: {e}")
             return False
 
+    # ==================== PROGRESS UPDATE HELPERS ====================
+
+    async def get_recent_messages(
+        self,
+        user_id: str,
+        limit: int = 5
+    ) -> list:
+        """Get recent message history for user.
+
+        Args:
+            user_id: User ID
+            limit: Number of messages to retrieve
+
+        Returns:
+            List of recent messages (dicts with role, content)
+        """
+        try:
+            response = self.client.table("messages").select(
+                "content, direction, created_at"
+            ).eq("subcontractor_id", user_id).order(
+                "created_at", desc=True
+            ).limit(limit).execute()
+
+            if response.data:
+                messages = []
+                for msg in reversed(response.data):  # Chronological order
+                    role = "user" if msg["direction"] == "inbound" else "assistant"
+                    messages.append({
+                        "role": role,
+                        "content": msg["content"]
+                    })
+                return messages
+            return []
+
+        except Exception as e:
+            log.error(f"Error getting recent messages: {e}")
+            return []
+
+    async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get task details by ID.
+
+        Args:
+            task_id: Task ID
+
+        Returns:
+            Task dict or None
+        """
+        try:
+            response = self.client.table("tasks").select("*").eq("id", task_id).execute()
+
+            if response.data:
+                return response.data[0]
+            return None
+
+        except Exception as e:
+            log.error(f"Error getting task: {e}")
+            return None
+
 
 # Global instance
 supabase_client = SupabaseClient()

@@ -272,26 +272,36 @@ async def handle_direct_action(
             return None
 
     elif action == "update_progress":
-        # Route through intent router (proper layering)
-        log.info(f"✅ Routing update_progress intent for user {user_id}")
+        # Route to specialized Progress Update Agent
+        log.info(f"✅ Routing update_progress to specialized agent for user {user_id}")
+        from src.services.progress_update.agent import progress_update_agent
         from src.integrations.supabase import supabase_client
 
-        # Get user name using centralized helper
+        # Get user name
         user_name = supabase_client.get_user_name(user_id)
 
-        result = await intent_router.route_intent(
-            intent="update_progress",
+        # Get recent chat history (last 5 messages)
+        chat_history = await supabase_client.get_recent_messages(user_id, limit=5)
+
+        # Route to specialized agent
+        result = await progress_update_agent.process(
             user_id=user_id,
-            phone_number=phone_number,
             user_name=user_name,
-            language=language
+            language=language,
+            message=message_body,
+            chat_history=chat_history,
+            media_url=media_url,
+            media_type=media_type
         )
 
-        if result:
-            # Return full structured response from handler (including list_type, carousel_data, etc.)
-            return result
+        if result.get("success"):
+            return {
+                "message": result["message"],
+                "tool_outputs": [],
+                "agent_used": result.get("agent_used")
+            }
         else:
-            # Fallback to AI if fast path fails
+            # Fallback to full AI if specialized agent fails
             return None
 
     # Handle interactive list selections (task_1_fr, tasks_1_fr, project_2_fr, projects_2_fr, option_3_fr, etc.)
