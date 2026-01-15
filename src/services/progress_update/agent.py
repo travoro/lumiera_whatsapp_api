@@ -244,8 +244,8 @@ class ProgressUpdateAgent:
                         # Extract task_id and project_id from observation for routing
                         import re
 
-                        task_id_match = re.search(r'Task ID: ([a-f0-9-]+)', observation)
-                        project_id_match = re.search(r'PlanRadar Project ID: ([a-f0-9-]+)', observation)
+                        task_id_match = re.search(r'Task ID: ([a-zA-Z0-9-]+)', observation)
+                        project_id_match = re.search(r'PlanRadar Project ID: ([a-zA-Z0-9-]+)', observation)
                         task_title_match = re.search(r'Task: (.+)', observation)
 
                         confirmation_data = {}

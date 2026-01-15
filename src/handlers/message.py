@@ -576,12 +576,34 @@ async def handle_direct_action(
                     log.info(f"   Project ID: {confirmation_data.get('project_id')}")
 
                     from src.services.progress_update.tools import start_progress_update_session_tool
+                    from src.integrations.supabase import supabase_client
+
+                    # Get project_id - if not in confirmation data, get from user context
+                    project_id = confirmation_data.get('project_id')
+                    if not project_id:
+                        log.warning(f"⚠️ No project_id in confirmation data, fetching from user context")
+                        # Get user's active project
+                        user = supabase_client.get_user(user_id)
+                        if user and user.get("active_project_id"):
+                            active_project_id = user["active_project_id"]
+                            project = await supabase_client.get_project(active_project_id, user_id=user_id)
+                            if project:
+                                project_id = project.get("planradar_project_id")
+                                log.info(f"   ✅ Retrieved project_id from context: {project_id}")
+
+                    if not project_id:
+                        log.error(f"❌ Cannot start session: no project_id available")
+                        return {
+                            "message": "❌ Erreur : impossible de démarrer la session de mise à jour. Veuillez réessayer.",
+                            "tool_outputs": [],
+                            "agent_used": "progress_update"
+                        }
 
                     # Start session directly
                     result_text = await start_progress_update_session_tool.ainvoke({
                         "user_id": user_id,
                         "task_id": confirmation_data.get('task_id'),
-                        "project_id": confirmation_data.get('project_id')
+                        "project_id": project_id
                     })
 
                     return {
