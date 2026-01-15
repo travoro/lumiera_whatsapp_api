@@ -333,8 +333,14 @@ async def get_documents_tool(user_id: str, project_id: str, folder_id: Optional[
 
     output = f"{result['message']}\n\n"
     for i, doc in enumerate(result["data"], 1):
-        output += f"{i}. {doc['name']}\n"
+        output += f"{i}. {doc['name']}"
+        if doc.get('component_name'):
+            output += f" (Composant: {doc['component_name']})"
+        output += "\n"
         output += f"   Type: {doc['type']}\n"
+        if doc.get('size'):
+            size_mb = doc['size'] / (1024 * 1024)
+            output += f"   Taille: {size_mb:.2f} MB\n"
         output += f"   URL: {doc['url']}\n\n"
 
     log.info(f"✅ get_documents_tool: Returned {len(result['data'])} documents")
@@ -968,8 +974,14 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
 
         output = f"{result['message']}\n\n"
         for i, doc in enumerate(result["data"], 1):
-            output += f"{i}. {doc['name']}\n"
+            output += f"{i}. {doc['name']}"
+            if doc.get('component_name'):
+                output += f" (Composant: {doc['component_name']})"
+            output += "\n"
             output += f"   Type: {doc['type']}\n"
+            if doc.get('size'):
+                size_mb = doc['size'] / (1024 * 1024)
+                output += f"   Taille: {size_mb:.2f} MB\n"
             output += f"   URL: {doc['url']}\n\n"
 
         log.info(f"✅ get_documents_tool: Returned {len(result['data'])} documents")

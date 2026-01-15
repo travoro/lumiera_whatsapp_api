@@ -41,10 +41,10 @@ async def get_documents(
             }
 
         # Fetch documents from PlanRadar using PlanRadar project ID
+        # Use get_project_documents() which retrieves plans via components workflow
         try:
-            documents = await planradar_client.get_documents(
-                project_id=planradar_project_id,
-                folder_id=folder_id,
+            documents = await planradar_client.get_project_documents(
+                project_id=planradar_project_id
             )
         except Exception as api_error:
             # Handle rate limit errors specifically
@@ -66,15 +66,17 @@ async def get_documents(
             }
 
         # Format documents for display
+        # get_project_documents() returns plans with component info
         formatted_docs = []
         for doc in documents:
             formatted_docs.append({
                 "id": doc.get("id"),
-                "name": doc.get("name"),
-                "type": doc.get("type"),
-                "url": doc.get("url"),
-                "size": doc.get("size"),
-                "created_at": doc.get("created_at"),
+                "name": doc.get("name"),  # Plan name (e.g., "La_plateforme.pdf")
+                "type": doc.get("content_type", "application/pdf"),  # MIME type
+                "url": doc.get("url"),  # original-url from PlanRadar
+                "size": doc.get("file_size"),  # File size in bytes
+                "component_name": doc.get("component_name"),  # Room/area name (e.g., "Principal")
+                "thumbnail_url": doc.get("thumbnail_url"),  # Optional thumbnail
             })
 
         # Log action

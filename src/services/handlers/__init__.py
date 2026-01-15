@@ -26,6 +26,7 @@ INTENT_HANDLERS = {
     "list_tasks": handle_list_tasks,
     "task_details": handle_task_details,
     "list_documents": handle_list_documents,
+    "view_documents": handle_list_documents,  # Same handler as list_documents
     "escalate": handle_escalation,
     "report_incident": handle_report_incident,
     "update_progress": handle_update_progress,
