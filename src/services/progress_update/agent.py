@@ -5,6 +5,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from src.config import settings
 from src.services.progress_update.tools import (
+    get_active_task_context_tool,
     get_progress_update_context_tool,
     add_progress_image_tool,
     add_progress_comment_tool,
@@ -31,9 +32,11 @@ CONTEXTE UTILISATEUR :
 RÈGLES IMPORTANTES :
 
 1. **Contexte de projet/tâche** :
-   - Si l'utilisateur n'a pas de projet actif, demande quel projet
-   - Si l'utilisateur n'a pas de tâche active, montre les tâches disponibles
-   - Utilise start_progress_update_session_tool pour démarrer une session
+   - TOUJOURS appeler get_active_task_context_tool EN PREMIER pour vérifier si l'utilisateur a déjà un projet/tâche actif
+   - Si active_task_id existe : Utilise start_progress_update_session_tool IMMÉDIATEMENT avec les IDs retournés
+   - Si seulement active_project_id existe : Demande quelle tâche l'utilisateur souhaite mettre à jour
+   - Si aucun contexte : Demande d'abord le projet, puis la tâche
+   - NE JAMAIS demander de sélectionner un projet/tâche si le contexte existe déjà!
 
 2. **Actions multiples** :
    - L'utilisateur peut effectuer plusieurs actions (photo + commentaire + compléter)
@@ -70,7 +73,8 @@ RÈGLES IMPORTANTES :
    - Résume à la fin
 
 OUTILS DISPONIBLES :
-- get_progress_update_context_tool : Voir l'état actuel
+- get_active_task_context_tool : Vérifier le contexte actif (projet/tâche) - UTILISE CECI EN PREMIER!
+- get_progress_update_context_tool : Voir l'état de la session de mise à jour
 - start_progress_update_session_tool : Démarrer une session pour une tâche
 - add_progress_image_tool : Ajouter une photo
 - add_progress_comment_tool : Ajouter un commentaire
@@ -99,6 +103,7 @@ class ProgressUpdateAgent:
 
         # Create tools list
         self.tools = [
+            get_active_task_context_tool,
             get_progress_update_context_tool,
             start_progress_update_session_tool,
             add_progress_image_tool,

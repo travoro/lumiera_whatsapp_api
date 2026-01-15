@@ -2,9 +2,60 @@
 from langchain.tools import tool
 from typing import Optional
 from src.services.progress_update.state import progress_update_state
+from src.services.project_context import project_context_service
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
+
+
+@tool
+async def get_active_task_context_tool(user_id: str) -> str:
+    """Check if user has an active project and task in context.
+
+    This should be called FIRST before asking user to select project/task.
+    Returns the active task info if available, or indicates what's missing.
+
+    Args:
+        user_id: User ID
+
+    Returns:
+        Context information about active project/task or what's needed
+    """
+    try:
+        # Check for active task (1 hour expiration)
+        active_task_id = await project_context_service.get_active_task(user_id)
+
+        if active_task_id:
+            # User has active task - get details
+            task = await supabase_client.get_task(active_task_id)
+            if task:
+                project_id = task.get("project_id")
+                task_title = task.get("title", "Unknown Task")
+
+                # Get project to find PlanRadar project ID
+                project = await supabase_client.get_project(project_id, user_id=user_id)
+                if project:
+                    planradar_project_id = project.get("planradar_project_id")
+                    project_name = project.get("name", "Unknown Project")
+
+                    return f"✅ ACTIVE CONTEXT FOUND:\nTask: {task_title}\nProject: {project_name}\nTask ID: {active_task_id}\nPlanRadar Project ID: {planradar_project_id}\n\nUSE start_progress_update_session_tool with these IDs immediately!"
+
+        # Check for active project (7 hour expiration)
+        active_project_id = await project_context_service.get_active_project(user_id)
+
+        if active_project_id:
+            # User has active project but no active task
+            project = await supabase_client.get_project(active_project_id, user_id=user_id)
+            if project:
+                project_name = project.get("name", "Unknown Project")
+                return f"⚠️ Active project found: {project_name} (ID: {active_project_id})\nBut NO active task. Ask user which task to update."
+
+        # No active context
+        return "❌ No active project or task context. Ask user to select a project first, then a task."
+
+    except Exception as e:
+        log.error(f"Error in get_active_task_context_tool: {e}")
+        return f"Erreur lors de la vérification du contexte : {str(e)}"
 
 
 @tool
