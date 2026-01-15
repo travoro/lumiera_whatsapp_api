@@ -703,11 +703,21 @@ class PlanRadarClient:
         try:
             log.info(f"📸 Downloading image from {image_url[:100]}...")
 
+            # Check if this is a Twilio URL and add authentication
+            auth = None
+            if "api.twilio.com" in image_url:
+                # Twilio media URLs require basic auth
+                from src.config import settings
+                auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+                log.info("   🔐 Using Twilio authentication for media download")
+
             # Download image
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(image_url)
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.get(image_url, auth=auth)
                 if response.status_code != 200:
                     log.error(f"   ❌ Failed to download image: {response.status_code}")
+                    if response.text:
+                        log.error(f"   Error details: {response.text[:200]}")
                     return False
 
                 image_data = response.content
