@@ -2,6 +2,9 @@
 from typing import Optional, List, Dict, Any
 import json
 import requests
+import tempfile
+import os
+from pathlib import Path
 from requests.auth import HTTPBasicAuth
 from twilio.rest import Client
 from twilio.request_validator import RequestValidator
@@ -364,6 +367,156 @@ class TwilioClient:
         except Exception as e:
             log.error(f"Error sending interactive buttons: {e}")
             log.warning("Interactive buttons may not be supported on your Twilio account tier")
+            return None
+
+    def download_and_upload_media(
+        self,
+        media_url: str,
+        content_type: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> Optional[str]:
+        """Download media from external URL and save with proper filename.
+
+        This is needed when external URLs (like PlanRadar S3) are protected
+        and Twilio can't fetch them directly (error 63019).
+
+        Args:
+            media_url: The URL of the media to download
+            content_type: Optional content type (e.g., 'application/pdf')
+            filename: Optional desired filename (e.g., 'La_plateforme.pdf')
+
+        Returns:
+            Local file path if successful, None otherwise
+        """
+        temp_file_path = None
+        try:
+            log.info(f"📥 Downloading media from external URL...")
+            log.info(f"   URL: {media_url[:100]}...")
+            if filename:
+                log.info(f"   Target filename: {filename}")
+
+            # Download the file
+            response = requests.get(media_url, timeout=30)
+            response.raise_for_status()
+
+            file_size = len(response.content)
+            log.info(f"   ✅ Downloaded {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+
+            # Determine file extension from content type or URL
+            extension = ".bin"  # Default
+            if content_type:
+                if "pdf" in content_type.lower():
+                    extension = ".pdf"
+                elif "png" in content_type.lower():
+                    extension = ".png"
+                elif "jpeg" in content_type.lower() or "jpg" in content_type.lower():
+                    extension = ".jpg"
+            else:
+                # Try to extract from URL
+                url_path = media_url.split('?')[0]  # Remove query params
+                if url_path.endswith('.pdf'):
+                    extension = '.pdf'
+                elif url_path.endswith('.png'):
+                    extension = '.png'
+                elif url_path.endswith('.jpg') or url_path.endswith('.jpeg'):
+                    extension = '.jpg'
+
+            log.info(f"   📄 File extension: {extension}")
+
+            # Use provided filename or generate temp name
+            if filename:
+                # Save with the actual filename in /tmp
+                import re
+                # Sanitize filename for filesystem
+                safe_filename = re.sub(r'[^\w\s\-\.]', '_', filename)
+                # Ensure the file has the proper extension
+                if not safe_filename.endswith(extension):
+                    safe_filename += extension
+                temp_file_path = os.path.join(tempfile.gettempdir(), safe_filename)
+            else:
+                # Save to temporary file with auto-generated name
+                with tempfile.NamedTemporaryFile(mode='wb', suffix=extension, delete=False) as temp_file:
+                    temp_file.write(response.content)
+                    temp_file_path = temp_file.name
+                    log.info(f"   💾 Saved to temporary file: {temp_file_path}")
+                    return temp_file_path
+
+            # Write content to the named file
+            with open(temp_file_path, 'wb') as f:
+                f.write(response.content)
+
+            log.info(f"   💾 Saved to: {temp_file_path}")
+            log.info(f"   ✅ File ready with correct filename")
+
+            return temp_file_path
+
+        except Exception as e:
+            log.error(f"   ❌ Error downloading/uploading media: {e}")
+            # Clean up temp file if it was created
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                    log.info(f"   🗑️ Cleaned up temp file after error")
+                except Exception as cleanup_error:
+                    log.warning(f"   ⚠️ Could not clean up temp file: {cleanup_error}")
+            return None
+
+    def send_message_with_local_media(
+        self,
+        to: str,
+        body: str,
+        local_file_path: str,
+        server_url: str,
+    ) -> Optional[str]:
+        """Send WhatsApp message with a local file attachment via temporary hosting.
+
+        Args:
+            to: Recipient phone number
+            body: Message body text
+            local_file_path: Path to local file to send
+            server_url: Base URL of this server (e.g., https://api.example.com)
+
+        Returns:
+            Message SID if successful, None otherwise
+        """
+        try:
+            # Ensure 'to' number is in WhatsApp format
+            if not to.startswith("whatsapp:"):
+                to = f"whatsapp:{to}"
+
+            # Ensure 'from' number is in WhatsApp format
+            from_number = self.whatsapp_number
+            if not from_number.startswith("whatsapp:"):
+                from_number = f"whatsapp:{from_number}"
+
+            log.info(f"📤 Sending message with local file via temporary hosting")
+            log.info(f"   To: {to}")
+            log.info(f"   File: {local_file_path}")
+            log.info(f"   Size: {os.path.getsize(local_file_path)} bytes")
+
+            # Register the file for temporary hosting
+            from src.handlers.media import register_temp_file
+            temp_url_path = register_temp_file(local_file_path)
+
+            # Build full URL
+            media_url = f"{server_url}{temp_url_path}"
+            log.info(f"   📡 Temporary URL: {media_url}")
+
+            # Send message with media URL
+            message = self.client.messages.create(
+                from_=from_number,
+                to=to,
+                body=body,
+                media_url=[media_url]
+            )
+
+            log.info(f"   ✅ Message sent with temp hosted file, SID: {message.sid}")
+            return message.sid
+
+        except Exception as e:
+            log.error(f"   ❌ Error sending message with local media: {e}")
+            import traceback
+            log.error(f"   Traceback: {traceback.format_exc()}")
             return None
 
     def validate_webhook(

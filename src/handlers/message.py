@@ -2,6 +2,7 @@
 from typing import Optional, Dict, Any
 import httpx
 import re
+import os
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from src.agent.agent import lumiera_agent
 from src.agent.tools import (
@@ -590,21 +591,81 @@ async def process_inbound_message(
 
                         for idx, card in enumerate(cards, 1):
                             media_url = card.get('media_url')
+                            media_type = card.get('media_type', 'unknown')
+                            media_name = card.get('media_name', 'document')
+
                             if not media_url:
                                 log.warning(f"   ⚠️ Attachment {idx}: No media_url, skipping")
                                 continue
 
-                            log.info(f"   📤 Sending attachment {idx}/{len(cards)}: {media_url[:80]}...")
+                            # Log what type of file we're sending
+                            file_type = "PDF document" if "pdf" in media_type.lower() else f"{media_type}"
+                            log.info(f"   📤 Sending attachment {idx}/{len(cards)}: {file_type}")
+                            log.info(f"      Name: {media_name}")
+                            log.info(f"      URL: {media_url[:80]}...")
 
-                            # Send each attachment as a separate message
-                            message_sid = twilio_client.send_message(
-                                to=from_number,
-                                body=" ",  # Just space, no text
-                                media_url=[media_url]
+                            # Download the file to temp storage (to avoid Twilio error 63019)
+                            log.info(f"   📥 Step 1: Downloading file from external URL...")
+                            local_file_path = twilio_client.download_and_upload_media(
+                                media_url=media_url,
+                                content_type=media_type,
+                                filename=media_name  # Save with actual filename
                             )
 
+                            if not local_file_path:
+                                log.error(f"   ❌ Failed to download attachment {idx}, skipping")
+                                continue
+
+                            # Send the local file without text (just the file)
+                            log.info(f"   📤 Step 2: Uploading and sending file via Twilio...")
+                            from src.config import settings
+                            message_sid = twilio_client.send_message_with_local_media(
+                                to=from_number,
+                                body=" ",  # No text, just the file
+                                local_file_path=local_file_path,
+                                server_url=settings.server_url
+                            )
+
+                            # Note: We do NOT delete the file immediately because Twilio needs to download it
+                            # The media handler will auto-cleanup the file after 5 minutes
+                            log.info(f"   ⏰ File will auto-cleanup in 5 minutes")
+
                             if message_sid:
-                                log.info(f"   ✅ Attachment {idx} sent: {message_sid}")
+                                log.info(f"   ✅ {file_type} successfully sent to Twilio")
+                                log.info(f"   📬 Message SID: {message_sid}")
+
+                                # Fetch message status to check for delivery issues (immediate)
+                                try:
+                                    fetched_msg = twilio_client.client.messages(message_sid).fetch()
+                                    log.info(f"   📊 Initial status: {fetched_msg.status}")
+                                    if fetched_msg.error_code:
+                                        log.error(f"   ⚠️ Twilio error code: {fetched_msg.error_code}")
+                                    if fetched_msg.error_message:
+                                        log.error(f"   ⚠️ Twilio error message: {fetched_msg.error_message}")
+                                except Exception as fetch_error:
+                                    log.warning(f"   ⚠️ Could not fetch immediate status: {fetch_error}")
+
+                                # Wait a bit and check final status
+                                try:
+                                    log.info(f"   ⏳ Waiting 3 seconds for Twilio to process media...")
+                                    time.sleep(3)
+                                    fetched_msg = twilio_client.client.messages(message_sid).fetch()
+                                    log.info(f"   📊 Final status: {fetched_msg.status}")
+
+                                    if fetched_msg.status in ['failed', 'undelivered']:
+                                        log.error(f"   ❌ Message failed to deliver!")
+                                        if fetched_msg.error_code:
+                                            log.error(f"   ⚠️ Error code: {fetched_msg.error_code}")
+                                        if fetched_msg.error_message:
+                                            log.error(f"   ⚠️ Error message: {fetched_msg.error_message}")
+                                    elif fetched_msg.status == 'sent':
+                                        log.info(f"   ✅ Message successfully sent to WhatsApp!")
+                                    elif fetched_msg.status == 'delivered':
+                                        log.info(f"   ✅ Message delivered to recipient!")
+                                    else:
+                                        log.info(f"   ℹ️ Message still processing (status: {fetched_msg.status})")
+                                except Exception as fetch_error:
+                                    log.warning(f"   ⚠️ Could not fetch final status: {fetch_error}")
                             else:
                                 log.error(f"   ❌ Failed to send attachment {idx}")
 
@@ -612,7 +673,7 @@ async def process_inbound_message(
                             if idx < len(cards):
                                 time.sleep(0.3)
 
-                        log.info(f"✅ All {len(cards)} attachments sent successfully")
+                        log.info(f"✅ SUCCESS: Recovered and pushed all {len(cards)} attachment(s) to Twilio")
 
                     except Exception as attachment_error:
                         log.error(f"❌ Error sending attachments: {attachment_error}", exc_info=True)
@@ -740,21 +801,46 @@ async def process_inbound_message(
 
                 for idx, card in enumerate(cards, 1):
                     media_url = card.get('media_url')
+                    media_type = card.get('media_type', 'unknown')
+                    media_name = card.get('media_name', 'document')
+
                     if not media_url:
                         log.warning(f"   ⚠️ Attachment {idx}: No media_url, skipping")
                         continue
 
-                    log.info(f"   📤 Sending attachment {idx}/{len(cards)}: {media_url[:80]}...")
+                    file_type = "PDF document" if "pdf" in media_type.lower() else f"{media_type}"
+                    log.info(f"   📤 Sending attachment {idx}/{len(cards)}: {file_type}")
+                    log.info(f"      Name: {media_name}")
+                    log.info(f"      URL: {media_url[:80]}...")
 
-                    # Send each attachment as a separate message
-                    message_sid = twilio_client.send_message(
-                        to=from_number,
-                        body=" ",  # Just space, no text
-                        media_url=[media_url]
+                    # Download the file to temp storage (to avoid Twilio error 63019)
+                    log.info(f"   📥 Step 1: Downloading file from external URL...")
+                    local_file_path = twilio_client.download_and_upload_media(
+                        media_url=media_url,
+                        content_type=media_type,
+                        filename=media_name  # Save with actual filename
                     )
 
+                    if not local_file_path:
+                        log.error(f"   ❌ Failed to download attachment {idx}, skipping")
+                        continue
+
+                    # Send the local file without text (just the file)
+                    log.info(f"   📤 Step 2: Uploading and sending file via Twilio...")
+                    from src.config import settings
+                    message_sid = twilio_client.send_message_with_local_media(
+                        to=from_number,
+                        body=" ",  # No text, just the file
+                        local_file_path=local_file_path,
+                        server_url=settings.server_url
+                    )
+
+                    # Note: We do NOT delete the file immediately because Twilio needs to download it
+                    # The media handler will auto-cleanup the file after 5 minutes
+                    log.info(f"   ⏰ File will auto-cleanup in 5 minutes")
+
                     if message_sid:
-                        log.info(f"   ✅ Attachment {idx} sent: {message_sid}")
+                        log.info(f"   ✅ {file_type} sent: {message_sid}")
                     else:
                         log.error(f"   ❌ Failed to send attachment {idx}")
 

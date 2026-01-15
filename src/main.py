@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 
 from src.config import settings
 from src.handlers.webhook import router as webhook_router
+from src.handlers.media import router as media_router
 from src.utils.logger import log
 
 
@@ -80,6 +81,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(webhook_router, tags=["webhooks"])
+app.include_router(media_router, tags=["media"])
 
 
 @app.get("/")

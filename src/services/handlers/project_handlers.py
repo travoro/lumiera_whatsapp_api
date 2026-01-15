@@ -108,7 +108,7 @@ async def handle_list_documents(
             log.info(f"✅ Auto-selected single available project: {project_name} (ID: {current_project_id[:8]}...)")
 
         # Use centralized translations (ALWAYS French)
-        message = get_translation("fr", "list_documents_header")
+        message = ""  # Start with empty message, we'll build a simple one-liner
         tool_outputs = []
         carousel_data = None
 
@@ -119,20 +119,20 @@ async def handle_list_documents(
             project_name = current_project['nom'] if current_project else projects[0]['nom']
             project_id = current_project['id'] if current_project else projects[0]['id']
 
-            message += get_translation("fr", "list_documents_project_context").format(project_name=project_name)
+            # Don't add header or project context - we'll add a simple one-liner when we have the count
 
             # Get PlanRadar project ID from database
             from src.integrations.supabase import supabase_client
             project = await supabase_client.get_project(project_id, user_id=user_id)
 
             if not project:
-                message += "❌ Impossible de récupérer les informations du projet."
+                message = "❌ Impossible de récupérer les informations du projet."
                 log.error(f"   ❌ Project not found in database: {project_id}")
             else:
                 planradar_project_id = project.get("planradar_project_id")
 
                 if not planradar_project_id:
-                    message += "❌ Ce projet n'est pas lié à PlanRadar."
+                    message = "❌ Ce projet n'est pas lié à PlanRadar."
                     log.error(f"   ❌ No PlanRadar project ID for project {project_id}")
                 else:
                     # Fetch all documents (plans) using unified method
@@ -140,35 +140,27 @@ async def handle_list_documents(
                     plans = await planradar_client.get_project_documents(planradar_project_id)
 
                     if not plans:
-                        message += get_translation("fr", "list_documents_no_documents")
+                        message = f"Aucun plan disponible pour le chantier {project_name}."
                     else:
                         plan_count = len(plans)
-                        message += f"📐 {plan_count} plan(s) disponible(s)\n\n"
+                        # Simple one-line message
+                        plan_word = "plan" if plan_count == 1 else "plans"
+                        message += f"Voici {plan_count} {plan_word} pour le chantier {project_name}. 📐"
 
                         # Prepare carousel_data for sending plans as attachments
+                        # Use component name (e.g., "Principal", "SDB") without extension
                         carousel_data = {
                             "cards": [
                                 {
                                     "media_url": plan.get("url"),
-                                    "media_type": plan.get("content_type", "image/png")
+                                    "media_type": plan.get("content_type", "image/png"),
+                                    "media_name": plan.get('component_name', 'document')
                                 }
                                 for plan in plans
                             ]
                         }
 
-                        # Show preview of plans in message
-                        for i, plan in enumerate(plans[:5], 1):  # Show max 5 in text
-                            component = plan.get("component_name", "")
-                            plan_name = plan.get("name", "Plan")
-                            message += f"{i}. 📐 {plan_name}"
-                            if component:
-                                message += f" ({component})"
-                            message += "\n"
-
-                        if len(plans) > 5:
-                            message += f"\n... et {len(plans) - 5} autre(s) plan(s)\n"
-
-            message += "\n" + get_translation("fr", "list_documents_footer")
+            # No footer needed anymore since message is self-contained
 
         # Scenario 3: Has projects but no current project in context
         else:

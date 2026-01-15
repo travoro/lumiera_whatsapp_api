@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     port: int = 8000
     host: str = "0.0.0.0"
     log_level: str = "INFO"
+    server_url: str = "https://whatsapp-api.lumiera.paris"  # Public URL for this server
 
     # Twilio WhatsApp
     twilio_account_sid: str

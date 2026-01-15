@@ -288,21 +288,53 @@ class PlanRadarClient:
             last_sync_date: Optional Unix timestamp - only components created after this will be returned
 
         Returns:
-            List of components for the project
+            List of components for the project with selected-plan relationships
         """
-        log.info(f"🏗️ get_project_components called: project_id={project_id[:8]}...")
+        log.info(f"🏗️ STEP 1: Fetching project components")
+        log.info(f"   Project ID: {project_id}")
         endpoint = f"{self.account_id}/projects/{project_id}/components/project_components"
         params = {}
         if last_sync_date:
             params["last_sync_date"] = last_sync_date
 
+        log.info(f"   🌐 API Request: GET {endpoint}")
         result = await self._request("GET", endpoint, params=params)
+
         # Check for rate limit error
         if result and result.get("_rate_limited"):
             raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+
         # PlanRadar uses JSON:API format with nested "data" array
         components = result.get("data", []) if result else []
-        log.info(f"   ✅ Retrieved {len(components)} components")
+        included = result.get("included", []) if result else []
+
+        log.info(f"   ✅ Retrieved {len(components)} component(s)")
+        log.info(f"   📦 Included section has {len(included)} item(s)")
+
+        # Log component details
+        for idx, comp in enumerate(components, 1):
+            comp_id = comp.get("id")
+            comp_attrs = comp.get("attributes", {})
+            comp_name = comp_attrs.get("name", "Unnamed")
+            comp_type = comp_attrs.get("component-type")
+            file_name = comp_attrs.get("file-name", "N/A")
+
+            log.info(f"   📋 Component {idx}/{len(components)}:")
+            log.info(f"      ID: {comp_id}")
+            log.info(f"      Name: {comp_name}")
+            log.info(f"      Type: {comp_type}")
+            log.info(f"      File: {file_name}")
+
+            # Check for selected-plan relationship
+            relationships = comp.get("relationships", {})
+            selected_plan = relationships.get("selected-plan", {}).get("data")
+            if selected_plan:
+                plan_id = selected_plan.get("id")
+                plan_type = selected_plan.get("type")
+                log.info(f"      🔗 Selected plan: {plan_id} (type: {plan_type})")
+            else:
+                log.info(f"      ℹ️ No selected plan relationship")
+
         return components
 
     async def get_component_plans(
@@ -319,15 +351,17 @@ class PlanRadarClient:
             is_simple: If True, retrieves simple plan versions data
 
         Returns:
-            List of plans for the component
+            List of plans for the component with original-url for PDF download
         """
-        log.info(f"📐 get_component_plans called: project_id={project_id[:8]}..., component_id={component_id[:8]}...")
+        log.info(f"📐 STEP 2: Fetching plans for component {component_id}")
         endpoint = f"{self.account_id}/projects/{project_id}/components/{component_id}/plans"
         params = {}
         if is_simple:
             params["is_simple"] = "true"
 
+        log.info(f"   🌐 API Request: GET {endpoint}")
         result = await self._request("GET", endpoint, params=params)
+
         # Check for rate limit error
         if result and result.get("_rate_limited"):
             raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
@@ -337,95 +371,137 @@ class PlanRadarClient:
             plans = result.get("data", [])
             included = result.get("included", [])
 
-            log.info(f"   📊 Processing {len(plans)} plan(s) from data, {len(included)} items in included")
+            log.info(f"   📊 Response contains {len(plans)} plan(s) in data section")
+            log.info(f"   📦 Response contains {len(included)} item(s) in included section")
 
             # Log included section IDs for debugging
             if included:
                 included_ids = [inc.get("id") for inc in included]
-                log.info(f"   📦 Included section IDs: {included_ids}")
+                log.info(f"   🔍 Included section IDs: {included_ids}")
 
-            # Extract plan URLs from included section
+            # Extract plan URLs from response
             all_plans = []
-            for plan in plans:
+            for idx, plan in enumerate(plans, 1):
                 plan_id = plan.get("id")
                 plan_type = plan.get("type")
                 plan_attributes = plan.get("attributes", {})
                 plan_relationships = plan.get("relationships", {})
-                log.info(f"   🔍 Plan {plan_id[:8]}... type={plan_type}")
-                log.info(f"      attributes: {list(plan_attributes.keys())}")
-                log.info(f"      relationships: {list(plan_relationships.keys())}")
 
-                # Try to extract URL directly from plan attributes first
-                # PlanRadar plans use: original-url, plan-thumb-big-url, plan-thumb-small-url
-                direct_url = (plan_attributes.get("original-url") or
-                             plan_attributes.get("plan-thumb-big-url") or
-                             plan_attributes.get("plan-thumb-small-url") or
+                log.info(f"   📄 Plan {idx}/{len(plans)}: {plan_id}")
+                log.info(f"      Type: {plan_type}")
+                log.info(f"      Attributes available: {list(plan_attributes.keys())}")
+
+                # Extract key plan info
+                plan_name = plan_attributes.get("name", "Unnamed Plan")
+                file_size = plan_attributes.get("download-filesize")
+                content_type = (plan_attributes.get("planfile-content-type") or
+                               plan_attributes.get("content-type") or
+                               plan_attributes.get("image-content-type"))
+
+                log.info(f"      Name: {plan_name}")
+                log.info(f"      Content-Type: {content_type}")
+                log.info(f"      File Size: {file_size} bytes" if file_size else "      File Size: unknown")
+
+                # PRIORITY 1: Try to extract original-url (the actual PDF)
+                original_url = plan_attributes.get("original-url")
+                if original_url:
+                    log.info(f"      ✅ Found original-url (full PDF):")
+                    log.info(f"         {original_url[:120]}...")
+
+                # PRIORITY 2: Fallback URLs
+                thumb_big_url = plan_attributes.get("plan-thumb-big-url")
+                thumb_small_url = plan_attributes.get("plan-thumb-small-url")
+                zip_url = plan_attributes.get("plan-zip-url")
+
+                if thumb_big_url:
+                    log.info(f"      📸 Thumbnail (big): {thumb_big_url[:80]}...")
+                if thumb_small_url:
+                    log.info(f"      📸 Thumbnail (small): {thumb_small_url[:80]}...")
+                if zip_url:
+                    log.info(f"      📦 Plan ZIP: {zip_url[:80]}...")
+
+                # Select the best URL (prioritize original-url for full PDF)
+                direct_url = (original_url or
+                             thumb_big_url or
+                             thumb_small_url or
                              plan_attributes.get("image-url") or
                              plan_attributes.get("url") or
                              plan_attributes.get("file-url"))
 
                 if direct_url:
-                    log.info(f"   ✅ Found URL directly in plan attributes")
+                    # Determine which URL we're using
+                    if direct_url == original_url:
+                        url_source = "original-url (full PDF)"
+                    elif direct_url == thumb_big_url:
+                        url_source = "plan-thumb-big-url (preview)"
+                    elif direct_url == thumb_small_url:
+                        url_source = "plan-thumb-small-url (thumbnail)"
+                    else:
+                        url_source = "fallback URL field"
 
-                    # Extract content type for plans (PlanRadar uses planfile-content-type)
-                    content_type = (plan_attributes.get("planfile-content-type") or
-                                   plan_attributes.get("content-type") or
-                                   plan_attributes.get("image-content-type"))
+                    log.info(f"      🔗 Selected URL source: {url_source}")
 
-                    # Default to PDF if filename suggests it's a PDF
-                    if not content_type:
-                        plan_name = plan_attributes.get("name", "")
-                        if plan_name.lower().endswith('.pdf'):
-                            content_type = "application/pdf"
+                    # Default to PDF if filename suggests it's a PDF and no content_type
+                    if not content_type and plan_name.lower().endswith('.pdf'):
+                        content_type = "application/pdf"
+                        log.info(f"      ℹ️ Inferred content-type as application/pdf from filename")
 
-                    all_plans.append({
+                    plan_data = {
                         "id": plan_id,
-                        "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
+                        "name": plan_name,
                         "url": direct_url,
-                        "thumbnail_url": plan_attributes.get("image-url-thumb") or plan_attributes.get("plan-thumb-small-url"),
+                        "thumbnail_url": thumb_small_url or plan_attributes.get("image-url-thumb"),
                         "content_type": content_type,
+                        "file_size": file_size,
                         "attributes": plan_attributes
-                    })
+                    }
+                    all_plans.append(plan_data)
+                    log.info(f"      ✅ Plan successfully extracted with URL")
                 else:
-                    # Find corresponding data in included section
+                    # Try to find in included section (fallback)
+                    log.info(f"      ⚠️ No direct URL in plan attributes, checking included section...")
                     found_in_included = False
                     for inc in included:
                         inc_id = inc.get("id")
                         inc_type = inc.get("type")
-                        log.info(f"   🔎 Checking included item: id={inc_id[:8] if inc_id else 'None'}..., type={inc_type}")
 
                         if inc_id == plan_id:
                             inc_attributes = inc.get("attributes", {})
-                            log.info(f"   📦 Found in included: type={inc_type}, attributes={list(inc_attributes.keys())[:10]}")
+                            log.info(f"      📦 Found plan in included section (type: {inc_type})")
+                            log.info(f"         Included attributes: {list(inc_attributes.keys())}")
 
-                            # Extract plan URL (could be image-url or other field)
-                            plan_url = (inc_attributes.get("image-url") or
+                            # Extract plan URL from included section
+                            plan_url = (inc_attributes.get("original-url") or
+                                       inc_attributes.get("image-url") or
                                        inc_attributes.get("url") or
                                        inc_attributes.get("file-url"))
 
                             if plan_url:
-                                log.info(f"   ✅ Found URL in included section")
+                                log.info(f"      ✅ Found URL in included section: {plan_url[:80]}...")
+                                plan_data = {
+                                    "id": plan_id,
+                                    "name": plan_name,
+                                    "url": plan_url,
+                                    "thumbnail_url": inc_attributes.get("image-url-thumb"),
+                                    "content_type": inc_attributes.get("content-type") or inc_attributes.get("image-content-type"),
+                                    "file_size": inc_attributes.get("file-size"),
+                                    "attributes": plan_attributes
+                                }
+                                all_plans.append(plan_data)
                             else:
-                                log.warning(f"   ⚠️ No URL found in included section. Available keys: {list(inc_attributes.keys())}")
+                                log.warning(f"      ❌ No URL found in included section")
+                                log.warning(f"         Available keys: {list(inc_attributes.keys())}")
 
-                            all_plans.append({
-                                "id": plan_id,
-                                "name": plan_attributes.get("name") or plan_attributes.get("title", "Plan"),
-                                "url": plan_url,
-                                "thumbnail_url": inc_attributes.get("image-url-thumb"),
-                                "content_type": inc_attributes.get("content-type") or inc_attributes.get("image-content-type"),
-                                "attributes": plan_attributes
-                            })
                             found_in_included = True
                             break
 
                     if not found_in_included:
-                        log.warning(f"   ⚠️ Plan {plan_id} not found in included section")
+                        log.warning(f"      ❌ Plan {plan_id} not found in included section either")
 
-            log.info(f"   ✅ Retrieved {len(all_plans)} plans")
+            log.info(f"   ✅ Successfully extracted {len(all_plans)} plan(s) with URLs")
             return all_plans
 
-        log.info(f"   ℹ️ No plans found")
+        log.info(f"   ℹ️ No plans found in response")
         return []
 
     async def get_project_documents(
@@ -434,10 +510,11 @@ class PlanRadarClient:
     ) -> List[Dict[str, Any]]:
         """Get all documents (plans) for a project by fetching all components and their plans.
 
-        This is a unified method that:
-        1. Fetches all components for the project
-        2. For each component, fetches all its plans
-        3. Returns all plans with URLs, filtered and ready to send
+        This is a unified method that follows the PlanRadar workflow:
+        1. GET /projects/{project_id}/components/project_components - Get all components
+        2. For each component: GET /projects/{project_id}/components/{component_id}/plans - Get plans
+        3. Extract original-url from plan attributes for full PDF access
+        4. Return all plans with URLs, filtered and ready to send
 
         Args:
             project_id: The PlanRadar project ID
@@ -445,45 +522,78 @@ class PlanRadarClient:
         Returns:
             List of all plans across all components, with URLs and metadata
         """
-        log.info(f"📚 get_project_documents called: project_id={project_id[:8]}...")
+        log.info(f"📚 ========== GET PROJECT DOCUMENTS WORKFLOW ==========")
+        log.info(f"   Project ID: {project_id}")
 
         try:
             # Step 1: Fetch all components for this project
+            log.info(f"\n🏗️ STEP 1: Fetching all project components...")
             components = await self.get_project_components(project_id)
 
             if not components:
-                log.info(f"   ℹ️ No components found for project")
+                log.info(f"   ⚠️ No components found for project {project_id}")
                 return []
 
+            log.info(f"   ✅ Found {len(components)} component(s)")
+
             # Step 2: Fetch plans for each component
+            log.info(f"\n📐 STEP 2: Fetching plans for each component...")
             all_plans = []
-            for component in components:
+            for idx, component in enumerate(components, 1):
                 component_id = component.get("id")
-                component_name = component.get("attributes", {}).get("name", "Composant")
+                component_attrs = component.get("attributes", {})
+                component_name = component_attrs.get("name", "Composant")
+
+                log.info(f"\n   🔄 Processing component {idx}/{len(components)}: {component_name}")
+                log.info(f"      Component ID: {component_id}")
 
                 plans = await self.get_component_plans(project_id, component_id)
+                log.info(f"      ✅ Retrieved {len(plans)} plan(s) for this component")
+
                 for plan in plans:
                     plan["component_name"] = component_name
+                    plan["component_id"] = component_id
                     all_plans.append(plan)
 
             if not all_plans:
-                log.info(f"   ℹ️ No plans found across all components")
+                log.info(f"\n   ℹ️ No plans found across all {len(components)} components")
                 return []
 
+            log.info(f"\n   📊 Total plans collected: {len(all_plans)}")
+
             # Step 3: Filter plans with valid URLs
+            log.info(f"\n🔍 STEP 3: Filtering plans with valid URLs...")
             plans_with_urls = [p for p in all_plans if p.get("url")]
             plans_without_urls = [p for p in all_plans if not p.get("url")]
 
             if plans_without_urls:
-                log.warning(f"   ⚠️ Filtered out {len(plans_without_urls)} plans without URLs:")
+                log.warning(f"   ⚠️ Filtered out {len(plans_without_urls)} plan(s) without URLs:")
                 for p in plans_without_urls[:3]:  # Show first 3
-                    log.warning(f"      - {p.get('name')} ({p.get('component_name')})")
+                    log.warning(f"      - {p.get('name')} (component: {p.get('component_name')})")
 
-            log.info(f"   ✅ Retrieved {len(plans_with_urls)} sendable plans (filtered {len(plans_without_urls)} without URLs)")
+            if plans_with_urls:
+                log.info(f"\n   ✅ Successfully recovered {len(plans_with_urls)} document(s) with URLs:")
+                for idx, p in enumerate(plans_with_urls, 1):
+                    content_type = p.get('content_type', 'unknown')
+                    file_size = p.get('file_size')
+                    file_type = "PDF" if "pdf" in content_type.lower() else content_type
+
+                    log.info(f"      {idx}. {p.get('name')}")
+                    log.info(f"         Type: {file_type}")
+                    log.info(f"         Size: {file_size} bytes" if file_size else "         Size: unknown")
+                    log.info(f"         Component: {p.get('component_name')}")
+                    log.info(f"         URL: {p.get('url')[:100]}...")
+            else:
+                log.warning(f"   ⚠️ No documents with valid URLs found")
+
+            log.info(f"\n📚 ========== WORKFLOW COMPLETE: {len(plans_with_urls)} documents ready ==========\n")
+
             return plans_with_urls
 
         except Exception as e:
-            log.error(f"   ❌ Error fetching project documents: {e}")
+            log.error(f"\n   ❌ Error fetching project documents: {e}")
+            import traceback
+            log.error(f"   Traceback: {traceback.format_exc()}")
             return []
 
     async def add_task_comment(
