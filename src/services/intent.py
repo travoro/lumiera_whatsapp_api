@@ -35,6 +35,20 @@ INTENTS = {
         "tools": ["list_tasks_tool"],
         "requires_confirmation": False
     },
+    "view_documents": {
+        "keywords": [
+            # English
+            "documents", "plans", "plan", "files", "blueprints", "drawings",
+            # French
+            "documents", "plan", "plans", "fichiers", "schémas", "dessins", "voir plan", "voir les plans",
+            # Spanish
+            "documentos", "planos", "archivos", "ver plan",
+            # Portuguese
+            "documentos", "planos", "arquivos", "ver plano"
+        ],
+        "tools": ["get_documents_tool"],
+        "requires_confirmation": False
+    },
     "escalate": {  # EASY ESCALATION - NO CONFIRMATION
         "keywords": [
             # English
@@ -202,6 +216,7 @@ class IntentClassifier:
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (l'utilisateur veut voir ses projets/chantiers)
 - list_tasks (l'utilisateur veut voir les tâches pour un projet)
+- view_documents (l'utilisateur veut voir les documents/plans d'un projet)
 - task_details (l'utilisateur veut voir les détails/description/photos d'une tâche spécifique)
 - report_incident (l'utilisateur veut signaler un problème/incident)
 - update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
@@ -211,6 +226,7 @@ class IntentClassifier:
 RÈGLES DE CONTEXTE IMPORTANTES :
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
 - Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90
+- Si utilisateur demande explicitement "plan", "plans", "documents" d'un projet → view_documents:90
 - Si le bot a demandé "quel projet/chantier" et l'utilisateur répond avec nom → list_tasks:90
 - Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
 - Quand utilisateur répond clairement à question du bot → confiance HAUTE (85-95) pour fast path
