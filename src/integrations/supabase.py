@@ -753,6 +753,11 @@ class SupabaseClient:
             if response.data:
                 messages = []
                 for msg in reversed(response.data):  # Chronological order
+                    # Skip messages with empty content (e.g., image-only messages)
+                    # Claude API requires all messages to have non-empty content
+                    if not msg["content"] or not msg["content"].strip():
+                        continue
+
                     role = "user" if msg["direction"] == "inbound" else "assistant"
                     messages.append({
                         "role": role,
