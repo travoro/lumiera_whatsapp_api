@@ -156,7 +156,11 @@ class IntentClassifier:
         active_session_id: str = None,
         fsm_state: str = None,
         expecting_response: bool = False,
-        should_continue_session: bool = False
+        should_continue_session: bool = False,
+        # Media context (critical for photo/video messages)
+        has_media: bool = False,
+        media_type: str = None,
+        num_media: int = 0
     ) -> Dict[str, Any]:
         """Classify intent quickly with Claude Haiku and confidence score.
 
@@ -215,6 +219,37 @@ class IntentClassifier:
                 if is_menu_response:
                     menu_hint = f"\n⚠️ IMPORTANT : L'utilisateur répond à un menu numéroté avec '{message}'. Analyse l'historique pour comprendre ce que ce numéro représente.\n"
 
+                # Media context hint (critical for photo/video messages)
+                media_hint = ""
+                if has_media:
+                    media_types = {
+                        "image": "photo/image",
+                        "video": "vidéo",
+                        "audio": "message vocal/audio"
+                    }
+                    media_display = media_types.get(media_type, "média")
+                    media_hint = f"""
+📎 MEDIA ATTACHÉ : L'utilisateur a envoyé {num_media} {media_display}
+
+RÈGLES CRITIQUES POUR MESSAGES AVEC MÉDIA :
+1. Si session active (update_progress) + photo/vidéo → update_progress:95
+   (L'utilisateur envoie une photo pour la tâche en cours)
+
+2. Si message vide/court ("...", "voilà", "") + photo → utiliser l'historique :
+   - Si bot vient de demander une photo → update_progress:95
+   - Si dernière action était mise à jour tâche → update_progress:90
+   - Si pas de contexte clair → general:70
+
+3. Si photo + texte descriptif ("le mur", "voici le problème") :
+   - Session active → update_progress:95 (photo pour tâche en cours)
+   - Pas de session → report_incident:85 (nouveau problème avec preuve)
+
+4. IMPORTANT : Ne JAMAIS classifier "escalate" quand il y a une photo,
+   sauf si le texte dit explicitement "aide", "parler à quelqu'un", etc.
+
+5. Photo = ACTION de l'utilisateur, pas demande d'aide!
+"""
+
                 # FSM context hint (critical for context preservation)
                 fsm_hint = ""
                 if should_continue_session and expecting_response:
@@ -258,7 +293,7 @@ RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
 - update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
 - general (tout le reste - questions, clarifications, demandes complexes)
-{fsm_hint}{menu_hint}
+{media_hint}{fsm_hint}{menu_hint}
 RÈGLES DE CONTEXTE IMPORTANTES :
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
 - Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90

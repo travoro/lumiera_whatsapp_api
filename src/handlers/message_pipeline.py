@@ -501,12 +501,21 @@ class MessagePipeline:
                     ctx.last_bot_options = metadata.get('available_actions', [])
 
                 # Calculate session age to determine if we should continue
-                from datetime import datetime
+                from datetime import datetime, timezone
                 last_activity_str = session.get('last_activity')
                 if last_activity_str:
                     try:
+                        # Parse last_activity timestamp
                         last_activity = datetime.fromisoformat(last_activity_str.replace('Z', '+00:00'))
-                        age_seconds = (datetime.now(last_activity.tzinfo) - last_activity).total_seconds()
+
+                        # Ensure both datetimes are timezone-aware for accurate comparison
+                        if last_activity.tzinfo is None:
+                            # Treat naive datetime as UTC
+                            last_activity = last_activity.replace(tzinfo=timezone.utc)
+
+                        # Get current time in UTC
+                        now = datetime.now(timezone.utc)
+                        age_seconds = (now - last_activity).total_seconds()
 
                         log.info(f"🔄 Active session found: {ctx.active_session_id[:8]}...")
                         log.info(f"   State: {ctx.fsm_state} | Step: {ctx.fsm_current_step}")
@@ -536,6 +545,23 @@ class MessagePipeline:
     async def _classify_intent(self, ctx: MessageContext) -> Result[None]:
         """Stage 6: Classify user intent with conversation context."""
         try:
+            # Determine media context
+            has_media = bool(ctx.media_url)
+            media_type_simple = None
+            num_media = 1 if has_media else 0
+
+            if has_media and ctx.media_type:
+                # Extract simple media type (image, video, audio)
+                if 'image' in ctx.media_type.lower():
+                    media_type_simple = 'image'
+                elif 'video' in ctx.media_type.lower():
+                    media_type_simple = 'video'
+                elif 'audio' in ctx.media_type.lower():
+                    media_type_simple = 'audio'
+
+            if has_media:
+                log.info(f"📎 Message has media: {media_type_simple} (url: {ctx.media_url[:50]}...)")
+
             intent_result = await intent_classifier.classify(
                 ctx.message_in_french,
                 ctx.user_id,
@@ -545,7 +571,11 @@ class MessagePipeline:
                 active_session_id=ctx.active_session_id,
                 fsm_state=ctx.fsm_state,
                 expecting_response=ctx.expecting_response,
-                should_continue_session=ctx.should_continue_session
+                should_continue_session=ctx.should_continue_session,
+                # Media context (critical for photo/video messages)
+                has_media=has_media,
+                media_type=media_type_simple,
+                num_media=num_media
             )
             ctx.intent = intent_result['intent']
             ctx.confidence = intent_result.get('confidence', 0.0)

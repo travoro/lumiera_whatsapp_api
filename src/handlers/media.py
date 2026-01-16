@@ -112,8 +112,9 @@ async def serve_temp_file(file_id: str, request: Request = None):
 
     # Add headers to help with Twilio download
     headers = {
-        "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
-        "Content-Disposition": f'inline; filename="{display_filename}"'  # Use inline for better compatibility
+        "Cache-Control": "public, max-age=600",  # Cache for 10 minutes (match expiry)
+        "Content-Disposition": f'attachment; filename="{display_filename}"',  # Use attachment for WhatsApp
+        "Accept-Ranges": "bytes"  # Allow range requests for better download reliability
     }
 
     return FileResponse(
