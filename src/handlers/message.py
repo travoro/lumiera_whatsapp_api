@@ -720,6 +720,24 @@ async def process_inbound_message(
         phone_number = from_number.replace("whatsapp:", "").strip()
         log.info(f"📥 Processing message from {phone_number}")
 
+        # FSM: Check for duplicate message (idempotency)
+        from src.config import settings
+        if settings.enable_fsm:
+            from src.fsm.core import StateManager
+            state_manager = StateManager()
+
+            # Check if we've already processed this message
+            cached_response = await state_manager.check_idempotency(
+                user_id=phone_number,
+                message_id=message_sid
+            )
+
+            if cached_response:
+                log.info(f"🔁 Duplicate message {message_sid} - returning cached response")
+                # Message already processed, skip reprocessing
+                # (Response already sent in previous processing)
+                return
+
         # Quick user lookup for escalation blocking and direct actions
         user = await supabase_client.get_user_by_phone(phone_number)
 
@@ -1059,6 +1077,19 @@ async def process_inbound_message(
 
             except Exception as attachment_error:
                 log.error(f"❌ Error sending attachments: {attachment_error}", exc_info=True)
+
+        # FSM: Record successful message processing (idempotency)
+        if settings.enable_fsm:
+            try:
+                await state_manager.record_idempotency(
+                    user_id=phone_number,
+                    message_id=message_sid,
+                    result={"status": "processed", "intent": intent if 'intent' in locals() else None}
+                )
+                log.info(f"✅ Idempotency recorded for message {message_sid}")
+            except Exception as idempotency_error:
+                # Don't fail the whole request if idempotency recording fails
+                log.warning(f"Failed to record idempotency: {idempotency_error}")
 
     except Exception as e:
         log.error(f"Error processing message: {e}")

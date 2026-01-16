@@ -3,6 +3,8 @@ from typing import Optional, List, Dict, Any
 import httpx
 import base64
 import uuid
+import time
+from datetime import datetime
 from src.config import settings
 from src.utils.logger import log
 
@@ -20,6 +22,7 @@ class PlanRadarClient:
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
+        self.request_count = 0  # Track total requests
         log.info("PlanRadar client initialized")
 
     async def _request(
@@ -32,8 +35,18 @@ class PlanRadarClient:
         """Make HTTP request to PlanRadar API."""
         url = f"{self.base_url}/{endpoint}"
 
-        # Log the request details
-        log.info(f"🌐 PlanRadar API Request: {method} {endpoint}")
+        # Increment request counter
+        self.request_count += 1
+        request_id = self.request_count
+
+        # Start timing
+        start_time = time.time()
+        timestamp = datetime.now().isoformat()
+
+        # Log the request with special marker for easy filtering
+        log.info(f"🔵 PLANRADAR_API_CALL #{request_id} | START | {method} {endpoint}")
+        log.info(f"   ⏰ Timestamp: {timestamp}")
+        log.info(f"   🌐 URL: {url}")
         if params:
             log.info(f"   📝 Query params: {params}")
         if data:
@@ -50,8 +63,11 @@ class PlanRadarClient:
                     timeout=30.0,
                 )
 
-                # Log response status
-                log.info(f"   ✅ Response: {response.status_code}")
+                # Calculate duration
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                # Log response status with timing
+                log.info(f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {response.status_code} | Duration: {duration_ms}ms")
 
                 response.raise_for_status()
                 result = response.json()
@@ -66,14 +82,37 @@ class PlanRadarClient:
 
                 return result
         except httpx.HTTPStatusError as e:
+            # Calculate duration even for errors
+            duration_ms = int((time.time() - start_time) * 1000)
+
             # Differentiate between rate limit and other errors
             if e.response.status_code == 429:
-                log.warning(f"   ⚠️ PlanRadar API rate limit (429)")
+                log.warning(f"🔵 PLANRADAR_API_CALL #{request_id} | RATE_LIMIT | 429 Too Many Requests | Duration: {duration_ms}ms")
+                log.warning(f"   ⚠️ PlanRadar API rate limit exceeded (30 requests/minute)")
                 log.warning(f"   URL was: {url}")
+
+                # Try to read the error response body
+                try:
+                    error_body = e.response.json()
+                    log.warning(f"   📄 Rate limit response: {error_body}")
+                except:
+                    try:
+                        error_text = e.response.text
+                        if error_text:
+                            log.warning(f"   📄 Rate limit response (text): {error_text[:500]}")
+                    except:
+                        pass
+
+                # Check response headers for rate limit info
+                headers = dict(e.response.headers)
+                rate_limit_headers = {k: v for k, v in headers.items() if 'rate' in k.lower() or 'limit' in k.lower() or 'retry' in k.lower()}
+                if rate_limit_headers:
+                    log.warning(f"   📊 Rate limit headers: {rate_limit_headers}")
+
                 # Return special error structure for rate limits
                 return {"_rate_limited": True, "error": "Rate limit exceeded"}
             else:
-                log.error(f"   ❌ PlanRadar API HTTP error: {e.response.status_code} {e.response.reason_phrase}")
+                log.error(f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {e.response.status_code} {e.response.reason_phrase} | Duration: {duration_ms}ms")
                 log.error(f"   URL was: {url}")
                 try:
                     error_body = e.response.json()
@@ -82,7 +121,9 @@ class PlanRadarClient:
                     log.error(f"   Error text: {e.response.text[:200]}")
                 return None
         except httpx.HTTPError as e:
-            log.error(f"   ❌ PlanRadar API error: {type(e).__name__}: {e}")
+            duration_ms = int((time.time() - start_time) * 1000)
+            log.error(f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {type(e).__name__} | Duration: {duration_ms}ms")
+            log.error(f"   Error: {e}")
             log.error(f"   URL was: {url}")
             return None
 

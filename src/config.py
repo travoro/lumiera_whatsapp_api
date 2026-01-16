@@ -83,6 +83,7 @@ class Settings(BaseSettings):
 
     # Feature Flags & Intent Classification
     enable_fast_path_handlers: bool = True
+    enable_fsm: bool = False  # Finite State Machine for session management
     intent_confidence_threshold: float = 0.80  # Keyword: 90%+, Haiku: 80%+
     intent_classification_cache_ttl: int = 300  # 5 minutes in seconds
 

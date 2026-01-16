@@ -79,18 +79,22 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             status_id = attributes.get("status-id")
             progress = attributes.get("progress", 0)
 
-            # DEBUG: Log full status info
-            log.info(f"   📊 Task {short_id_val}: status-id={status_id} (type: {type(status_id).__name__}), progress={progress}%")
+            # Get closed status
+            closed_at = attributes.get("closed-at")
 
-            # Skip resolved, closed, or rejected tasks
-            # Only show: 1=Open, 2=In-Progress, 4=Feedback
-            if status_id in [3, 5, 6]:
-                log.info(f"   ⏭️  Skipping task {short_id_val} - status {status_id} (resolved/closed/rejected)")
+            # DEBUG: Log full status info
+            log.info(f"   📊 Task {short_id_val}: status-id={status_id} (type: {type(status_id).__name__}), progress={progress}%, closed_at={closed_at}")
+
+            # Skip tasks that are actually closed (closed-at is set)
+            if closed_at is not None:
+                log.info(f"   ⏭️  Skipping task {short_id_val} - closed at {closed_at}")
                 continue
 
-            # Also skip tasks with 100% progress that might not have status updated yet
-            if progress == 100:
-                log.info(f"   ⏭️  Skipping task {short_id_val} - 100% complete")
+            # Skip resolved, closed, or rejected tasks by status ID
+            # Only show: 1=Open, 2=In-Progress, 4=Feedback
+            # Note: status-id can be numeric (1,2,3...) or string ("lm", etc.)
+            if status_id in [3, 5, 6, "3", "5", "6"]:
+                log.info(f"   ⏭️  Skipping task {short_id_val} - status {status_id} (resolved/closed/rejected)")
                 continue
 
             formatted_tasks.append({

@@ -11,6 +11,7 @@ from src.config import settings
 from src.handlers.webhook import router as webhook_router
 from src.handlers.media import router as media_router
 from src.utils.logger import log
+import asyncio
 
 
 # Initialize Sentry if enabled
@@ -26,6 +27,21 @@ if settings.enable_sentry and settings.sentry_dsn:
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
+
+
+async def fsm_cleanup_task():
+    """Background task to clean up expired FSM records every 5 minutes."""
+    from src.fsm.handlers import run_cleanup_task
+
+    while True:
+        try:
+            await asyncio.sleep(5 * 60)  # Sleep 5 minutes
+            if settings.enable_fsm:
+                await run_cleanup_task()
+                log.info("✅ FSM cleanup task completed")
+        except Exception as e:
+            log.error(f"❌ FSM cleanup task failed: {e}")
+            # Continue running despite errors
 
 
 @asynccontextmanager
@@ -49,10 +65,36 @@ async def lifespan(app: FastAPI):
         os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
         log.info("LangChain tracing enabled")
 
+    # FSM: Run session recovery on startup
+    if settings.enable_fsm:
+        try:
+            from src.fsm.handlers import session_recovery_manager
+            log.info("Running FSM session recovery...")
+            stats = await session_recovery_manager.recover_on_startup()
+            log.info(f"✅ FSM session recovery complete: {stats}")
+        except Exception as e:
+            log.error(f"❌ FSM session recovery failed: {e}")
+            # Don't fail startup if recovery fails
+
+        # Start background cleanup task
+        cleanup_task = asyncio.create_task(fsm_cleanup_task())
+        log.info("✅ FSM background cleanup task started (runs every 5 minutes)")
+    else:
+        log.info("FSM disabled - skipping session recovery and cleanup")
+        cleanup_task = None
+
     yield
 
     # Shutdown
     log.info("Shutting down Lumiera WhatsApp Copilot")
+
+    # Cancel background task
+    if cleanup_task and not cleanup_task.done():
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            log.info("FSM cleanup task cancelled")
 
 
 # Create FastAPI app
