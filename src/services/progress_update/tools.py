@@ -63,11 +63,14 @@ AGENT INSTRUCTIONS - This is a CONFIRMATION, not a task list!
 Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le projet {project_name} ?
 
 1. Oui, c'est ça
-2. Non, changer de tâche/projet"
+2. Non, autre tâche"
 
 IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
+IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
 - If user says 1 or "oui": USE start_progress_update_session_tool with task_id={active_task_id}, project_id={planradar_project_id}
-- If user says 2 or "non": Call get_active_task_context_tool again to show task list
+- If user says 2 or "non": Ask user if they want to change task in same project OR change project entirely
+  * If user says "changer de projet" or "autre projet": Call list_projects_tool to show all projects
+  * If user says "changer de tâche" or "autre tâche": Call get_active_task_context_tool to show task list
 - NEVER say "session", "prête", "active", "contexte" - too technical!"""
 
         # Check for active project (7 hour expiration)
@@ -109,11 +112,14 @@ AGENT INSTRUCTIONS - This is a CONFIRMATION, not a task list!
 Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le projet {project_name} ?
 
 1. Oui, c'est ça
-2. Non, changer de tâche/projet"
+2. Non, autre tâche"
 
 IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
+IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
 - If user says 1 or "oui": USE start_progress_update_session_tool with task_id={task_id}, project_id={planradar_project_id}
-- If user says 2 or "non": Show list of ALL available tasks/projects
+- If user says 2 or "non": Ask user if they want to change task in same project OR change project entirely
+  * If user says "changer de projet" or "autre projet": Call list_projects_tool to show all projects
+  * If user says "changer de tâche" or "autre tâche": Call get_active_task_context_tool to show task list
 - NEVER say "session", "prête", "active", "contexte" - too technical!"""
 
                         # MULTIPLE TASKS: Show list for selection
