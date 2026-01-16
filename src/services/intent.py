@@ -221,6 +221,7 @@ class IntentClassifier:
 
                 # Media context hint (critical for photo/video messages)
                 media_hint = ""
+                media_reminder = ""  # For reinforcement near message
                 if has_media:
                     media_types = {
                         "image": "photo/image",
@@ -249,6 +250,8 @@ RÈGLES CRITIQUES POUR MESSAGES AVEC MÉDIA :
 
 5. Photo = ACTION de l'utilisateur, pas demande d'aide!
 """
+                    # Add reminder near the message for better locality
+                    media_reminder = f"\n📎 Médias joints : {num_media} {media_display}"
 
                 # FSM context hint (critical for context preservation)
                 fsm_hint = ""
@@ -302,7 +305,7 @@ RÈGLES DE CONTEXTE IMPORTANTES :
 - Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
 - Quand utilisateur répond clairement à question du bot → confiance HAUTE (85-95) pour fast path
 {context_section}
-Message actuel : {message}
+Message actuel : {message}{media_reminder}
 
 Retourne UNIQUEMENT un JSON valide sans texte supplémentaire. Format :
 {{"intent": "nom_intent", "confidence": 95}}
