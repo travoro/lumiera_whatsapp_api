@@ -1,5 +1,5 @@
 """Temporary media file hosting for Twilio."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 import os
 import time
@@ -10,7 +10,7 @@ router = APIRouter()
 
 # In-memory storage for temporary files (path -> expiry_time)
 temp_files: Dict[str, float] = {}
-TEMP_FILE_EXPIRY = 300  # 5 minutes
+TEMP_FILE_EXPIRY = 600  # 10 minutes (increased from 5 to give Twilio more time for retries)
 
 
 def cleanup_expired_files():
@@ -57,13 +57,19 @@ def register_temp_file(file_path: str) -> str:
 
 
 @router.get("/media/temp/{file_id}")
-async def serve_temp_file(file_id: str):
+async def serve_temp_file(file_id: str, request: Request = None):
     """Serve a temporary file.
-    
+
     This endpoint allows Twilio to download files that we've temporarily
     downloaded from external sources (like PlanRadar).
     """
+    # Log request details for debugging Twilio issues
+    user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
+    client_ip = request.client.host if request and request.client else "unknown"
+
     log.info(f"📥 Request to serve temp file: {file_id}")
+    log.info(f"   👤 User-Agent: {user_agent}")
+    log.info(f"   🌐 Client IP: {client_ip}")
     
     # Cleanup expired files
     cleanup_expired_files()
@@ -100,20 +106,19 @@ async def serve_temp_file(file_id: str):
     elif file_path.endswith('.jpg') or file_path.endswith('.jpeg'):
         media_type = "image/jpeg"
 
-    # Strip extension from display filename for cleaner look
-    # The media_type header tells clients it's a PDF, so extension is optional
+    # Keep the original filename with extension
+    # Twilio/WhatsApp may rely on file extension for validation
     display_filename = file_id
-    if file_id.endswith('.pdf'):
-        display_filename = file_id[:-4]  # Remove .pdf extension
-    elif file_id.endswith('.png'):
-        display_filename = file_id[:-4]  # Remove .png extension
-    elif file_id.endswith('.jpg'):
-        display_filename = file_id[:-4]  # Remove .jpg extension
-    elif file_id.endswith('.jpeg'):
-        display_filename = file_id[:-5]  # Remove .jpeg extension
+
+    # Add headers to help with Twilio download
+    headers = {
+        "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
+        "Content-Disposition": f'inline; filename="{display_filename}"'  # Use inline for better compatibility
+    }
 
     return FileResponse(
         file_path,
         media_type=media_type,
-        filename=display_filename
+        filename=display_filename,
+        headers=headers
     )

@@ -425,14 +425,30 @@ class TwilioClient:
 
             # Use provided filename or generate temp name
             if filename:
-                # Save with the actual filename in /tmp
+                # Save with a simplified filename to avoid URL encoding issues
                 import re
-                # Sanitize filename for filesystem and URLs (no spaces!)
-                safe_filename = re.sub(r'[^\w\-\.]', '_', filename)
-                # Ensure the file has the proper extension
-                if not safe_filename.endswith(extension):
-                    safe_filename += extension
+                import hashlib
+
+                # Create a hash of the original filename for uniqueness
+                name_hash = hashlib.md5(filename.encode()).hexdigest()[:8]
+
+                # Extract just the base name without path, and limit length
+                base_name = os.path.basename(filename)
+                # Keep only alphanumeric, hyphens, and underscores
+                clean_name = re.sub(r'[^\w\-]', '_', base_name)
+                # Remove multiple consecutive underscores
+                clean_name = re.sub(r'_+', '_', clean_name)
+                # Remove leading/trailing underscores
+                clean_name = clean_name.strip('_')
+                # Limit length to 50 chars (excluding extension)
+                if len(clean_name) > 50:
+                    clean_name = clean_name[:50]
+
+                # Create final filename: cleanname_hash.ext
+                safe_filename = f"{clean_name}_{name_hash}{extension}"
+
                 temp_file_path = os.path.join(tempfile.gettempdir(), safe_filename)
+                log.info(f"   🏷️ Sanitized filename: {filename} → {safe_filename}")
             else:
                 # Save to temporary file with auto-generated name
                 with tempfile.NamedTemporaryFile(mode='wb', suffix=extension, delete=False) as temp_file:
