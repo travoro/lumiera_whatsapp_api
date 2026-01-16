@@ -492,14 +492,14 @@ async def handle_direct_action(
                         "agent_used": "progress_update"
                     }
                 else:
-                    # User said no - route back to agent to show task list
-                    log.info(f"❌ User declined - routing back to show task list")
+                    # User said no - route to agent to ask clarification (change task vs change project)
+                    log.info(f"❌ User declined - routing to agent for clarification")
                     return await handle_direct_action(
                         action="update_progress",
                         user_id=user_id,
                         phone_number=phone_number,
                         language=language,
-                        message_body="Non, changer de tâche"
+                        message_body="Non, autre tâche"  # Triggers agent clarification flow
                     )
 
             elif list_type in ["project", "projects", "option"]:
