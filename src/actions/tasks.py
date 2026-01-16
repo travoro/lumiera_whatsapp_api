@@ -1,11 +1,13 @@
 """Task action handlers."""
 from typing import Dict, Any, Optional, List
+from langsmith import traceable
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
 from src.services.project_context import project_context_service
 from src.utils.logger import log
 
 
+@traceable(name="list_tasks", tags=["actions", "tasks", "planradar"])
 async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Optional[str] = None) -> Dict[str, Any]:
     """List tasks for a specific project.
 
@@ -151,6 +153,7 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
         }
 
 
+@traceable(name="get_task_description", tags=["actions", "tasks", "planradar"])
 async def get_task_description(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get detailed description of a task."""
     log.info(f"📝 get_task_description action: user_id={user_id[:8]}..., task_id={task_id}, project_id={project_id[:8] if project_id else 'None'}...")
@@ -284,6 +287,7 @@ async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] =
         }
 
 
+@traceable(name="get_task_images", tags=["actions", "tasks", "planradar"])
 async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
     """Get all attachments (images, documents, etc.) attached to a task.
 

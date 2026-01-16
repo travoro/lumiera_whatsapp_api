@@ -1,10 +1,12 @@
 """Project (Chantier) action handlers."""
 from typing import Dict, Any, List
+from langsmith import traceable
 from src.integrations.supabase import supabase_client
 from src.utils.whatsapp_formatter import get_plural_translation
 from src.utils.logger import log
 
 
+@traceable(name="list_projects", tags=["actions", "projects", "supabase"])
 async def list_projects(user_id: str) -> Dict[str, Any]:
     """List all active projects for the user."""
     try:
@@ -51,6 +53,7 @@ async def list_projects(user_id: str) -> Dict[str, Any]:
         }
 
 
+@traceable(name="get_project_details", tags=["actions", "projects", "supabase"])
 async def get_project_details(user_id: str, project_id: str) -> Dict[str, Any]:
     """Get detailed information about a specific project."""
     try:
