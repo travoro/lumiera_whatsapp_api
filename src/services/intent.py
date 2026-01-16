@@ -151,7 +151,12 @@ class IntentClassifier:
         message: str,
         user_id: str = None,
         last_bot_message: str = None,
-        conversation_history: list = None
+        conversation_history: list = None,
+        # FSM context for session continuation (context preservation)
+        active_session_id: str = None,
+        fsm_state: str = None,
+        expecting_response: bool = False,
+        should_continue_session: bool = False
     ) -> Dict[str, Any]:
         """Classify intent quickly with Claude Haiku and confidence score.
 
@@ -210,6 +215,39 @@ class IntentClassifier:
                 if is_menu_response:
                     menu_hint = f"\n⚠️ IMPORTANT : L'utilisateur répond à un menu numéroté avec '{message}'. Analyse l'historique pour comprendre ce que ce numéro représente.\n"
 
+                # FSM context hint (critical for context preservation)
+                fsm_hint = ""
+                if should_continue_session and expecting_response:
+                    fsm_hint = f"""
+⚠️⚠️⚠️ CONTEXTE DE SESSION ACTIVE CRITIQUE ⚠️⚠️⚠️
+
+L'utilisateur est EN TRAIN de mettre à jour une tâche (état FSM: {fsm_state})
+Le bot vient de lui présenter des options et ATTEND UNE RÉPONSE.
+Ce message est TRÈS PROBABLEMENT une réponse à ces options, PAS un nouveau intent!
+
+RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
+1. Si le message peut être interprété comme un commentaire/description (texte descriptif,
+   observation, mention de problème, description d'état), c'est "update_progress" pour
+   CONTINUER la session active, PAS "report_incident" pour créer un nouvel incident.
+
+2. EXEMPLES dans ce contexte de session active :
+   - "le mur est encore fisurré" → update_progress:95 (commentaire sur la tâche en cours)
+   - "il y a un problème avec la peinture" → update_progress:95 (commentaire, pas incident)
+   - "c'est fait" / "terminé" → update_progress:90 (veut probablement marquer comme terminé)
+   - "voilà" / "ok" → update_progress:85 (confirmation vague, continuer session)
+
+3. Classifier comme NOUVEAU intent seulement si l'utilisateur dit EXPLICITEMENT :
+   - "Annuler" / "Stop" / "Non merci" / "Laisse tomber" / "Abandonner"
+   - "Je veux faire autre chose" / "Change de sujet"
+   - Demande CLAIRE et EXPLICITE d'une action différente ("Montre-moi les documents" / "Liste mes projets")
+
+4. IMPORTANT : Dans le DOUTE, TOUJOURS privilégier "update_progress" (continuer la session)
+   plutôt que de commencer un nouveau flow. Il est préférable de continuer la session existante
+   que de l'abandonner par erreur.
+
+5. Confiance recommandée : update_progress:95 (haute confiance car session active)
+"""
+
                 prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (l'utilisateur veut voir ses projets/chantiers)
@@ -220,7 +258,7 @@ class IntentClassifier:
 - update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
 - general (tout le reste - questions, clarifications, demandes complexes)
-{menu_hint}
+{fsm_hint}{menu_hint}
 RÈGLES DE CONTEXTE IMPORTANTES :
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
 - Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90

@@ -36,6 +36,7 @@ class ProgressUpdateState:
                 "task_id": task_id,
                 "project_id": project_id,
                 "current_step": "awaiting_action",
+                "fsm_state": "awaiting_action",  # Set initial FSM state
                 "expires_at": (datetime.utcnow() + timedelta(hours=self.SESSION_EXPIRY_HOURS)).isoformat()
             }).execute()
 
@@ -132,6 +133,20 @@ class ProgressUpdateState:
                 updates["comments_added"] = session["comments_added"] + 1
             elif action_type == "complete":
                 updates["status_changed"] = True
+
+            # Update FSM state to indicate we're collecting data and expecting response
+            # This is critical for context preservation when user responds to options
+            updates["fsm_state"] = "collecting_data"
+
+            # Set expecting_response flag in metadata so intent classifier knows
+            # that bot just showed options and is waiting for user's next action
+            session_metadata = session.get("session_metadata", {})
+            session_metadata["expecting_response"] = True
+            session_metadata["last_bot_action"] = f"added_{action_type}"
+            session_metadata["available_actions"] = ["add_comment", "add_photo", "mark_complete"]
+            updates["session_metadata"] = session_metadata
+
+            log.info(f"🔄 FSM: Setting state='collecting_data', expecting_response=True after {action_type}")
 
             return await self.update_session(user_id, **updates)
 

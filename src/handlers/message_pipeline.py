@@ -43,6 +43,15 @@ class MessageContext:
     tools_called: list = field(default_factory=list)
     tool_outputs: list = field(default_factory=list)  # Structured tool outputs (for short-term memory)
 
+    # FSM session context (for context preservation)
+    active_session_id: Optional[str] = None
+    fsm_state: Optional[str] = None
+    fsm_current_step: Optional[str] = None
+    fsm_task_id: Optional[str] = None
+    expecting_response: bool = False
+    last_bot_options: list = field(default_factory=list)
+    should_continue_session: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for logging."""
         return {
@@ -150,7 +159,12 @@ class MessagePipeline:
             if not result.success:
                 return result
 
-            # Stage 6: Classify intent
+            # Stage 5.5: Check for active session (FSM context preservation)
+            result = await self._check_active_session(ctx)
+            if not result.success:
+                return result
+
+            # Stage 6: Classify intent (now with FSM context)
             result = await self._classify_intent(ctx)
             if not result.success:
                 return result
@@ -459,6 +473,66 @@ class MessagePipeline:
         except Exception as e:
             return Result.from_exception(e)
 
+    async def _check_active_session(self, ctx: MessageContext) -> Result[None]:
+        """Stage 5.5: Check if user has active progress update session (for context preservation)."""
+        try:
+            # Query for active progress update session
+            result = supabase_client.client.table('progress_update_sessions')\
+                .select('*')\
+                .eq('subcontractor_id', ctx.user_id)\
+                .gt('expires_at', 'now()')\
+                .order('last_activity', desc=True)\
+                .limit(1)\
+                .execute()
+
+            if result.data and len(result.data) > 0:
+                session = result.data[0]
+
+                # Extract FSM context
+                ctx.active_session_id = session['id']
+                ctx.fsm_state = session.get('fsm_state', 'idle')
+                ctx.fsm_current_step = session.get('current_step')
+                ctx.fsm_task_id = session.get('task_id')
+
+                # Check if bot is expecting a response (from session_metadata)
+                metadata = session.get('session_metadata', {})
+                if isinstance(metadata, dict):
+                    ctx.expecting_response = metadata.get('expecting_response', False)
+                    ctx.last_bot_options = metadata.get('available_actions', [])
+
+                # Calculate session age to determine if we should continue
+                from datetime import datetime
+                last_activity_str = session.get('last_activity')
+                if last_activity_str:
+                    try:
+                        last_activity = datetime.fromisoformat(last_activity_str.replace('Z', '+00:00'))
+                        age_seconds = (datetime.now(last_activity.tzinfo) - last_activity).total_seconds()
+
+                        log.info(f"🔄 Active session found: {ctx.active_session_id[:8]}...")
+                        log.info(f"   State: {ctx.fsm_state} | Step: {ctx.fsm_current_step}")
+                        log.info(f"   Expecting response: {ctx.expecting_response}")
+                        log.info(f"   Age: {age_seconds:.0f}s")
+
+                        # If expecting response and recent activity (< 5 minutes = 300s)
+                        if ctx.expecting_response and age_seconds < 300:
+                            ctx.should_continue_session = True
+                            log.info(f"   ✅ Should continue session (recent activity, expecting response)")
+                        else:
+                            log.info(f"   💤 Session exists but not expecting response or too old")
+                    except Exception as e:
+                        log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
+                else:
+                    log.info(f"🔄 Active session found: {ctx.active_session_id[:8]}... (no last_activity)")
+            else:
+                log.info(f"💤 No active progress update session for user")
+
+            return Result.ok(None)
+
+        except Exception as e:
+            # Non-fatal: FSM is optional enhancement for context preservation
+            log.warning(f"⚠️ Error checking active session: {e}")
+            return Result.ok(None)
+
     async def _classify_intent(self, ctx: MessageContext) -> Result[None]:
         """Stage 6: Classify user intent with conversation context."""
         try:
@@ -466,7 +540,12 @@ class MessagePipeline:
                 ctx.message_in_french,
                 ctx.user_id,
                 last_bot_message=ctx.last_bot_message,  # Pass for menu context
-                conversation_history=ctx.recent_messages  # Pass last 3 messages for better context
+                conversation_history=ctx.recent_messages,  # Pass last 3 messages for better context
+                # FSM context for session continuation (context preservation)
+                active_session_id=ctx.active_session_id,
+                fsm_state=ctx.fsm_state,
+                expecting_response=ctx.expecting_response,
+                should_continue_session=ctx.should_continue_session
             )
             ctx.intent = intent_result['intent']
             ctx.confidence = intent_result.get('confidence', 0.0)
