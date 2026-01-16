@@ -508,7 +508,7 @@ async def handle_task_details(
         log.info(f"   images_result['success'] = {images_result.get('success')}")
         log.info(f"   images_result['data'] = {images_result.get('data')}")
 
-        carousel_data = None
+        attachments = None
         if images_result["success"] and images_result["data"]:
             all_attachments = images_result["data"][:10]  # Limit to 10 attachments
 
@@ -528,43 +528,32 @@ async def handle_task_details(
                     log.warning(f"      - {att.get('type')}: {att.get('title')}")
 
             if attachments_with_urls:
-                # Create carousel data with unique media names to avoid filename collisions
-                cards = []
+                # Prepare simple attachments list for direct sending
+                attachments = []
                 for idx, att in enumerate(attachments_with_urls, 1):
-                    # Generate unique media_name from title, ID, or index
-                    media_name = att.get("title", "").strip()
+                    # Generate filename from title, ID, or index
+                    filename = att.get("title", "").strip()
 
-                    # If no title, extract UUID from URL or use attachment ID
-                    if not media_name:
+                    # If no title, use attachment ID or index
+                    if not filename:
                         att_id = att.get("id", "")
                         if att_id:
-                            # Use first 8 chars of ID for brevity
-                            media_name = f"attachment_{att_id[:8]}"
+                            filename = f"attachment_{att_id[:8]}"
                         else:
-                            # Last resort: extract UUID from URL
-                            url = att.get("url", "")
-                            import re
-                            uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', url)
-                            if uuid_match:
-                                media_name = f"attachment_{uuid_match.group(1)[:8]}"
-                            else:
-                                # Absolute fallback: use index
-                                media_name = f"attachment_{idx}"
+                            filename = f"attachment_{idx}"
 
-                    # Clean filename (remove file extension if present, we'll add it back based on content type)
-                    media_name = media_name.replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.pdf', '')
+                    # Clean filename (remove extension, we'll add correct one based on content type)
+                    filename = filename.replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.pdf', '')
 
-                    cards.append({
-                        "media_url": att.get("url"),
-                        "media_type": att.get("content_type", "application/octet-stream"),
-                        "media_name": media_name
+                    attachments.append({
+                        "url": att.get("url"),
+                        "content_type": att.get("content_type", "application/octet-stream"),
+                        "filename": filename
                     })
 
-                carousel_data = {"cards": cards}
-
-                log.info(f"📦 Attachment data created with {len(carousel_data['cards'])} items (sendable)")
-                for idx, card in enumerate(cards, 1):
-                    log.info(f"   Card {idx}: media_name='{card.get('media_name')}', type={card.get('media_type')}")
+                log.info(f"📦 Prepared {len(attachments)} attachments for direct sending")
+                for idx, att in enumerate(attachments, 1):
+                    log.info(f"   Attachment {idx}: filename='{att.get('filename')}', type={att.get('content_type')}")
 
                 # Store attachments in tool_outputs (only those with URLs)
                 tool_outputs.append({
@@ -598,14 +587,14 @@ async def handle_task_details(
             "tools_called": ["get_task_description_tool", "get_task_images_tool"],
             "fast_path": True,
             "tool_outputs": tool_outputs,
-            "carousel_data": carousel_data  # NEW: carousel data for image display
+            "attachments": attachments  # Direct attachments for sending
         }
 
         log.info(f"📦 Returning result:")
         log.info(f"   message length: {len(result['message'])}")
-        log.info(f"   has carousel_data: {result['carousel_data'] is not None}")
-        if result['carousel_data']:
-            log.info(f"   carousel_data cards: {len(result['carousel_data'].get('cards', []))}")
+        log.info(f"   has attachments: {result['attachments'] is not None}")
+        if result['attachments']:
+            log.info(f"   attachments count: {len(result['attachments'])}")
         log.info(f"   tool_outputs count: {len(result['tool_outputs'])}")
 
         return result

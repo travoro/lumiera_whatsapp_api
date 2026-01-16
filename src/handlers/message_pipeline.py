@@ -201,6 +201,11 @@ class MessagePipeline:
                 response_data["list_type"] = ctx.list_type
                 log.info(f"📦 Pipeline forwarding list_type: {ctx.list_type}")
 
+            # Include attachments if present (for task images/files)
+            if hasattr(ctx, 'attachments') and ctx.attachments:
+                response_data["attachments"] = ctx.attachments
+                log.info(f"📦 Pipeline forwarding {len(ctx.attachments)} attachments")
+
             return Result.ok(response_data)
 
         except LumieraException as e:
@@ -642,6 +647,17 @@ class MessagePipeline:
                     ctx.escalation = result.get("escalation", False)
                     ctx.tools_called = result.get("tools_called", [])
                     ctx.tool_outputs = result.get("tool_outputs", [])  # Capture tool outputs from fast path
+
+                    # Capture response metadata from specialized handlers
+                    if "response_type" in result:
+                        ctx.response_type = result.get("response_type")
+                    if "list_type" in result:
+                        ctx.list_type = result.get("list_type")
+                    if "attachments" in result:
+                        ctx.attachments = result.get("attachments")
+                        if ctx.attachments:
+                            log.info(f"📦 Captured {len(ctx.attachments)} attachments from fast path")
+
                     log.info(f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)")
                     return Result.ok(None)
                 else:
@@ -669,6 +685,10 @@ class MessagePipeline:
                         ctx.agent_used = specialized_result.get("agent_used")
                         ctx.response_type = specialized_result.get("response_type")  # For formatting decisions
                         ctx.list_type = specialized_result.get("list_type")  # For interactive lists
+                        if "attachments" in specialized_result:
+                            ctx.attachments = specialized_result.get("attachments")
+                            if ctx.attachments:
+                                log.info(f"📦 Captured {len(ctx.attachments)} attachments from specialized handler")
                         return Result.ok(None)
                     else:
                         log.warning(f"❌ No specialized routing found - parameters unclear")

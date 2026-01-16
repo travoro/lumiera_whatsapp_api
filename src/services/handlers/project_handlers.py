@@ -110,7 +110,7 @@ async def handle_list_documents(
         # Use centralized translations (ALWAYS French)
         message = ""  # Start with empty message, we'll build a simple one-liner
         tool_outputs = []
-        carousel_data = None
+        attachments = None
 
         # Scenario 3: Has current project in context or auto-selected
         if current_project_id:
@@ -165,18 +165,16 @@ async def handle_list_documents(
                         plan_word = "plan" if plan_count == 1 else "plans"
                         message += f"Voici {plan_count} {plan_word} pour le chantier {project_name}. 📐"
 
-                        # Prepare carousel_data for sending plans as attachments
+                        # Prepare attachments for sending plans directly
                         # Use component name (e.g., "Principal", "SDB") without extension
-                        carousel_data = {
-                            "cards": [
-                                {
-                                    "media_url": plan.get("url"),
-                                    "media_type": plan.get("content_type", "image/png"),
-                                    "media_name": plan.get('component_name', 'document')
-                                }
-                                for plan in plans
-                            ]
-                        }
+                        attachments = [
+                            {
+                                "url": plan.get("url"),
+                                "content_type": plan.get("content_type", "image/png"),
+                                "filename": plan.get('component_name', 'document')
+                            }
+                            for plan in plans
+                        ]
 
             # No footer needed anymore since message is self-contained
 
@@ -213,8 +211,8 @@ async def handle_list_documents(
         if list_type:
             result["list_type"] = list_type
 
-        if carousel_data:
-            result["carousel_data"] = carousel_data
+        if attachments:
+            result["attachments"] = attachments
 
         return result
 
