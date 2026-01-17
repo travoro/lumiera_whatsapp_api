@@ -13,11 +13,6 @@ The following files have been created for CI/CD:
 - [x] `.github/workflows/dependency-update.yml` - Dependency Updates
 - [x] `.github/dependabot.yml` - Dependabot Configuration
 
-### Docker
-- [x] `Dockerfile` - Container image definition
-- [x] `.dockerignore` - Docker build exclusions
-- [x] `docker-compose.yml` - Multi-container setup
-
 ### Documentation
 - [x] `CI-CD.md` - Complete CI/CD documentation
 - [x] `.github/workflows/README.md` - Workflows overview
@@ -52,7 +47,7 @@ See [GIT-SETUP.md](../getting-started/GIT-SETUP.md) for detailed configuration.
 ### 1. Commit and Push CI/CD Files
 
 ```bash
-git add .github/ Dockerfile .dockerignore docker-compose.yml CI-CD.md
+git add .github/ docs/deployment/CI-CD.md
 git commit -m "ci: Add CI/CD pipeline with GitHub Actions"
 git push origin main
 ```
@@ -87,17 +82,6 @@ gh variable set DEPLOYMENT_METHOD -b"ssh"
 3. Go to Variables tab
 4. Add variable:
    - `DEPLOYMENT_METHOD`: `ssh`
-
-#### Option B: Docker Hub Deployment
-
-```bash
-# Add Docker Hub credentials
-gh secret set DOCKER_USERNAME -b"your-dockerhub-username"
-gh secret set DOCKER_PASSWORD -b"your-dockerhub-token"
-
-# Set deployment method
-gh variable set DEPLOYMENT_METHOD -b"docker"
-```
 
 ### 4. Configure Dependabot
 
@@ -283,10 +267,6 @@ gh run view --log-failed
 
 # Run tests locally
 ./run_tests.sh
-
-# Check if services are needed
-docker-compose up -d postgres redis
-./run_tests.sh
 ```
 
 ### CD Workflow Fails
@@ -298,19 +278,6 @@ ssh -i ~/.ssh/id_ed25519 ceeai@whatsapp.lumiera.paris
 
 # Check if service exists
 ssh ceeai@whatsapp.lumiera.paris "systemctl status lumiera-whatsapp.service"
-```
-
-**Docker Deployment:**
-```bash
-# Test Docker build locally
-docker build -t test .
-
-# Test Docker Hub login
-docker login
-
-# Test push
-docker tag test your-username/whatsapp-api:test
-docker push your-username/whatsapp-api:test
 ```
 
 ### Workflows Not Running

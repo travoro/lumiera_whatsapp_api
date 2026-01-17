@@ -32,17 +32,13 @@ Before workflows can run successfully, configure the following:
 - `DEPLOY_PORT` (optional) - SSH port (default: 22)
 - `DEPLOY_PATH` (optional) - App path on server
 
-**For Docker Deployment:**
-- `DOCKER_USERNAME` - Docker Hub username
-- `DOCKER_PASSWORD` - Docker Hub token
-
 **Optional:**
 - `SLACK_WEBHOOK_URL` - For deployment notifications
 - `CODECOV_TOKEN` - For coverage reports (get from codecov.io)
 
 ### 2. Variables (Settings → Secrets → Variables)
 
-- `DEPLOYMENT_METHOD` - Choose: `ssh`, `docker`, or `cloud`
+- `DEPLOYMENT_METHOD` - Choose: `ssh` or `cloud`
 
 ### 3. Enable Workflows
 

@@ -15,9 +15,6 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
-    labels:
-      - "dependencies"
-      - "automated"
     # Group minor and patch updates
     groups:
       dev-dependencies:
@@ -49,20 +46,3 @@ updates:
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
-    labels:
-      - "ci"
-      - "automated"
-
-  # Enable version updates for Docker
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-    commit-message:
-      prefix: "chore(docker)"
-      include: "scope"
-    labels:
-      - "docker"
-      - "automated"

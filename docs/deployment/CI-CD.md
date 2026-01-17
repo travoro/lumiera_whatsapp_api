@@ -20,7 +20,6 @@ The CI/CD pipeline automatically:
 - 📊 Checks code quality and generates reports
 - 🚀 Deploys to production on main branch pushes
 - 📦 Updates dependencies weekly
-- 🐳 Builds and pushes Docker images
 
 ## GitHub Actions Workflows
 
@@ -57,13 +56,7 @@ Deploys to your server via SSH:
 git pull → pip install → run tests → restart service
 ```
 
-#### Option B: Docker Deployment
-Builds and pushes Docker image to Docker Hub:
-```bash
-docker build → docker push → deploy container
-```
-
-#### Option C: Cloud Platform
+#### Option B: Cloud Platform
 Deploy to cloud platforms (customize for your needs):
 - Google Cloud Run
 - AWS ECS/Fargate
@@ -74,7 +67,6 @@ Deploy to cloud platforms (customize for your needs):
 **Choose deployment method:**
 Set the `DEPLOYMENT_METHOD` variable in GitHub:
 - `ssh` (default) - Deploy via SSH
-- `docker` - Build and push Docker image
 - `cloud` - Cloud platform deployment
 
 ### 3. Code Quality Workflow (`.github/workflows/code-quality.yml`)
@@ -110,7 +102,6 @@ Set the `DEPLOYMENT_METHOD` variable in GitHub:
 - Creates PRs for:
   - Python packages (pip)
   - GitHub Actions versions
-  - Docker base images
 - Groups related updates together
 - Auto-assigns reviewers
 
@@ -157,7 +148,7 @@ Go to **Settings → Secrets and variables → Actions → Variables → New rep
 
 Add:
 - **Name:** `DEPLOYMENT_METHOD`
-- **Value:** `ssh` or `docker` or `cloud`
+- **Value:** `ssh` or `cloud`
 
 ## Deployment Options
 
@@ -198,44 +189,7 @@ DEPLOY_PATH: /home/ceeai/whatsapp_api  # Optional
 **Customize deployment script:**
 Edit `.github/workflows/cd.yml` under "Deploy to Server via SSH"
 
-### Option 2: Docker Deployment
-
-**Best for:** Container-based deployments
-
-**Required Secrets:**
-```yaml
-DOCKER_USERNAME: your-dockerhub-username
-DOCKER_PASSWORD: your-dockerhub-password-or-token
-```
-
-**Setup:**
-1. Create Docker Hub account at https://hub.docker.com
-2. Create access token: Account Settings → Security → New Access Token
-3. Add secrets to GitHub
-
-**Deploy the image:**
-```bash
-# On your server:
-docker pull your-username/whatsapp-api:latest
-docker-compose up -d
-```
-
-**Test locally:**
-```bash
-# Build
-docker build -t whatsapp-api .
-
-# Run with docker-compose
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f app
-
-# Stop
-docker-compose down
-```
-
-### Option 3: Cloud Platform Deployment
+### Option 2: Cloud Platform Deployment
 
 **Customize for your platform:**
 
@@ -262,66 +216,6 @@ aws ecs update-service \
 railway up
 ```
 
-## Docker Deployment
-
-### Build and Run Locally
-
-```bash
-# Build the image
-docker build -t whatsapp-api .
-
-# Run standalone
-docker run -d \
-  -p 8000:8000 \
-  --env-file .env \
-  --name whatsapp-api \
-  whatsapp-api
-
-# Or use docker-compose
-docker-compose up -d
-
-# View logs
-docker logs -f whatsapp-api
-# OR
-docker-compose logs -f app
-
-# Stop
-docker stop whatsapp-api
-# OR
-docker-compose down
-```
-
-### Production Deployment with Docker
-
-```bash
-# Pull latest image
-docker pull your-username/whatsapp-api:latest
-
-# Start with docker-compose
-docker-compose up -d
-
-# Update
-docker-compose pull
-docker-compose up -d
-
-# Rollback
-docker-compose down
-docker pull your-username/whatsapp-api:previous-sha
-docker-compose up -d
-```
-
-### Environment Variables
-
-Create `.env` file (don't commit this!):
-```env
-# Copy from .env.example and fill in values
-ENVIRONMENT=production
-DEBUG=false
-DATABASE_URL=postgresql://user:pass@postgres:5432/db
-REDIS_URL=redis://redis:6379/0
-# ... add all required variables
-```
-
 ## Secrets Configuration
 
 ### GitHub Secrets Reference
@@ -333,8 +227,6 @@ REDIS_URL=redis://redis:6379/0
 | `DEPLOY_SSH_KEY` | SSH | Private SSH key | `-----BEGIN OPENSSH...` |
 | `DEPLOY_PORT` | SSH (optional) | SSH port | `22` |
 | `DEPLOY_PATH` | SSH (optional) | App directory | `/home/ceeai/whatsapp_api` |
-| `DOCKER_USERNAME` | Docker | Docker Hub username | `myusername` |
-| `DOCKER_PASSWORD` | Docker | Docker Hub token | `dckr_pat_...` |
 | `SLACK_WEBHOOK_URL` | Notifications (optional) | Slack webhook | `https://hooks.slack.com/...` |
 
 ### Add Secrets via GitHub CLI
@@ -344,10 +236,6 @@ REDIS_URL=redis://redis:6379/0
 gh secret set DEPLOY_HOST -b"your-server.com"
 gh secret set DEPLOY_USER -b"ceeai"
 gh secret set DEPLOY_SSH_KEY < ~/.ssh/id_ed25519
-
-# Docker deployment
-gh secret set DOCKER_USERNAME -b"your-username"
-gh secret set DOCKER_PASSWORD -b"your-token"
 ```
 
 ## Badge Setup
@@ -388,17 +276,6 @@ sudo journalctl -u lumiera-whatsapp.service -f
 sudo systemctl restart lumiera-whatsapp.service
 ```
 
-### Docker Health Check
-
-```bash
-# Check container health
-docker ps
-docker inspect whatsapp-api | grep -A 10 Health
-
-# Via docker-compose
-docker-compose ps
-```
-
 ## Troubleshooting
 
 ### CI Tests Failing
@@ -418,12 +295,6 @@ docker-compose ps
 - Test SSH connection manually: `ssh -i key user@host`
 - Check server logs: `sudo journalctl -u lumiera-whatsapp.service`
 - Ensure git repository is accessible on server
-
-**Docker Deployment:**
-- Check Docker Hub credentials
-- Verify image was pushed: `docker pull your-username/whatsapp-api:latest`
-- Check container logs: `docker logs whatsapp-api`
-- Verify environment variables are set
 
 ### Coverage Not Uploading
 
@@ -468,7 +339,6 @@ docker-compose ps
 ## Additional Resources
 
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Docker Documentation](https://docs.docker.com/)
 - [pytest Documentation](https://docs.pytest.org/)
 - [Codecov Documentation](https://docs.codecov.com/)
 
