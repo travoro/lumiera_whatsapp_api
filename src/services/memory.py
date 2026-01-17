@@ -59,7 +59,7 @@ class ConversationMemoryService:
             conversation = "\n".join(conversation_text)
 
             # Create summarization prompt
-            summary_prompt = """Résume cette conversation entre un sous-traitant BTP et un assistant virtuel.
+            summary_prompt = f"""Résume cette conversation entre un sous-traitant BTP et un assistant virtuel.
 Inclus les points clés, les demandes principales, et les actions effectuées.
 Sois concis et factuel.
 
