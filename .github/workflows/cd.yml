@@ -26,10 +26,10 @@ jobs:
       if: ${{ vars.DEPLOYMENT_METHOD == 'ssh' || vars.DEPLOYMENT_METHOD == '' }}
       uses: appleboy/ssh-action@v1.0.3
       with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT || 22 }}
         script: |
           cd ${{ secrets.DEPLOY_PATH || '/home/ceeai/whatsapp_api' }}
           git pull origin main
