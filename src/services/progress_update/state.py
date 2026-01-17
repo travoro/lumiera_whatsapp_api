@@ -90,6 +90,9 @@ class ProgressUpdateState:
     ) -> Optional[str]:
         """Create a new progress update session.
 
+        Uses UPSERT to atomically replace any existing session for this user.
+        This prevents race conditions from concurrent session creation.
+
         Args:
             user_id: Subcontractor ID
             task_id: Task ID to update
@@ -99,13 +102,11 @@ class ProgressUpdateState:
             Session ID if created successfully, None otherwise
         """
         try:
-            # Clear any existing session for this user
-            await self.clear_session(user_id)
-
-            # Create new session
+            # Use UPSERT to atomically replace existing session
+            # Database has UNIQUE(subcontractor_id) constraint
             response = (
                 supabase_client.client.table("progress_update_sessions")
-                .insert(
+                .upsert(
                     {
                         "subcontractor_id": user_id,
                         "task_id": task_id,
@@ -116,7 +117,13 @@ class ProgressUpdateState:
                             datetime.utcnow()
                             + timedelta(hours=self.SESSION_EXPIRY_HOURS)
                         ).isoformat(),
-                    }
+                        "images_uploaded": 0,  # Reset counters
+                        "comments_added": 0,
+                        "status_changed": False,
+                        "created_at": datetime.utcnow().isoformat(),  # Reset creation time
+                        "last_activity": datetime.utcnow().isoformat(),
+                    },
+                    on_conflict="subcontractor_id",  # Specify unique constraint column
                 )
                 .execute()
             )
@@ -124,7 +131,8 @@ class ProgressUpdateState:
             if response.data:
                 session_id = response.data[0]["id"]
                 log.info(
-                    f"✅ Created progress update session {session_id} for user {user_id}"
+                    f"✅ Created/updated progress update session {session_id} for user {user_id} "
+                    f"(task: {task_id})"
                 )
 
                 # Set expecting_response flag immediately after session creation
