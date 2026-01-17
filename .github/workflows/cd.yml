@@ -21,9 +21,16 @@ jobs:
       with:
         python-version: '3.12'
 
+    # Debug: Check if secrets are available
+    - name: Debug secrets availability
+      run: |
+        echo "SSH_HOST is set: ${{ secrets.SSH_HOST != '' }}"
+        echo "SSH_USERNAME is set: ${{ secrets.SSH_USERNAME != '' }}"
+        echo "SSH_KEY is set: ${{ secrets.SSH_KEY != '' }}"
+        echo "SSH_PORT is set: ${{ secrets.SSH_PORT != '' }}"
+
     # Option 1: Deploy via SSH
     - name: Deploy to Server via SSH
-      if: ${{ vars.DEPLOYMENT_METHOD == 'ssh' || vars.DEPLOYMENT_METHOD == '' }}
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.SSH_HOST }}
