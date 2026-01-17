@@ -387,7 +387,7 @@ class IntentClassifier:
                         "audio": "message vocal/audio",
                     }
                     media_display = media_types.get(media_type, "média")
-                    media_hint = """
+                    media_hint = f"""
 📎 MEDIA ATTACHÉ : L'utilisateur a envoyé {num_media} {media_display}
 
 RÈGLES CRITIQUES POUR MESSAGES AVEC MÉDIA :
@@ -414,7 +414,7 @@ RÈGLES CRITIQUES POUR MESSAGES AVEC MÉDIA :
                 # FSM context hint (critical for context preservation)
                 fsm_hint = ""
                 if should_continue_session and expecting_response:
-                    fsm_hint = """
+                    fsm_hint = f"""
 ⚠️⚠️⚠️ CONTEXTE DE SESSION ACTIVE CRITIQUE ⚠️⚠️⚠️
 
 L'utilisateur est EN TRAIN de mettre à jour une tâche (état FSM: {fsm_state})
@@ -444,7 +444,7 @@ RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
 5. Confiance recommandée : update_progress:95 (haute confiance car session active)
 """
 
-                prompt = """Classifie ce message dans UN seul intent avec confiance :
+                prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (l'utilisateur veut voir ses projets/chantiers)
 - list_tasks (l'utilisateur veut voir les tâches pour un projet)
