@@ -1,13 +1,16 @@
 """LangChain agent orchestrator with Claude."""
+
 import os
-from typing import Dict, Any
+from typing import Any, Dict
 
 # === Agent Execution Context ===
 # Thread-safe execution context (replaces global mutable dict)
 from src.agent.execution_context import (
     execution_context,  # Backward compatibility proxy
+)
+from src.agent.execution_context import (
     execution_context_scope,
-    get_execution_context
+    get_execution_context,
 )
 
 # === LangSmith Integration ===
@@ -17,7 +20,9 @@ from src.config import settings
 from src.utils.logger import log
 
 if settings.langchain_api_key:
-    os.environ["LANGCHAIN_TRACING_V2"] = "true" if settings.langchain_tracing_v2 else "false"
+    os.environ["LANGCHAIN_TRACING_V2"] = (
+        "true" if settings.langchain_tracing_v2 else "false"
+    )
     os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
     os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
     os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
@@ -25,11 +30,13 @@ if settings.langchain_api_key:
 else:
     log.warning("LangSmith API key not configured - tracing disabled")
 
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+
 # Import LangChain AFTER setting environment variables
 from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI
+
 # NOTE: all_tools import removed - now using build_tools_for_user() for closure pattern
 
 
@@ -210,7 +217,9 @@ def create_agent(user_id: str, phone_number: str, language: str) -> AgentExecuto
     """
     # Initialize LLM based on provider selection
     if settings.llm_provider == "openai":
-        log.debug(f"🤖 Initializing OpenAI agent with model: {settings.openai_model} (user: {user_id[:8]}...)")
+        log.debug(
+            f"🤖 Initializing OpenAI agent with model: {settings.openai_model} (user: {user_id[:8]}...)"
+        )
         llm = ChatOpenAI(
             model=settings.openai_model,
             api_key=settings.openai_api_key,
@@ -218,7 +227,9 @@ def create_agent(user_id: str, phone_number: str, language: str) -> AgentExecuto
             max_tokens=settings.openai_max_tokens,
         )
     else:  # Default to Anthropic
-        log.debug(f"🤖 Initializing Anthropic agent with model: {settings.anthropic_model} (user: {user_id[:8]}...)")
+        log.debug(
+            f"🤖 Initializing Anthropic agent with model: {settings.anthropic_model} (user: {user_id[:8]}...)"
+        )
         llm = ChatAnthropic(
             model=settings.anthropic_model,
             api_key=settings.anthropic_api_key,
@@ -227,18 +238,23 @@ def create_agent(user_id: str, phone_number: str, language: str) -> AgentExecuto
         )
 
     # Create prompt template
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        MessagesPlaceholder(variable_name="chat_history", optional=True),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT),
+            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
 
     # Build user-specific tools with captured context (closure pattern)
     from src.agent.tools import build_tools_for_user
+
     user_tools = build_tools_for_user(user_id, phone_number, language)
 
-    log.debug(f"🔧 Built {len(user_tools)} tools with captured context for user {user_id[:8]}...")
+    log.debug(
+        f"🔧 Built {len(user_tools)} tools with captured context for user {user_id[:8]}..."
+    )
 
     # Create agent with user-specific tools
     agent = create_tool_calling_agent(llm, user_tools, prompt)
@@ -272,7 +288,9 @@ class LumieraAgent:
         This allows tools to capture authenticated user_id, phone_number, and language
         from the closure scope, following LangChain best practices for AgentExecutor.
         """
-        log.info("🚀 Lumiera Agent initialized (agent built per-request with closure pattern)")
+        log.info(
+            "🚀 Lumiera Agent initialized (agent built per-request with closure pattern)"
+        )
 
     async def process_message(
         self,
@@ -346,28 +364,34 @@ class LumieraAgent:
                 result = await agent_executor.ainvoke(agent_input)
 
                 # Extract output
-                output = result.get("output", "Désolé, je n'ai pas pu traiter votre demande.")
+                output = result.get(
+                    "output", "Désolé, je n'ai pas pu traiter votre demande."
+                )
 
                 # Normalize output to string (LangChain sometimes returns dict/list)
                 if isinstance(output, dict):
                     # Extract 'text' field from dict: {'text': '...', 'type': 'text', 'index': 0}
                     log.warning(f"Agent returned dict output, extracting text field")
-                    output = output.get('text', str(output))
+                    output = output.get("text", str(output))
                 elif isinstance(output, list):
                     # List items might be dicts with 'text' field or plain strings
-                    log.warning(f"Agent returned list output ({len(output)} items), extracting text")
+                    log.warning(
+                        f"Agent returned list output ({len(output)} items), extracting text"
+                    )
                     extracted_items = []
                     for item in output:
                         if isinstance(item, dict):
                             # Extract 'text' field from dict item
-                            extracted_items.append(item.get('text', str(item)))
+                            extracted_items.append(item.get("text", str(item)))
                         else:
                             # Plain string or other type
                             extracted_items.append(str(item))
-                    output = '\n'.join(extracted_items)
+                    output = "\n".join(extracted_items)
                 elif not isinstance(output, str):
                     # Fallback: convert to string
-                    log.warning(f"Agent returned unexpected type {type(output)}, converting to string")
+                    log.warning(
+                        f"Agent returned unexpected type {type(output)}, converting to string"
+                    )
                     output = str(output)
 
                 # Extract intermediate_steps (tool calls + outputs)
@@ -387,10 +411,14 @@ class LumieraAgent:
                         user_id_input = action.tool_input.get("user_id")
 
                         if project_id and user_id_input:
-                            task_result = await task_actions.list_tasks(user_id_input, project_id)
+                            task_result = await task_actions.list_tasks(
+                                user_id_input, project_id
+                            )
                             if task_result.get("success") and task_result.get("data"):
                                 structured_output = compact_tasks(task_result["data"])
-                                log.info(f"   🗜️ Stored structured data for list_tasks_tool: {len(structured_output)} tasks")
+                                log.info(
+                                    f"   🗜️ Stored structured data for list_tasks_tool: {len(structured_output)} tasks"
+                                )
                             else:
                                 structured_output = []
                         else:
@@ -399,20 +427,22 @@ class LumieraAgent:
                         tool_output_entry = {
                             "tool": action.tool,
                             "input": action.tool_input,
-                            "output": structured_output  # Structured data, not string
+                            "output": structured_output,  # Structured data, not string
                         }
                     else:
                         # For other tools, store as-is
                         tool_output_entry = {
                             "tool": action.tool,
                             "input": action.tool_input,
-                            "output": tool_result
+                            "output": tool_result,
                         }
 
                     tool_outputs.append(tool_output_entry)
 
                 if tool_outputs:
-                    log.info(f"📦 Captured {len(tool_outputs)} tool outputs for short-term memory")
+                    log.info(
+                        f"📦 Captured {len(tool_outputs)} tool outputs for short-term memory"
+                    )
 
                 # Get escalation flag from execution context (set by tools)
                 escalation_occurred = ctx.escalation_occurred
@@ -426,7 +456,7 @@ class LumieraAgent:
                     "message": output,
                     "escalation": escalation_occurred,
                     "tools_called": ctx.tools_called,
-                    "tool_outputs": tool_outputs  # NEW: Short-term tool memory
+                    "tool_outputs": tool_outputs,  # NEW: Short-term tool memory
                 }
 
             except Exception as e:
@@ -435,7 +465,7 @@ class LumieraAgent:
                     "message": "Désolé, une erreur s'est produite. Veuillez réessayer.",
                     "escalation": False,
                     "tools_called": [],
-                    "tool_outputs": []
+                    "tool_outputs": [],
                 }
 
 

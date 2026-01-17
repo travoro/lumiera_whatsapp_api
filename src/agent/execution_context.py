@@ -3,10 +3,11 @@
 This module provides a thread-safe way to track escalations and tool calls
 during agent execution, replacing the global mutable state pattern.
 """
-from contextvars import ContextVar
-from typing import Dict, List, Any
-from dataclasses import dataclass, field
+
 from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 
 @dataclass
@@ -38,14 +39,13 @@ class ExecutionContext:
         return {
             "escalation_occurred": self.escalation_occurred,
             "tools_called": self.tools_called,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
 # Thread-local context variable
 _execution_context: ContextVar[ExecutionContext] = ContextVar(
-    'execution_context',
-    default=ExecutionContext()
+    "execution_context", default=ExecutionContext()
 )
 
 

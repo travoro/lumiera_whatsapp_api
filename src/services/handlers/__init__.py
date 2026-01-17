@@ -8,16 +8,17 @@ The handlers are organized into three modules:
 - project_handlers: list_projects, list_documents, report_incident
 - task_handlers: list_tasks, update_progress
 """
-from typing import Dict, Any, Optional
-from src.services.handlers.basic_handlers import handle_greeting, handle_escalation
+
+from typing import Any, Dict, Optional
+
+from src.services.handlers.basic_handlers import handle_escalation, handle_greeting
 from src.services.handlers.project_handlers import (
-    handle_list_projects,
     handle_list_documents,
-    handle_report_incident
+    handle_list_projects,
+    handle_report_incident,
 )
 from src.services.handlers.task_handlers import handle_list_tasks, handle_task_details
 from src.utils.logger import log
-
 
 # Intent handler mapping
 INTENT_HANDLERS = {
@@ -40,7 +41,7 @@ async def execute_direct_handler(
     phone_number: str,
     user_name: str,
     language: str,
-    **kwargs
+    **kwargs,
 ) -> Optional[Dict[str, Any]]:
     """Execute direct handler for given intent.
 
@@ -68,7 +69,7 @@ async def execute_direct_handler(
             phone_number=phone_number,
             user_name=user_name,
             language=language,
-            **kwargs
+            **kwargs,
         )
 
         if result:

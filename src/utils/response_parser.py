@@ -1,10 +1,14 @@
 """Smart response parser that detects and structures agent responses."""
-from typing import Optional, Tuple, List, Dict, Any
+
 import re
+from typing import Any, Dict, List, Optional, Tuple
+
 from src.utils.logger import log
 
 
-def detect_numbered_list(text: str, language: str = "fr", list_type: str = "option") -> Optional[List[Dict[str, Any]]]:
+def detect_numbered_list(
+    text: str, language: str = "fr", list_type: str = "option"
+) -> Optional[List[Dict[str, Any]]]:
     """Detect numbered lists in text and extract structured items.
 
     Looks for patterns like:
@@ -24,7 +28,7 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
         log.warning(f"detect_numbered_list received non-string: {type(text)}")
         return None
 
-    lines = text.split('\n')
+    lines = text.split("\n")
     items = []
     current_section = []
 
@@ -34,7 +38,7 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
             continue
 
         # Match numbered items: "1. ...", "1) ...", "1 - ..."
-        match = re.match(r'^(\d+)[\.\)]\s+(.+)$', line)
+        match = re.match(r"^(\d+)[\.\)]\s+(.+)$", line)
         if match:
             current_section.append(line)
         elif current_section and not match:
@@ -47,7 +51,7 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
 
     # Parse items
     for line in current_section:
-        match = re.match(r'^(\d+)[\.\)]\s+(.+)$', line)
+        match = re.match(r"^(\d+)[\.\)]\s+(.+)$", line)
         if not match:
             continue
 
@@ -55,7 +59,7 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
         content = match.group(2).strip()
 
         # Remove leading emoji if present
-        emoji_match = re.match(r'^([^\w\s]+)\s+(.+)$', content)
+        emoji_match = re.match(r"^([^\w\s]+)\s+(.+)$", content)
         if emoji_match:
             emoji = emoji_match.group(1)
             content = emoji_match.group(2)
@@ -63,9 +67,9 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
             emoji = ""
 
         # Split into title and description
-        if ' - ' in content or ' – ' in content:
+        if " - " in content or " – " in content:
             # Use both regular and em dash
-            parts = re.split(r'\s+[-–]\s+', content, 1)
+            parts = re.split(r"\s+[-–]\s+", content, 1)
             title = parts[0].strip()
             description = parts[1].strip() if len(parts) > 1 else None
         else:
@@ -84,16 +88,22 @@ def detect_numbered_list(text: str, language: str = "fr", list_type: str = "opti
         else:
             title = title[:24]
 
-        items.append({
-            "id": f"{list_type}_{number}_{language}",  # e.g., "task_1_fr" or "project_1_fr"
-            "title": title[:24],  # Final safety truncation
-            "description": description[:72] if description else None  # WhatsApp limit
-        })
+        items.append(
+            {
+                "id": f"{list_type}_{number}_{language}",  # e.g., "task_1_fr" or "project_1_fr"
+                "title": title[:24],  # Final safety truncation
+                "description": (
+                    description[:72] if description else None
+                ),  # WhatsApp limit
+            }
+        )
 
     return items if items else None
 
 
-def extract_intro_and_list(text: str, language: str = "fr", list_type: str = "option") -> Tuple[str, Optional[List[Dict[str, Any]]], str]:
+def extract_intro_and_list(
+    text: str, language: str = "fr", list_type: str = "option"
+) -> Tuple[str, Optional[List[Dict[str, Any]]], str]:
     """Extract intro text, list items, and outro text from response.
 
     Args:
@@ -109,7 +119,7 @@ def extract_intro_and_list(text: str, language: str = "fr", list_type: str = "op
         log.warning(f"extract_intro_and_list received non-string: {type(text)}")
         return str(text) if text else "", None, ""
 
-    lines = text.split('\n')
+    lines = text.split("\n")
     intro_lines = []
     list_lines = []
     outro_lines = []
@@ -121,7 +131,7 @@ def extract_intro_and_list(text: str, language: str = "fr", list_type: str = "op
         stripped = line.strip()
 
         # Check if this is a numbered item
-        is_numbered = bool(re.match(r'^\d+[\.\)]\s+', stripped))
+        is_numbered = bool(re.match(r"^\d+[\.\)]\s+", stripped))
 
         if is_numbered and not list_ended:
             in_list = True
@@ -138,11 +148,11 @@ def extract_intro_and_list(text: str, language: str = "fr", list_type: str = "op
         else:
             outro_lines.append(line)
 
-    intro_text = '\n'.join(intro_lines).strip()
-    outro_text = '\n'.join(outro_lines).strip()
+    intro_text = "\n".join(intro_lines).strip()
+    outro_text = "\n".join(outro_lines).strip()
 
     # Parse list items
-    list_text = '\n'.join(list_lines).strip()
+    list_text = "\n".join(list_lines).strip()
     items = detect_numbered_list(list_text, language, list_type) if list_text else None
 
     return intro_text, items, outro_text
@@ -166,7 +176,9 @@ def should_use_interactive_message(text: str) -> bool:
     return 1 <= num_items <= 10
 
 
-def format_for_interactive(text: str, language: str = "fr", list_type: str = "option") -> Tuple[str, Optional[Dict[str, Any]]]:
+def format_for_interactive(
+    text: str, language: str = "fr", list_type: str = "option"
+) -> Tuple[str, Optional[Dict[str, Any]]]:
     """Format response for interactive WhatsApp message.
 
     Args:
@@ -196,19 +208,14 @@ def format_for_interactive(text: str, language: str = "fr", list_type: str = "op
     if outro:
         body_parts.append(outro)
 
-    interactive_body = '\n\n'.join(body_parts).strip()
+    interactive_body = "\n\n".join(body_parts).strip()
 
     # Create interactive list data with the body text
     interactive_data = {
         "type": "list",
         "button_text": "Choisir une option",
         "body_text": interactive_body,  # Text shown above the list button
-        "sections": [
-            {
-                "title": "Options",
-                "rows": items
-            }
-        ]
+        "sections": [{"title": "Options", "rows": items}],
     }
 
     log.info(f"📋 Formatted interactive message with {len(items)} items")
@@ -221,7 +228,9 @@ def format_for_interactive(text: str, language: str = "fr", list_type: str = "op
     return text, interactive_data
 
 
-def format_for_buttons(text: str, buttons: List[Dict[str, str]]) -> Tuple[str, Dict[str, Any]]:
+def format_for_buttons(
+    text: str, buttons: List[Dict[str, str]]
+) -> Tuple[str, Dict[str, Any]]:
     """Format response with button options (max 3).
 
     Args:
@@ -234,12 +243,9 @@ def format_for_buttons(text: str, buttons: List[Dict[str, str]]) -> Tuple[str, D
     interactive_data = {
         "type": "buttons",
         "buttons": [
-            {
-                "id": btn.get("id", f"btn_{i}"),
-                "title": btn.get("title", "Option")[:20]
-            }
+            {"id": btn.get("id", f"btn_{i}"), "title": btn.get("title", "Option")[:20]}
             for i, btn in enumerate(buttons[:3])  # Max 3
-        ]
+        ],
     }
 
     return text, interactive_data

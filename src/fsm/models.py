@@ -3,9 +3,11 @@
 This module defines the core data models used throughout the FSM system,
 including session states, transition rules, and context management.
 """
-from enum import Enum
-from typing import Optional, List, Dict, Any
+
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -21,6 +23,7 @@ class SessionState(str, Enum):
     - COMPLETED: Session successfully completed
     - ABANDONED: Session abandoned (timeout or user cancelled)
     """
+
     IDLE = "idle"
     TASK_SELECTION = "task_selection"
     AWAITING_ACTION = "awaiting_action"
@@ -36,10 +39,11 @@ class IntentPriority(str, Enum):
     Higher priority (P0) takes precedence over lower priority (P4).
     Used for conflict resolution when multiple intents are detected.
     """
+
     P0_CRITICAL = "P0"  # Explicit commands: cancel, stop, help
     P1_EXPLICIT = "P1"  # Direct action requests: "upload photo", "add comment"
     P2_IMPLICIT = "P2"  # Contextual actions during session
-    P3_GENERAL = "P3"   # General queries, greetings
+    P3_GENERAL = "P3"  # General queries, greetings
     P4_FALLBACK = "P4"  # Fallback/unknown intents
 
 
@@ -53,6 +57,7 @@ class TransitionRule(BaseModel):
         conditions: Optional conditions that must be met (not enforced in v1)
         description: Human-readable description of the transition
     """
+
     from_state: Optional[SessionState] = None  # None = from any state
     to_state: SessionState
     trigger: str
@@ -79,6 +84,7 @@ class FSMContext(BaseModel):
         intent_history: Recent intents detected (for conflict resolution)
         metadata: Additional context-specific metadata
     """
+
     user_id: str
     current_state: SessionState
     session_id: Optional[str] = None
@@ -104,6 +110,7 @@ class TransitionResult(BaseModel):
         context: Updated FSM context after transition
         side_effects: List of side effects executed (for logging)
     """
+
     success: bool
     from_state: SessionState
     to_state: SessionState
@@ -126,6 +133,7 @@ class IntentClassification(BaseModel):
         parameters: Extracted parameters from user message
         conflicts_with_session: Whether this intent conflicts with active session
     """
+
     intent: str
     confidence: float = Field(ge=0.0, le=1.0)
     priority: IntentPriority
@@ -147,6 +155,7 @@ class ClarificationRequest(BaseModel):
         created_at: When clarification was requested
         expires_at: When this clarification request expires
     """
+
     user_id: str
     message: str
     options: List[str]
@@ -168,6 +177,7 @@ class IdempotencyRecord(BaseModel):
         processed_at: When the message was processed
         result: Result of processing (for caching)
     """
+
     key: str
     user_id: str
     message_id: str

@@ -3,7 +3,9 @@
 This module acts as the single point of routing for all user intents,
 preventing direct handler-to-handler calls and maintaining proper layering.
 """
-from typing import Dict, Any, Optional
+
+from typing import Any, Dict, Optional
+
 from src.utils.logger import log
 
 
@@ -22,14 +24,14 @@ class IntentRouter:
 
         # Lazy import handlers
         from src.services.handlers import (
-            handle_list_tasks,
-            handle_task_details,
-            handle_list_documents,
-            handle_report_incident,
-            handle_update_progress,
-            handle_greeting,
             handle_escalation,
-            handle_list_projects
+            handle_greeting,
+            handle_list_documents,
+            handle_list_projects,
+            handle_list_tasks,
+            handle_report_incident,
+            handle_task_details,
+            handle_update_progress,
         )
 
         handler_mapping = {
@@ -59,7 +61,7 @@ class IntentRouter:
         phone_number: str,
         user_name: str,
         language: str,
-        **kwargs
+        **kwargs,
     ) -> Optional[Dict[str, Any]]:
         """Route intent to appropriate handler.
 
@@ -87,7 +89,7 @@ class IntentRouter:
                 phone_number=phone_number,
                 user_name=user_name,
                 language=language,
-                **kwargs
+                **kwargs,
             )
 
             if result:

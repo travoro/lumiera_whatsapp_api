@@ -7,9 +7,12 @@ Best Practices:
 - Separate error logs: Errors also go to dedicated file for easy debugging
 - Compression: Old logs are compressed to save space
 """
+
 import sys
 from pathlib import Path
+
 from loguru import logger
+
 from src.config import settings
 
 

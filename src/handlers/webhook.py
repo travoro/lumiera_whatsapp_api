@@ -1,13 +1,15 @@
 """Twilio webhook handlers for FastAPI."""
-from fastapi import APIRouter, Form, Request, HTTPException
-from fastapi.responses import Response
+
 from typing import Optional
-from src.handlers.message import process_inbound_message
-from src.integrations.twilio import twilio_client
-from src.utils.logger import log
+
+from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi.responses import Response
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from src.handlers.message import process_inbound_message
+from src.integrations.twilio import twilio_client
+from src.utils.logger import log
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -23,7 +25,7 @@ async def whatsapp_webhook(
     MediaUrl0: Optional[str] = Form(None),
     MediaContentType0: Optional[str] = Form(None),
     ButtonPayload: Optional[str] = Form(None),  # Interactive list selection ID
-    ButtonText: Optional[str] = Form(None),     # Interactive list selection text
+    ButtonText: Optional[str] = Form(None),  # Interactive list selection text
 ):
     """Handle incoming WhatsApp messages from Twilio.
 
@@ -60,7 +62,9 @@ async def whatsapp_webhook(
         is_interactive_response = ButtonPayload is not None
 
         if is_interactive_response:
-            log.info(f"Received interactive list selection from {From}: {ButtonPayload}")
+            log.info(
+                f"Received interactive list selection from {From}: {ButtonPayload}"
+            )
         else:
             log.info(f"Received webhook from {From}")
 

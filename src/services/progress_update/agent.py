@@ -1,22 +1,24 @@
 """Specialized agent for progress update multi-step flows."""
-from typing import Dict, Any, Optional
-from langchain_anthropic import ChatAnthropic
+
+from typing import Any, Dict, Optional
+
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_anthropic import ChatAnthropic
+
+from src.agent.tools import escalate_to_human_tool
 from src.config import settings
+from src.integrations.supabase import supabase_client
 from src.services.progress_update.tools import (
+    add_progress_comment_tool,
+    add_progress_image_tool,
     get_active_task_context_tool,
     get_progress_update_context_tool,
-    add_progress_image_tool,
-    add_progress_comment_tool,
     mark_task_complete_tool,
-    start_progress_update_session_tool
+    start_progress_update_session_tool,
 )
-from src.agent.tools import escalate_to_human_tool
 from src.services.project_context import project_context_service
-from src.integrations.supabase import supabase_client
 from src.utils.logger import log
-
 
 PROGRESS_UPDATE_PROMPT = """Tu es un assistant spécialisé pour guider les utilisateurs dans la mise à jour de leurs tâches.
 
@@ -129,16 +131,18 @@ class ProgressUpdateAgent:
             add_progress_image_tool,
             add_progress_comment_tool,
             mark_task_complete_tool,
-            escalate_to_human_tool
+            escalate_to_human_tool,
         ]
 
         # Create prompt
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", PROGRESS_UPDATE_PROMPT),
-            MessagesPlaceholder(variable_name="chat_history", optional=True),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad")
-        ])
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", PROGRESS_UPDATE_PROMPT),
+                MessagesPlaceholder(variable_name="chat_history", optional=True),
+                ("human", "{input}"),
+                MessagesPlaceholder(variable_name="agent_scratchpad"),
+            ]
+        )
 
         # Create agent
         agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
@@ -148,7 +152,7 @@ class ProgressUpdateAgent:
             verbose=True,
             max_iterations=10,
             handle_parsing_errors=True,
-            return_intermediate_steps=True  # CRITICAL: Need this to analyze tool calls!
+            return_intermediate_steps=True,  # CRITICAL: Need this to analyze tool calls!
         )
 
         log.info("✅ Progress Update Agent initialized")
@@ -161,7 +165,7 @@ class ProgressUpdateAgent:
         message: str,
         chat_history: list = None,
         media_url: Optional[str] = None,
-        media_type: Optional[str] = None
+        media_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Process progress update request.
 
@@ -180,27 +184,38 @@ class ProgressUpdateAgent:
         try:
             # Enhance message with media context
             enhanced_message = message
-            if media_url and 'image' in (media_type or ''):
+            if media_url and "image" in (media_type or ""):
                 enhanced_message = f"{message}\n\n[SYSTEM: L'utilisateur a envoyé une image. URL: {media_url}]"
 
             # Run agent
-            result = await self.agent_executor.ainvoke({
-                "input": enhanced_message,
-                "user_id": user_id,
-                "user_name": user_name,
-                "language": language,
-                "chat_history": chat_history or []
-            })
+            result = await self.agent_executor.ainvoke(
+                {
+                    "input": enhanced_message,
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "language": language,
+                    "chat_history": chat_history or [],
+                }
+            )
 
             log.info(f"🤖 Agent result output type: {type(result['output'])}")
-            log.info(f"🤖 Agent result output: {result['output'][:200] if isinstance(result['output'], str) else str(result['output'])[:200]}")
+            log.info(
+                f"🤖 Agent result output: {result['output'][:200] if isinstance(result['output'], str) else str(result['output'])[:200]}"
+            )
 
             # Extract message text from result
             # Opus 4.5 sometimes returns structured output [{"text": "..."}] instead of plain string
             output = result["output"]
-            if isinstance(output, list) and len(output) > 0 and isinstance(output[0], dict) and "text" in output[0]:
+            if (
+                isinstance(output, list)
+                and len(output) > 0
+                and isinstance(output[0], dict)
+                and "text" in output[0]
+            ):
                 message_text = output[0]["text"]
-                log.info(f"📝 Extracted text from structured output: {message_text[:100]}")
+                log.info(
+                    f"📝 Extracted text from structured output: {message_text[:100]}"
+                )
             elif isinstance(output, str):
                 message_text = output
             else:
@@ -211,7 +226,7 @@ class ProgressUpdateAgent:
                 "success": True,
                 "message": message_text,
                 "agent_used": "progress_update",
-                "response_type": "text"  # Default to plain text
+                "response_type": "text",  # Default to plain text
             }
 
             # Analyze intermediate_steps to determine response type
@@ -219,35 +234,45 @@ class ProgressUpdateAgent:
             log.info(f"🔍 Analyzing {len(intermediate_steps)} intermediate steps")
 
             for action, observation in intermediate_steps:
-                if not hasattr(action, 'tool'):
+                if not hasattr(action, "tool"):
                     continue
 
                 tool_name = action.tool
 
                 # Case 1: Escalation called
-                if tool_name == 'escalate_to_human_tool':
+                if tool_name == "escalate_to_human_tool":
                     response["escalation"] = True
                     response["response_type"] = "escalation"
-                    log.info("🔧 Agent called escalate_to_human_tool → Setting escalation flag")
+                    log.info(
+                        "🔧 Agent called escalate_to_human_tool → Setting escalation flag"
+                    )
                     break
 
                 # Case 2: Task confirmation or task list
-                elif tool_name == 'get_active_task_context_tool':
+                elif tool_name == "get_active_task_context_tool":
                     log.info(f"🔍 Checking get_active_task_context_tool observation")
-                    log.info(f"   Has 'Show the user this list': {'Show the user this list' in observation}")
-                    log.info(f"   Has 'CONFIRMATION NEEDED': {'CONFIRMATION NEEDED' in observation}")
+                    log.info(
+                        f"   Has 'Show the user this list': {'Show the user this list' in observation}"
+                    )
+                    log.info(
+                        f"   Has 'CONFIRMATION NEEDED': {'CONFIRMATION NEEDED' in observation}"
+                    )
                     log.info(f"   Has 'Number': {'Number' in observation}")
                     log.info(f"   Observation preview: {observation[:200]}")
 
                     # Check if this is a CONFIRMATION (Yes/No options)
-                    if 'CONFIRMATION NEEDED' in observation:
+                    if "CONFIRMATION NEEDED" in observation:
                         # This is a confirmation, not a task list
                         # Extract task_id and project_id from observation for routing
                         import re
 
-                        task_id_match = re.search(r'Task ID: ([a-zA-Z0-9-]+)', observation)
-                        project_id_match = re.search(r'PlanRadar Project ID: ([a-zA-Z0-9-]+)', observation)
-                        task_title_match = re.search(r'Task: (.+)', observation)
+                        task_id_match = re.search(
+                            r"Task ID: ([a-zA-Z0-9-]+)", observation
+                        )
+                        project_id_match = re.search(
+                            r"PlanRadar Project ID: ([a-zA-Z0-9-]+)", observation
+                        )
+                        task_title_match = re.search(r"Task: (.+)", observation)
 
                         confirmation_data = {}
                         if task_id_match:
@@ -255,29 +280,46 @@ class ProgressUpdateAgent:
                         if project_id_match:
                             confirmation_data["project_id"] = project_id_match.group(1)
                         if task_title_match:
-                            confirmation_data["task_title"] = task_title_match.group(1).strip()
+                            confirmation_data["task_title"] = task_title_match.group(
+                                1
+                            ).strip()
 
                         # Add tool_outputs so message history search can find this
-                        response["tool_outputs"] = [{
-                            "tool": "get_active_task_context_tool",
-                            "output": {"confirmation": confirmation_data}
-                        }]
+                        response["tool_outputs"] = [
+                            {
+                                "tool": "get_active_task_context_tool",
+                                "output": {"confirmation": confirmation_data},
+                            }
+                        ]
                         response["response_type"] = "interactive_list"
                         response["list_type"] = "option"  # Use "option" not "tasks"
-                        log.info(f"✅ Detected confirmation → response_type=interactive_list, list_type=option")
+                        log.info(
+                            f"✅ Detected confirmation → response_type=interactive_list, list_type=option"
+                        )
                         log.info(f"   Confirmation data: {confirmation_data}")
                         break
 
                     # Check if observation contains task list with IDs
-                    elif 'Show the user this list' in observation and 'Number' in observation:
+                    elif (
+                        "Show the user this list" in observation
+                        and "Number" in observation
+                    ):
                         # Extract task list from observation
                         import re
 
                         # Extract user-facing task list (simple format)
-                        user_list_match = re.search(r'Show the user this list.*?:\n((?:\d+\..+\n?)+)', observation, re.DOTALL)
+                        user_list_match = re.search(
+                            r"Show the user this list.*?:\n((?:\d+\..+\n?)+)",
+                            observation,
+                            re.DOTALL,
+                        )
 
                         # Extract ID mapping
-                        id_mapping_match = re.search(r'Task ID mapping.*?:\n((?:Number \d+.*\n?)+)', observation, re.DOTALL)
+                        id_mapping_match = re.search(
+                            r"Task ID mapping.*?:\n((?:Number \d+.*\n?)+)",
+                            observation,
+                            re.DOTALL,
+                        )
 
                         if user_list_match and id_mapping_match:
                             user_list = user_list_match.group(1).strip()
@@ -287,14 +329,16 @@ class ProgressUpdateAgent:
                             log.info(f"🔗 Extracted ID mapping: {id_mapping[:100]}")
 
                             # Parse ID mapping: "Number 1 = ID abc-123"
-                            id_pattern = r'Number (\d+) = ID ([a-f0-9-]+)'
+                            id_pattern = r"Number (\d+) = ID ([a-f0-9-]+)"
                             id_matches = re.findall(id_pattern, id_mapping)
 
                             # Parse user list: "1. Task title"
-                            task_pattern = r'(\d+)\.\s+(.+?)(?:\n|$)'
+                            task_pattern = r"(\d+)\.\s+(.+?)(?:\n|$)"
                             task_matches = re.findall(task_pattern, user_list)
 
-                            log.info(f"🔢 ID matches: {len(id_matches)}, Task matches: {len(task_matches)}")
+                            log.info(
+                                f"🔢 ID matches: {len(id_matches)}, Task matches: {len(task_matches)}"
+                            )
 
                             if id_matches and task_matches:
                                 # Build task data
@@ -304,33 +348,41 @@ class ProgressUpdateAgent:
                                 for num, title in task_matches:
                                     task_id = id_map.get(num)
                                     if task_id:
-                                        tasks_data.append({
-                                            "id": task_id,
-                                            "title": title.strip()
-                                        })
+                                        tasks_data.append(
+                                            {"id": task_id, "title": title.strip()}
+                                        )
 
                                 if tasks_data:
-                                    response["tool_outputs"] = [{
-                                        "tool": "get_active_task_context_tool",
-                                        "output": {"tasks": tasks_data}
-                                    }]
+                                    response["tool_outputs"] = [
+                                        {
+                                            "tool": "get_active_task_context_tool",
+                                            "output": {"tasks": tasks_data},
+                                        }
+                                    ]
                                     response["list_type"] = "tasks"
                                     response["response_type"] = "interactive_list"
-                                    log.info(f"📋 Extracted {len(tasks_data)} tasks for interactive list")
+                                    log.info(
+                                        f"📋 Extracted {len(tasks_data)} tasks for interactive list"
+                                    )
                                     break
 
                     # Case 3: No tasks available, but agent provided numbered options
-                    elif 'NO tasks found' in observation or 'aucune tâche disponible' in observation.lower():
+                    elif (
+                        "NO tasks found" in observation
+                        or "aucune tâche disponible" in observation.lower()
+                    ):
                         response["response_type"] = "no_tasks_available"
                         log.info("⚠️ No tasks available in project")
 
                 # Case 4: Session started - could show action menu
-                elif tool_name == 'start_progress_update_session_tool':
-                    if 'Session de mise à jour démarrée' in observation:
+                elif tool_name == "start_progress_update_session_tool":
+                    if "Session de mise à jour démarrée" in observation:
                         response["response_type"] = "session_started"
                         log.info("✅ Progress update session started")
 
-            log.info(f"✅ Returning response with response_type: {response.get('response_type')}")
+            log.info(
+                f"✅ Returning response with response_type: {response.get('response_type')}"
+            )
             if response.get("list_type"):
                 log.info(f"   list_type: {response.get('list_type')}")
             if response.get("tool_outputs"):
@@ -341,11 +393,12 @@ class ProgressUpdateAgent:
         except Exception as e:
             log.error(f"Error in progress update agent: {e}")
             import traceback
+
             log.error(f"Traceback: {traceback.format_exc()}")
             return {
                 "success": False,
                 "message": "❌ Erreur lors de la mise à jour. Veuillez réessayer.",
-                "error": str(e)
+                "error": str(e),
             }
 
 

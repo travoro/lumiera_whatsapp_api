@@ -1,9 +1,12 @@
 """Audio transcription service using OpenAI Whisper."""
-from typing import Optional, Tuple
-import httpx
+
 import os
-from openai import OpenAI
+from typing import Optional, Tuple
+
+import httpx
 from langsmith import traceable
+from openai import OpenAI
+
 from src.config import settings
 from src.utils.logger import log
 
@@ -33,6 +36,7 @@ class TranscriptionService:
             if "api.twilio.com" in url:
                 # Twilio media URLs require basic auth
                 from src.config import settings
+
                 auth = (settings.twilio_account_sid, settings.twilio_auth_token)
                 log.info("Downloading audio from Twilio with authentication")
 
@@ -50,7 +54,7 @@ class TranscriptionService:
         audio_data: bytes,
         user_id: str,
         message_sid: str,
-        content_type: str = "audio/ogg"
+        content_type: str = "audio/ogg",
     ) -> Optional[str]:
         """Upload audio file to Supabase storage.
 
@@ -72,9 +76,7 @@ class TranscriptionService:
 
             # Upload to Supabase storage
             public_url = await supabase_client.upload_media(
-                file_data=audio_data,
-                file_name=file_name,
-                content_type=content_type
+                file_data=audio_data, file_name=file_name, content_type=content_type
             )
 
             if public_url:
@@ -120,7 +122,7 @@ class TranscriptionService:
                 transcript = self.client.audio.transcriptions.create(
                     model=self.model,
                     file=audio_file,
-                    response_format="text"
+                    response_format="text",
                     # language parameter removed - let Whisper auto-detect the language
                 )
 
@@ -130,7 +132,9 @@ class TranscriptionService:
             except:
                 pass
 
-            transcribed_text = transcript if isinstance(transcript, str) else transcript.text
+            transcribed_text = (
+                transcript if isinstance(transcript, str) else transcript.text
+            )
             log.info(f"Audio transcription completed: {transcribed_text[:50]}...")
             return transcribed_text
 
@@ -145,7 +149,7 @@ class TranscriptionService:
         user_id: str,
         message_sid: str,
         target_language: Optional[str] = None,
-        content_type: str = "audio/ogg"
+        content_type: str = "audio/ogg",
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Download, store, and transcribe audio file.
 
@@ -169,10 +173,7 @@ class TranscriptionService:
 
             # Upload to permanent storage
             storage_url = await self.upload_audio_to_storage(
-                audio_data,
-                user_id,
-                message_sid,
-                content_type
+                audio_data, user_id, message_sid, content_type
             )
 
             # Transcribe (we already have the audio data)
@@ -185,14 +186,16 @@ class TranscriptionService:
             log.info(f"   → model: {self.model}")
             log.info(f"   → response_format: verbose_json")
             log.info(f"   → target_language (received): {target_language}")
-            log.info(f"   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)")
+            log.info(
+                f"   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)"
+            )
 
             with open(temp_file_path, "rb") as audio_file:
                 # Use verbose_json to get detected language from Whisper
                 transcript = self.client.audio.transcriptions.create(
                     model=self.model,
                     file=audio_file,
-                    response_format="verbose_json"
+                    response_format="verbose_json",
                     # No language parameter - let Whisper auto-detect
                 )
 
@@ -203,30 +206,36 @@ class TranscriptionService:
                 pass
 
             # Extract text from Whisper response
-            transcribed_text = transcript.text if hasattr(transcript, 'text') else str(transcript)
+            transcribed_text = (
+                transcript.text if hasattr(transcript, "text") else str(transcript)
+            )
 
             # Log Whisper's response details
             log.info(f"📥 WHISPER API RESPONSE:")
             log.info(f"   → transcribed_text: '{transcribed_text}'")
-            if hasattr(transcript, 'language'):
+            if hasattr(transcript, "language"):
                 log.info(f"   → Whisper detected language: {transcript.language}")
-            if hasattr(transcript, 'duration'):
+            if hasattr(transcript, "duration"):
                 log.info(f"   → audio duration: {transcript.duration}s")
 
             # IGNORE Whisper's language field - detect from transcribed text instead
             # Whisper transcribes correctly but language metadata is unreliable
             # Use robust hybrid detection (Claude AI + lingua-py + keywords)
             detected_language = None
-            detection_method = 'none'
+            detection_method = "none"
             if transcribed_text and len(transcribed_text.strip()) > 2:
                 try:
-                    from src.services.language_detection import language_detection_service
-                    # Use Claude AI-powered async detection (most accurate)
-                    detected_language, detection_method = await language_detection_service.detect_async(
-                        transcribed_text,
-                        fallback_language='unknown'
+                    from src.services.language_detection import (
+                        language_detection_service,
                     )
-                    if detected_language != 'unknown':
+
+                    # Use Claude AI-powered async detection (most accurate)
+                    detected_language, detection_method = (
+                        await language_detection_service.detect_async(
+                            transcribed_text, fallback_language="unknown"
+                        )
+                    )
+                    if detected_language != "unknown":
                         log.info(
                             f"✅ Language detected from transcribed text: '{detected_language}' "
                             f"(method: {detection_method})"
@@ -238,7 +247,9 @@ class TranscriptionService:
                     log.warning(f"⚠️ Text language detection failed: {e}")
                     detected_language = None
 
-            log.info(f"📤 RETURNING: text='{transcribed_text[:50]}...', language={detected_language}")
+            log.info(
+                f"📤 RETURNING: text='{transcribed_text[:50]}...', language={detected_language}"
+            )
 
             return transcribed_text, storage_url, detected_language
 

@@ -1,6 +1,8 @@
 """Fuzzy matching utility for project/task names."""
-from typing import List, Dict, Optional
+
 from difflib import SequenceMatcher
+from typing import Dict, List, Optional
+
 from src.utils.logger import log
 
 
@@ -32,9 +34,7 @@ def calculate_similarity(str1: str, str2: str) -> float:
 
 
 def fuzzy_match_project(
-    user_input: str,
-    projects: List[Dict],
-    threshold: float = 0.80
+    user_input: str, projects: List[Dict], threshold: float = 0.80
 ) -> Optional[Dict]:
     """Find best matching project using fuzzy matching.
 
@@ -57,13 +57,15 @@ def fuzzy_match_project(
         return None
 
     user_input_clean = user_input.lower().strip()
-    log.debug(f"🔍 Fuzzy matching '{user_input_clean}' against {len(projects)} projects (threshold: {threshold})")
+    log.debug(
+        f"🔍 Fuzzy matching '{user_input_clean}' against {len(projects)} projects (threshold: {threshold})"
+    )
 
     best_match = None
     best_score = 0.0
 
     for project in projects:
-        project_name = project.get('nom', '')
+        project_name = project.get("nom", "")
         if not project_name:
             continue
 
@@ -75,18 +77,22 @@ def fuzzy_match_project(
         if similarity > best_score:
             best_score = similarity
             best_match = {
-                'project_id': project.get('id'),
-                'project_name': project_name,
-                'confidence': similarity,
-                'input': user_input
+                "project_id": project.get("id"),
+                "project_name": project_name,
+                "confidence": similarity,
+                "input": user_input,
             }
 
     # Check if best match meets threshold
     if best_match and best_score >= threshold:
-        log.info(f"✅ Fuzzy match: '{user_input}' → '{best_match['project_name']}' (confidence: {best_score:.2%})")
+        log.info(
+            f"✅ Fuzzy match: '{user_input}' → '{best_match['project_name']}' (confidence: {best_score:.2%})"
+        )
         return best_match
     elif best_match:
-        log.debug(f"❌ Fuzzy match: Best match '{best_match['project_name']}' ({best_score:.2%}) below threshold ({threshold:.2%})")
+        log.debug(
+            f"❌ Fuzzy match: Best match '{best_match['project_name']}' ({best_score:.2%}) below threshold ({threshold:.2%})"
+        )
     else:
         log.debug(f"❌ Fuzzy match: No matches found")
 
@@ -94,9 +100,7 @@ def fuzzy_match_project(
 
 
 def fuzzy_match_task(
-    user_input: str,
-    tasks: List[Dict],
-    threshold: float = 0.80
+    user_input: str, tasks: List[Dict], threshold: float = 0.80
 ) -> Optional[Dict]:
     """Find best matching task using fuzzy matching.
 
@@ -119,13 +123,15 @@ def fuzzy_match_task(
         return None
 
     user_input_clean = user_input.lower().strip()
-    log.debug(f"🔍 Fuzzy matching '{user_input_clean}' against {len(tasks)} tasks (threshold: {threshold})")
+    log.debug(
+        f"🔍 Fuzzy matching '{user_input_clean}' against {len(tasks)} tasks (threshold: {threshold})"
+    )
 
     best_match = None
     best_score = 0.0
 
     for task in tasks:
-        task_title = task.get('title', '')
+        task_title = task.get("title", "")
         if not task_title:
             continue
 
@@ -137,18 +143,22 @@ def fuzzy_match_task(
         if similarity > best_score:
             best_score = similarity
             best_match = {
-                'task_id': task.get('id'),
-                'task_title': task_title,
-                'confidence': similarity,
-                'input': user_input
+                "task_id": task.get("id"),
+                "task_title": task_title,
+                "confidence": similarity,
+                "input": user_input,
             }
 
     # Check if best match meets threshold
     if best_match and best_score >= threshold:
-        log.info(f"✅ Fuzzy match: '{user_input}' → '{best_match['task_title']}' (confidence: {best_score:.2%})")
+        log.info(
+            f"✅ Fuzzy match: '{user_input}' → '{best_match['task_title']}' (confidence: {best_score:.2%})"
+        )
         return best_match
     elif best_match:
-        log.debug(f"❌ Fuzzy match: Best match '{best_match['task_title']}' ({best_score:.2%}) below threshold ({threshold:.2%})")
+        log.debug(
+            f"❌ Fuzzy match: Best match '{best_match['task_title']}' ({best_score:.2%}) below threshold ({threshold:.2%})"
+        )
     else:
         log.debug(f"❌ Fuzzy match: No matches found")
 

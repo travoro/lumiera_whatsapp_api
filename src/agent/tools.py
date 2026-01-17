@@ -1,7 +1,10 @@
 """LangChain tools for the WhatsApp agent."""
-from typing import Optional, List
+
+from typing import List, Optional
+
 from langchain.tools import tool
-from src.actions import projects, tasks, incidents, documents
+
+from src.actions import documents, incidents, projects, tasks
 from src.integrations.supabase import supabase_client
 from src.services.escalation import escalation_service
 from src.utils.logger import log
@@ -113,9 +116,32 @@ def _normalize_language_input(language: str) -> str:
     # Check if it's already a valid ISO code (2 letters)
     if len(language) == 2:
         # Validate against supported languages
-        supported = ['fr', 'en', 'es', 'pt', 'ro', 'ar', 'de', 'it',
-                     'cs', 'sk', 'hu', 'bg', 'sr', 'hr', 'sl', 'uk',
-                     'ru', 'lt', 'lv', 'et', 'sq', 'mk', 'bs', 'pl']
+        supported = [
+            "fr",
+            "en",
+            "es",
+            "pt",
+            "ro",
+            "ar",
+            "de",
+            "it",
+            "cs",
+            "sk",
+            "hu",
+            "bg",
+            "sr",
+            "hr",
+            "sl",
+            "uk",
+            "ru",
+            "lt",
+            "lv",
+            "et",
+            "sq",
+            "mk",
+            "bs",
+            "pl",
+        ]
         if language in supported:
             log.info(f"✅ Language already in ISO format: '{language}'")
             return language
@@ -151,7 +177,7 @@ async def list_projects_tool(user_id: str) -> str:
     output = f"{result['message']}\n\n"
     for i, project in enumerate(result["data"], 1):
         output += f"{i}. 🏗️ {project['nom']}\n"
-        if project.get('location'):
+        if project.get("location"):
             output += f"   📍 {project['location']}\n"
         output += "\n"
 
@@ -160,7 +186,9 @@ async def list_projects_tool(user_id: str) -> str:
 
 
 @tool
-async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status: Optional[str] = None) -> str:
+async def list_tasks_tool(
+    user_id: str, project_id: Optional[str] = None, status: Optional[str] = None
+) -> str:
     """List tasks for a specific project.
 
     If project_id is not provided, uses the user's active project context (current work project).
@@ -174,7 +202,9 @@ async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status
     Returns:
         A formatted string with the list of tasks (minimal format: emoji + title only)
     """
-    log.info(f"🔧 Tool called: list_tasks_tool(user_id={user_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}..., status={status})")
+    log.info(
+        f"🔧 Tool called: list_tasks_tool(user_id={user_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}..., status={status})"
+    )
 
     result = await tasks.list_tasks(user_id, project_id, status)
 
@@ -190,24 +220,26 @@ async def list_tasks_tool(user_id: str, project_id: Optional[str] = None, status
     # Status emoji mapping (minimal format)
     def get_status_emoji(task_status: str) -> str:
         status_map = {
-            'in_progress': '🔨',
-            'pending': '⏳',
-            'open': '📋',
-            'completed': '✅',
-            'done': '✅',
-            'closed': '✅',
-            'todo': '⏳',
-            'in progress': '🔨',
+            "in_progress": "🔨",
+            "pending": "⏳",
+            "open": "📋",
+            "completed": "✅",
+            "done": "✅",
+            "closed": "✅",
+            "todo": "⏳",
+            "in progress": "🔨",
         }
-        return status_map.get(task_status.lower() if task_status else '', '📝')
+        return status_map.get(task_status.lower() if task_status else "", "📝")
 
     # Format tasks for display (MINIMAL: emoji + title only)
     output = f"{result['message']}\n\n"
     for i, task in enumerate(result["data"], 1):
-        emoji = get_status_emoji(task.get('status', ''))
+        emoji = get_status_emoji(task.get("status", ""))
         output += f"{i}. {emoji} {task['title']}\n"
 
-    log.info(f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)")
+    log.info(
+        f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)"
+    )
     return output
 
 
@@ -226,7 +258,9 @@ async def get_task_description_tool(user_id: str, task_id: str) -> str:
     Returns:
         The task description
     """
-    log.info(f"🔧 Tool called: get_task_description_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+    log.info(
+        f"🔧 Tool called: get_task_description_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+    )
 
     result = await tasks.get_task_description(user_id, task_id)
 
@@ -249,7 +283,9 @@ async def get_task_plans_tool(user_id: str, task_id: str) -> str:
     Returns:
         Information about available plans
     """
-    log.info(f"🔧 Tool called: get_task_plans_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+    log.info(
+        f"🔧 Tool called: get_task_plans_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+    )
 
     result = await tasks.get_task_plans(user_id, task_id)
 
@@ -285,7 +321,9 @@ async def get_task_images_tool(user_id: str, task_id: str) -> str:
     Returns:
         Information about available images
     """
-    log.info(f"🔧 Tool called: get_task_images_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+    log.info(
+        f"🔧 Tool called: get_task_images_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+    )
 
     result = await tasks.get_task_images(user_id, task_id)
 
@@ -307,7 +345,9 @@ async def get_task_images_tool(user_id: str, task_id: str) -> str:
 
 
 @tool
-async def get_documents_tool(user_id: str, project_id: str, folder_id: Optional[str] = None) -> str:
+async def get_documents_tool(
+    user_id: str, project_id: str, folder_id: Optional[str] = None
+) -> str:
     """Get documents for a project.
 
     Args:
@@ -318,7 +358,9 @@ async def get_documents_tool(user_id: str, project_id: str, folder_id: Optional[
     Returns:
         Information about available documents
     """
-    log.info(f"🔧 Tool called: get_documents_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., folder_id={folder_id[:8] if folder_id else 'None'}...)")
+    log.info(
+        f"🔧 Tool called: get_documents_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., folder_id={folder_id[:8] if folder_id else 'None'}...)"
+    )
 
     result = await documents.get_documents(user_id, project_id, folder_id)
 
@@ -333,12 +375,12 @@ async def get_documents_tool(user_id: str, project_id: str, folder_id: Optional[
     output = f"{result['message']}\n\n"
     for i, doc in enumerate(result["data"], 1):
         output += f"{i}. {doc['name']}"
-        if doc.get('component_name'):
+        if doc.get("component_name"):
             output += f" (Composant: {doc['component_name']})"
         output += "\n"
         output += f"   Type: {doc['type']}\n"
-        if doc.get('size'):
-            size_mb = doc['size'] / (1024 * 1024)
+        if doc.get("size"):
+            size_mb = doc["size"] / (1024 * 1024)
             output += f"   Taille: {size_mb:.2f} MB\n"
         output += f"   URL: {doc['url']}\n\n"
 
@@ -358,7 +400,9 @@ async def add_task_comment_tool(user_id: str, task_id: str, comment_text: str) -
     Returns:
         Success or error message
     """
-    log.info(f"🔧 Tool called: add_task_comment_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., comment_length={len(comment_text)} chars)")
+    log.info(
+        f"🔧 Tool called: add_task_comment_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., comment_length={len(comment_text)} chars)"
+    )
 
     result = await tasks.add_task_comment(user_id, task_id, comment_text)
 
@@ -381,7 +425,9 @@ async def get_task_comments_tool(user_id: str, task_id: str) -> str:
     Returns:
         All comments for the task
     """
-    log.info(f"🔧 Tool called: get_task_comments_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+    log.info(
+        f"🔧 Tool called: get_task_comments_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+    )
 
     result = await tasks.get_task_comments(user_id, task_id)
 
@@ -395,7 +441,9 @@ async def get_task_comments_tool(user_id: str, task_id: str) -> str:
 
     output = f"{result['message']}\n\n"
     for i, comment in enumerate(result["data"], 1):
-        output += f"{i}. {comment.get('author', 'Utilisateur')}: {comment.get('text')}\n"
+        output += (
+            f"{i}. {comment.get('author', 'Utilisateur')}: {comment.get('text')}\n"
+        )
         output += f"   Date: {comment.get('created_at')}\n\n"
 
     log.info(f"✅ get_task_comments_tool: Returned {len(result['data'])} comments")
@@ -422,15 +470,19 @@ async def submit_incident_report_tool(
     Returns:
         Success message with incident ID or error message
     """
-    log.info(f"🔧 Tool called: submit_incident_report_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., title={title[:50]}..., images={len(image_urls)})")
+    log.info(
+        f"🔧 Tool called: submit_incident_report_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., title={title[:50]}..., images={len(image_urls)})"
+    )
 
     result = await incidents.submit_incident_report(
         user_id, project_id, title, description, image_urls
     )
 
     if result["success"]:
-        incident_id = result['data']['incident_id']
-        log.info(f"✅ submit_incident_report_tool: Incident created (ID: {incident_id[:8]}...)")
+        incident_id = result["data"]["incident_id"]
+        log.info(
+            f"✅ submit_incident_report_tool: Incident created (ID: {incident_id[:8]}...)"
+        )
         return f"{result['message']} ID de l'incident: {incident_id}"
 
     log.warning(f"❌ submit_incident_report_tool failed: {result['message']}")
@@ -455,7 +507,9 @@ async def update_incident_report_tool(
     Returns:
         Success or error message
     """
-    log.info(f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})")
+    log.info(
+        f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})"
+    )
 
     result = await incidents.update_incident_report(
         user_id, incident_id, additional_text, additional_images
@@ -491,16 +545,27 @@ async def update_task_progress_tool(
     Returns:
         Success or error message
     """
-    status_names = {1: "Open", 2: "In-Progress", 3: "Resolved", 4: "Feedback", 5: "Closed", 6: "Rejected"}
+    status_names = {
+        1: "Open",
+        2: "In-Progress",
+        3: "Resolved",
+        4: "Feedback",
+        5: "Closed",
+        6: "Rejected",
+    }
     status_name = status_names.get(status_id, f"ID:{status_id}")
-    log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
+    log.info(
+        f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})"
+    )
 
     result = await tasks.update_task_progress(
         user_id, task_id, status_id, progress, progress_note, image_urls
     )
 
     if result["success"]:
-        log.info(f"✅ update_task_progress_tool: Task progress updated to status_id {status_id} ({status_name})")
+        log.info(
+            f"✅ update_task_progress_tool: Task progress updated to status_id {status_id} ({status_name})"
+        )
     else:
         log.warning(f"❌ update_task_progress_tool failed: {result['message']}")
 
@@ -518,7 +583,9 @@ async def mark_task_complete_tool(user_id: str, task_id: str) -> str:
     Returns:
         Success or error message
     """
-    log.info(f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+    log.info(
+        f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+    )
 
     result = await tasks.mark_task_complete(user_id, task_id)
 
@@ -542,7 +609,9 @@ async def set_language_tool(user_id: str, phone_number: str, language: str) -> s
     Returns:
         Success or error message
     """
-    log.info(f"🔧 Tool called: set_language_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language})")
+    log.info(
+        f"🔧 Tool called: set_language_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language})"
+    )
 
     # Normalize language input to ISO 639-1 code
     # Handles both ISO codes ("fr", "en") and full names ("french", "english")
@@ -579,7 +648,9 @@ async def escalate_to_human_tool(
     Returns:
         Success or error message
     """
-    log.info(f"🔧 Tool called: escalate_to_human_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language}, reason={reason[:100]}...)")
+    log.info(
+        f"🔧 Tool called: escalate_to_human_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language}, reason={reason[:100]}...)"
+    )
 
     # Import execution context to set escalation flag
     from src.agent.execution_context import get_execution_context
@@ -595,13 +666,20 @@ async def escalate_to_human_tool(
     if escalation_id:
         # Set flag to indicate escalation occurred
         get_execution_context().record_escalation()
-        log.info(f"✅ escalate_to_human_tool: Escalation created (ID: {escalation_id[:8]}...)")
+        log.info(
+            f"✅ escalate_to_human_tool: Escalation created (ID: {escalation_id[:8]}...)"
+        )
         log.info("🚨 Escalation flag set: is_escalation will be True")
 
         # ALWAYS return French - translation to user language happens in pipeline
         from src.utils.whatsapp_formatter import get_translation
+
         success_message = get_translation("fr", "escalation_success", "en")
-        return success_message if success_message else "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu."
+        return (
+            success_message
+            if success_message
+            else "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu."
+        )
 
     log.warning(f"❌ escalate_to_human_tool failed to create escalation")
     return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
@@ -624,19 +702,24 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
         JSON string with project details if found, or error message
     """
     import json
+
     from src.actions import projects
 
-    log.info(f"🔧 Tool called: find_project_by_name(user_id={user_id[:8]}..., project_name={project_name})")
+    log.info(
+        f"🔧 Tool called: find_project_by_name(user_id={user_id[:8]}..., project_name={project_name})"
+    )
 
     result = await projects.list_projects(user_id)
 
     if not result["success"] or not result["data"]:
         log.warning(f"❌ find_project_by_name: No projects found for user")
-        return json.dumps({
-            "success": False,
-            "error": "no_projects",
-            "message": "Aucun projet trouvé pour cet utilisateur"
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "error": "no_projects",
+                "message": "Aucun projet trouvé pour cet utilisateur",
+            }
+        )
 
     # Search for project by name (fuzzy matching)
     project_name_lower = project_name.lower().strip()
@@ -646,45 +729,59 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
         project_nom = project.get("nom", "").lower()
         # Exact match
         if project_nom == project_name_lower:
-            log.info(f"✅ find_project_by_name: Exact match found - {project['nom']} (ID: {project['id'][:8]}...)")
-            return json.dumps({
-                "success": True,
-                "project_id": project["id"],
-                "project_name": project["nom"],
-                "match_type": "exact"
-            })
+            log.info(
+                f"✅ find_project_by_name: Exact match found - {project['nom']} (ID: {project['id'][:8]}...)"
+            )
+            return json.dumps(
+                {
+                    "success": True,
+                    "project_id": project["id"],
+                    "project_name": project["nom"],
+                    "match_type": "exact",
+                }
+            )
         # Partial match
         elif project_name_lower in project_nom or project_nom in project_name_lower:
             matches.append(project)
 
     # Single partial match found
     if len(matches) == 1:
-        log.info(f"✅ find_project_by_name: Partial match found - {matches[0]['nom']} (ID: {matches[0]['id'][:8]}...)")
-        return json.dumps({
-            "success": True,
-            "project_id": matches[0]["id"],
-            "project_name": matches[0]["nom"],
-            "match_type": "partial"
-        })
+        log.info(
+            f"✅ find_project_by_name: Partial match found - {matches[0]['nom']} (ID: {matches[0]['id'][:8]}...)"
+        )
+        return json.dumps(
+            {
+                "success": True,
+                "project_id": matches[0]["id"],
+                "project_name": matches[0]["nom"],
+                "match_type": "partial",
+            }
+        )
 
     # Multiple matches - return list for disambiguation
     elif len(matches) > 1:
-        log.info(f"📋 find_project_by_name: Multiple matches found ({len(matches)} projects)")
-        return json.dumps({
-            "success": False,
-            "error": "multiple_matches",
-            "message": f"Plusieurs projets correspondent à '{project_name}'",
-            "matches": [{"name": p["nom"]} for p in matches]
-        })
+        log.info(
+            f"📋 find_project_by_name: Multiple matches found ({len(matches)} projects)"
+        )
+        return json.dumps(
+            {
+                "success": False,
+                "error": "multiple_matches",
+                "message": f"Plusieurs projets correspondent à '{project_name}'",
+                "matches": [{"name": p["nom"]} for p in matches],
+            }
+        )
 
     # No matches
     else:
         log.warning(f"❌ find_project_by_name: No matches found for '{project_name}'")
-        return json.dumps({
-            "success": False,
-            "error": "not_found",
-            "message": f"Aucun projet trouvé avec le nom '{project_name}'"
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "error": "not_found",
+                "message": f"Aucun projet trouvé avec le nom '{project_name}'",
+            }
+        )
 
 
 # ============================================================================
@@ -703,6 +800,7 @@ async def find_project_by_name(user_id: str, project_name: str) -> str:
 #
 # Reference: https://forum.langchain.com/t/how-to-use-injectedtoolarg-in-agentexecutor/1840
 # ============================================================================
+
 
 def build_tools_for_user(user_id: str, phone_number: str, language: str):
     """Build tools with captured user context via closure pattern.
@@ -727,9 +825,10 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         >>> # user_id is automatically injected from closure
     """
     # Import execution context for tracking tool calls and escalations
+    import json
+
     from src.agent.execution_context import get_execution_context
     from src.utils.whatsapp_formatter import get_translation
-    import json
 
     @tool("list_projects_tool")
     async def list_projects_tool() -> str:
@@ -756,7 +855,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         output = f"{result['message']}\n\n"
         for i, project in enumerate(result["data"], 1):
             output += f"{i}. 🏗️ {project['nom']}\n"
-            if project.get('location'):
+            if project.get("location"):
                 output += f"   📍 {project['location']}\n"
             output += "\n"
 
@@ -764,7 +863,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         return output
 
     @tool("list_tasks_tool")
-    async def list_tasks_tool(project_id: Optional[str] = None, status: Optional[str] = None) -> str:
+    async def list_tasks_tool(
+        project_id: Optional[str] = None, status: Optional[str] = None
+    ) -> str:
         """List tasks for a specific project.
 
         If project_id is not provided, uses the user's active project context (current work project).
@@ -778,7 +879,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             A formatted string with the list of tasks (minimal format: emoji + title only)
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: list_tasks_tool(user_id={user_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}..., status={status})")
+        log.info(
+            f"🔧 Tool called: list_tasks_tool(user_id={user_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}..., status={status})"
+        )
         get_execution_context().record_tool_call("list_tasks_tool")
 
         result = await tasks.list_tasks(user_id, project_id, status)
@@ -794,24 +897,26 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         # Status emoji mapping (minimal format)
         def get_status_emoji(task_status: str) -> str:
             status_map = {
-                'in_progress': '🔨',
-                'pending': '⏳',
-                'open': '📋',
-                'completed': '✅',
-                'done': '✅',
-                'closed': '✅',
-                'todo': '⏳',
-                'in progress': '🔨',
+                "in_progress": "🔨",
+                "pending": "⏳",
+                "open": "📋",
+                "completed": "✅",
+                "done": "✅",
+                "closed": "✅",
+                "todo": "⏳",
+                "in progress": "🔨",
             }
-            return status_map.get(task_status.lower() if task_status else '', '📝')
+            return status_map.get(task_status.lower() if task_status else "", "📝")
 
         # Format tasks for display (MINIMAL: emoji + title only)
         output = f"{result['message']}\n\n"
         for i, task in enumerate(result["data"], 1):
-            emoji = get_status_emoji(task.get('status', ''))
+            emoji = get_status_emoji(task.get("status", ""))
             output += f"{i}. {emoji} {task['title']}\n"
 
-        log.info(f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)")
+        log.info(
+            f"✅ list_tasks_tool: Returned {len(result['data'])} tasks (minimal format)"
+        )
         return output
 
     @tool("get_task_description_tool")
@@ -825,7 +930,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             The task description
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: get_task_description_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+        log.info(
+            f"🔧 Tool called: get_task_description_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+        )
         get_execution_context().record_tool_call("get_task_description_tool")
 
         result = await tasks.get_task_description(user_id, task_id)
@@ -848,7 +955,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Information about available plans
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: get_task_plans_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+        log.info(
+            f"🔧 Tool called: get_task_plans_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+        )
         get_execution_context().record_tool_call("get_task_plans_tool")
 
         result = await tasks.get_task_plans(user_id, task_id)
@@ -880,7 +989,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Information about available images
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: get_task_images_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+        log.info(
+            f"🔧 Tool called: get_task_images_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+        )
         get_execution_context().record_tool_call("get_task_images_tool")
 
         result = await tasks.get_task_images(user_id, task_id)
@@ -902,7 +1013,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         return output
 
     @tool
-    async def get_documents_tool(project_id: str, folder_id: Optional[str] = None) -> str:
+    async def get_documents_tool(
+        project_id: str, folder_id: Optional[str] = None
+    ) -> str:
         """Get documents for a project.
 
         Args:
@@ -913,7 +1026,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Information about available documents
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: get_documents_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., folder_id={folder_id[:8] if folder_id else 'None'}...)")
+        log.info(
+            f"🔧 Tool called: get_documents_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., folder_id={folder_id[:8] if folder_id else 'None'}...)"
+        )
         get_execution_context().record_tool_call("get_documents_tool")
 
         result = await documents.get_documents(user_id, project_id, folder_id)
@@ -929,12 +1044,12 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         output = f"{result['message']}\n\n"
         for i, doc in enumerate(result["data"], 1):
             output += f"{i}. {doc['name']}"
-            if doc.get('component_name'):
+            if doc.get("component_name"):
                 output += f" (Composant: {doc['component_name']})"
             output += "\n"
             output += f"   Type: {doc['type']}\n"
-            if doc.get('size'):
-                size_mb = doc['size'] / (1024 * 1024)
+            if doc.get("size"):
+                size_mb = doc["size"] / (1024 * 1024)
                 output += f"   Taille: {size_mb:.2f} MB\n"
             output += f"   URL: {doc['url']}\n\n"
 
@@ -953,7 +1068,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: add_task_comment_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., comment_length={len(comment_text)} chars)")
+        log.info(
+            f"🔧 Tool called: add_task_comment_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., comment_length={len(comment_text)} chars)"
+        )
         get_execution_context().record_tool_call("add_task_comment_tool")
 
         result = await tasks.add_task_comment(user_id, task_id, comment_text)
@@ -976,7 +1093,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             All comments for the task
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: get_task_comments_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+        log.info(
+            f"🔧 Tool called: get_task_comments_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+        )
         get_execution_context().record_tool_call("get_task_comments_tool")
 
         result = await tasks.get_task_comments(user_id, task_id)
@@ -991,7 +1110,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
 
         output = f"{result['message']}\n\n"
         for i, comment in enumerate(result["data"], 1):
-            output += f"{i}. {comment.get('author', 'Utilisateur')}: {comment.get('text')}\n"
+            output += (
+                f"{i}. {comment.get('author', 'Utilisateur')}: {comment.get('text')}\n"
+            )
             output += f"   Date: {comment.get('created_at')}\n\n"
 
         log.info(f"✅ get_task_comments_tool: Returned {len(result['data'])} comments")
@@ -1016,7 +1137,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success message with incident ID or error message
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: submit_incident_report_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., title={title[:50]}..., images={len(image_urls)})")
+        log.info(
+            f"🔧 Tool called: submit_incident_report_tool(user_id={user_id[:8]}..., project_id={project_id[:8]}..., title={title[:50]}..., images={len(image_urls)})"
+        )
         get_execution_context().record_tool_call("submit_incident_report_tool")
 
         result = await incidents.submit_incident_report(
@@ -1024,8 +1147,10 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         )
 
         if result["success"]:
-            incident_id = result['data']['incident_id']
-            log.info(f"✅ submit_incident_report_tool: Incident created (ID: {incident_id[:8]}...)")
+            incident_id = result["data"]["incident_id"]
+            log.info(
+                f"✅ submit_incident_report_tool: Incident created (ID: {incident_id[:8]}...)"
+            )
             return f"{result['message']} ID de l'incident: {incident_id}"
 
         log.warning(f"❌ submit_incident_report_tool failed: {result['message']}")
@@ -1048,7 +1173,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})")
+        log.info(
+            f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})"
+        )
         get_execution_context().record_tool_call("update_incident_report_tool")
 
         result = await incidents.update_incident_report(
@@ -1083,9 +1210,18 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id captured from closure ↓
-        status_names = {1: "Open", 2: "In-Progress", 3: "Resolved", 4: "Feedback", 5: "Closed", 6: "Rejected"}
+        status_names = {
+            1: "Open",
+            2: "In-Progress",
+            3: "Resolved",
+            4: "Feedback",
+            5: "Closed",
+            6: "Rejected",
+        }
         status_name = status_names.get(status_id, f"ID:{status_id}")
-        log.info(f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})")
+        log.info(
+            f"🔧 Tool called: update_task_progress_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={progress_note is not None}, images={len(image_urls) if image_urls else 0})"
+        )
         get_execution_context().record_tool_call("update_task_progress_tool")
 
         result = await tasks.update_task_progress(
@@ -1093,7 +1229,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         )
 
         if result["success"]:
-            log.info(f"✅ update_task_progress_tool: Task progress updated to status_id {status_id} ({status_name})")
+            log.info(
+                f"✅ update_task_progress_tool: Task progress updated to status_id {status_id} ({status_name})"
+            )
         else:
             log.warning(f"❌ update_task_progress_tool failed: {result['message']}")
 
@@ -1110,7 +1248,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)")
+        log.info(
+            f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+        )
         get_execution_context().record_tool_call("mark_task_complete_tool")
 
         result = await tasks.mark_task_complete(user_id, task_id)
@@ -1133,7 +1273,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id, phone_number captured from closure ↓
-        log.info(f"🔧 Tool called: set_language_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language_input})")
+        log.info(
+            f"🔧 Tool called: set_language_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language_input})"
+        )
         get_execution_context().record_tool_call("set_language_tool")
 
         # Normalize language input to ISO 639-1 code
@@ -1162,7 +1304,9 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             Success or error message
         """
         # user_id, phone_number, language captured from closure ↓
-        log.info(f"🔧 Tool called: escalate_to_human_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language}, reason={reason[:100]}...)")
+        log.info(
+            f"🔧 Tool called: escalate_to_human_tool(user_id={user_id[:8]}..., phone={phone_number}, language={language}, reason={reason[:100]}...)"
+        )
 
         escalation_id = await escalation_service.create_escalation(
             user_id=user_id,
@@ -1175,12 +1319,18 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         if escalation_id:
             # Set flag to indicate escalation occurred
             get_execution_context().record_escalation()
-            log.info(f"✅ escalate_to_human_tool: Escalation created (ID: {escalation_id[:8]}...)")
+            log.info(
+                f"✅ escalate_to_human_tool: Escalation created (ID: {escalation_id[:8]}...)"
+            )
             log.info("🚨 Escalation flag set: is_escalation will be True")
 
             # ALWAYS return French - translation to user language happens in pipeline
             success_message = get_translation("fr", "escalation_success", "en")
-            return success_message if success_message else "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu."
+            return (
+                success_message
+                if success_message
+                else "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu."
+            )
 
         log.warning(f"❌ escalate_to_human_tool failed to create escalation")
         return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
@@ -1201,18 +1351,22 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             JSON string with project details if found, or error message
         """
         # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: find_project_by_name(user_id={user_id[:8]}..., project_name={project_name})")
+        log.info(
+            f"🔧 Tool called: find_project_by_name(user_id={user_id[:8]}..., project_name={project_name})"
+        )
         get_execution_context().record_tool_call("find_project_by_name")
 
         result = await projects.list_projects(user_id)
 
         if not result["success"] or not result["data"]:
             log.warning(f"❌ find_project_by_name: No projects found for user")
-            return json.dumps({
-                "success": False,
-                "error": "no_projects",
-                "message": "Aucun projet trouvé pour cet utilisateur"
-            })
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "no_projects",
+                    "message": "Aucun projet trouvé pour cet utilisateur",
+                }
+            )
 
         # Search for project by name (fuzzy matching)
         project_name_lower = project_name.lower().strip()
@@ -1222,45 +1376,61 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             project_nom = project.get("nom", "").lower()
             # Exact match
             if project_nom == project_name_lower:
-                log.info(f"✅ find_project_by_name: Exact match found - {project['nom']} (ID: {project['id'][:8]}...)")
-                return json.dumps({
-                    "success": True,
-                    "project_id": project["id"],
-                    "project_name": project["nom"],
-                    "match_type": "exact"
-                })
+                log.info(
+                    f"✅ find_project_by_name: Exact match found - {project['nom']} (ID: {project['id'][:8]}...)"
+                )
+                return json.dumps(
+                    {
+                        "success": True,
+                        "project_id": project["id"],
+                        "project_name": project["nom"],
+                        "match_type": "exact",
+                    }
+                )
             # Partial match
             elif project_name_lower in project_nom or project_nom in project_name_lower:
                 matches.append(project)
 
         # Single partial match found
         if len(matches) == 1:
-            log.info(f"✅ find_project_by_name: Partial match found - {matches[0]['nom']} (ID: {matches[0]['id'][:8]}...)")
-            return json.dumps({
-                "success": True,
-                "project_id": matches[0]["id"],
-                "project_name": matches[0]["nom"],
-                "match_type": "partial"
-            })
+            log.info(
+                f"✅ find_project_by_name: Partial match found - {matches[0]['nom']} (ID: {matches[0]['id'][:8]}...)"
+            )
+            return json.dumps(
+                {
+                    "success": True,
+                    "project_id": matches[0]["id"],
+                    "project_name": matches[0]["nom"],
+                    "match_type": "partial",
+                }
+            )
 
         # Multiple matches - return list for disambiguation
         elif len(matches) > 1:
-            log.info(f"📋 find_project_by_name: Multiple matches found ({len(matches)} projects)")
-            return json.dumps({
-                "success": False,
-                "error": "multiple_matches",
-                "message": f"Plusieurs projets correspondent à '{project_name}'",
-                "matches": [{"name": p["nom"]} for p in matches]
-            })
+            log.info(
+                f"📋 find_project_by_name: Multiple matches found ({len(matches)} projects)"
+            )
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "multiple_matches",
+                    "message": f"Plusieurs projets correspondent à '{project_name}'",
+                    "matches": [{"name": p["nom"]} for p in matches],
+                }
+            )
 
         # No matches
         else:
-            log.warning(f"❌ find_project_by_name: No matches found for '{project_name}'")
-            return json.dumps({
-                "success": False,
-                "error": "not_found",
-                "message": f"Aucun projet trouvé avec le nom '{project_name}'"
-            })
+            log.warning(
+                f"❌ find_project_by_name: No matches found for '{project_name}'"
+            )
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "not_found",
+                    "message": f"Aucun projet trouvé avec le nom '{project_name}'",
+                }
+            )
 
     # Return all tools with captured context
     return [

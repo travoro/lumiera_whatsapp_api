@@ -1,6 +1,9 @@
 """Template manager for creating dynamic WhatsApp list-picker templates."""
-from typing import Optional, Dict, List, Any
+
+from typing import Any, Dict, List, Optional
+
 from twilio.rest import Client
+
 from src.config import settings
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
@@ -11,10 +14,7 @@ class TemplateManager:
 
     def __init__(self):
         """Initialize template manager."""
-        self.client = Client(
-            settings.twilio_account_sid,
-            settings.twilio_auth_token
-        )
+        self.client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
         # Cache for template SIDs: {language: {template_name: sid}}
         self.template_cache: Dict[str, Dict[str, str]] = {}
         log.info("Template manager initialized")
@@ -42,7 +42,10 @@ class TemplateManager:
         try:
             # Check cache first
             cache_key = f"{template_name}_{language}"
-            if language in self.template_cache and template_name in self.template_cache[language]:
+            if (
+                language in self.template_cache
+                and template_name in self.template_cache[language]
+            ):
                 cached_sid = self.template_cache[language][template_name]
                 log.info(f"Using cached template: {cache_key} (SID: {cached_sid})")
                 return cached_sid
@@ -53,18 +56,20 @@ class TemplateManager:
             # Build list items (max 10)
             template_items = []
             for idx, item in enumerate(items[:10]):
-                template_items.append({
-                    "item": f"{{{{{idx*3 + 2}}}}}",  # {{2}}, {{5}}, {{8}}, etc.
-                    "id": f"{{{{{idx*3 + 3}}}}}",    # {{3}}, {{6}}, {{9}}, etc.
-                    "description": f"{{{{{idx*3 + 4}}}}}"  # {{4}}, {{7}}, {{10}}, etc.
-                })
+                template_items.append(
+                    {
+                        "item": f"{{{{{idx*3 + 2}}}}}",  # {{2}}, {{5}}, {{8}}, etc.
+                        "id": f"{{{{{idx*3 + 3}}}}}",  # {{3}}, {{6}}, {{9}}, etc.
+                        "description": f"{{{{{idx*3 + 4}}}}}",  # {{4}}, {{7}}, {{10}}, etc.
+                    }
+                )
 
             # Create template via Content API
             content_types = {
                 "twilio/list-picker": {
                     "body": greeting_text,  # Must have {{1}} for name
                     "button": button_text,
-                    "items": template_items
+                    "items": template_items,
                 }
             }
 
@@ -75,9 +80,7 @@ class TemplateManager:
 
             # Create the content template
             content = self.client.content.v1.contents.create(
-                friendly_name=friendly_name,
-                language=language,
-                types=content_types
+                friendly_name=friendly_name, language=language, types=content_types
             )
 
             content_sid = content.sid
@@ -114,7 +117,7 @@ class TemplateManager:
             "it": "Ciao {{1}}! Come posso aiutarti?",
             "ro": "Bună {{1}}! Cum te pot ajuta?",
             "pl": "Cześć {{1}}! Jak mogę Ci pomóc?",
-            "ar": "مرحبا {{1}}! كيف يمكنني مساعدتك؟"
+            "ar": "مرحبا {{1}}! كيف يمكنني مساعدتك؟",
         }
 
         button_texts = {
@@ -126,7 +129,7 @@ class TemplateManager:
             "it": "Scegli un'opzione",
             "ro": "Alege o opțiune",
             "pl": "Wybierz opcję",
-            "ar": "اختر خيار"
+            "ar": "اختر خيار",
         }
 
         # Use English as fallback
@@ -148,7 +151,7 @@ class TemplateManager:
             language=language,
             greeting_text=greeting,
             button_text=button_text,
-            items=items
+            items=items,
         )
 
     def delete_template(self, content_sid: str) -> bool:
@@ -167,7 +170,9 @@ class TemplateManager:
             # Remove from cache
             for lang in self.template_cache:
                 self.template_cache[lang] = {
-                    k: v for k, v in self.template_cache[lang].items() if v != content_sid
+                    k: v
+                    for k, v in self.template_cache[lang].items()
+                    if v != content_sid
                 }
 
             return True
@@ -175,7 +180,9 @@ class TemplateManager:
             log.error(f"❌ Error deleting template {content_sid}: {e}")
             return False
 
-    def get_template_from_database(self, template_name: str, language: str = "all") -> Optional[str]:
+    def get_template_from_database(
+        self, template_name: str, language: str = "all"
+    ) -> Optional[str]:
         """Fetch template SID from database.
 
         Args:
@@ -188,35 +195,48 @@ class TemplateManager:
         try:
             # Check cache first
             cache_key = f"{template_name}_{language}"
-            if language in self.template_cache and template_name in self.template_cache[language]:
+            if (
+                language in self.template_cache
+                and template_name in self.template_cache[language]
+            ):
                 cached_sid = self.template_cache[language][template_name]
-                log.info(f"Using cached template from memory: {cache_key} (SID: {cached_sid})")
+                log.info(
+                    f"Using cached template from memory: {cache_key} (SID: {cached_sid})"
+                )
                 return cached_sid
 
             # Query database - try specific language first, then fallback to "all"
             # Note: Using direct client access here because this method is called synchronously during initialization
-            result = supabase_client.client.table("templates")\
-                .select("twilio_content_sid")\
-                .eq("template_name", template_name)\
-                .eq("language", language)\
-                .eq("is_active", True)\
-                .single()\
+            result = (
+                supabase_client.client.table("templates")
+                .select("twilio_content_sid")
+                .eq("template_name", template_name)
+                .eq("language", language)
+                .eq("is_active", True)
+                .single()
                 .execute()
+            )
 
             if not result.data and language != "all":
                 # Fallback to universal template
-                log.info(f"Language-specific template not found, trying universal template")
-                result = supabase_client.client.table("templates")\
-                    .select("twilio_content_sid")\
-                    .eq("template_name", template_name)\
-                    .eq("language", "all")\
-                    .eq("is_active", True)\
-                    .single()\
+                log.info(
+                    f"Language-specific template not found, trying universal template"
+                )
+                result = (
+                    supabase_client.client.table("templates")
+                    .select("twilio_content_sid")
+                    .eq("template_name", template_name)
+                    .eq("language", "all")
+                    .eq("is_active", True)
+                    .single()
                     .execute()
+                )
 
             if result.data:
                 content_sid = result.data["twilio_content_sid"]
-                log.info(f"Retrieved template from database: {cache_key} (SID: {content_sid})")
+                log.info(
+                    f"Retrieved template from database: {cache_key} (SID: {content_sid})"
+                )
 
                 # Cache it
                 if language not in self.template_cache:
@@ -225,7 +245,9 @@ class TemplateManager:
 
                 return content_sid
             else:
-                log.warning(f"Template not found in database: {template_name}_{language}")
+                log.warning(
+                    f"Template not found in database: {template_name}_{language}"
+                )
                 return None
 
         except Exception as e:

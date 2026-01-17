@@ -1,7 +1,10 @@
 """Escalation service for human handoff."""
-from typing import Optional, Dict, Any
+
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 import httpx
+
 from src.config import settings
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client

@@ -3,18 +3,16 @@
 These handlers execute directly without calling the main agent,
 providing fast responses for simple, unambiguous requests.
 """
-from typing import Dict, Any
+
+from typing import Any, Dict
+
 from src.services.escalation import escalation_service
-from src.utils.whatsapp_formatter import get_translation
 from src.utils.logger import log
+from src.utils.whatsapp_formatter import get_translation
 
 
 async def handle_greeting(
-    user_id: str,
-    user_name: str,
-    language: str,
-    phone_number: str = None,
-    **kwargs
+    user_id: str, user_name: str, language: str, phone_number: str = None, **kwargs
 ) -> Dict[str, Any]:
     """Handle greeting intent directly.
 
@@ -31,13 +29,17 @@ async def handle_greeting(
 
     # ALWAYS return French - translation to user language happens in pipeline
     greeting_template = get_translation("fr", "greeting")
-    message = greeting_template.format(name=name_part) if greeting_template else f"Bonjour{name_part}!"
+    message = (
+        greeting_template.format(name=name_part)
+        if greeting_template
+        else f"Bonjour{name_part}!"
+    )
 
     return {
         "message": message,
         "escalation": False,
         "tools_called": [],
-        "fast_path": True
+        "fast_path": True,
     }
 
 
@@ -47,7 +49,7 @@ async def handle_escalation(
     user_name: str,
     language: str,
     reason: str = "User requested to speak with team",
-    **kwargs
+    **kwargs,
 ) -> Dict[str, Any]:
     """Handle escalation intent directly.
 
@@ -74,7 +76,7 @@ async def handle_escalation(
                 "message": get_translation("fr", "escalation_success"),
                 "escalation": True,
                 "tools_called": ["escalate_to_human_tool"],
-                "fast_path": True
+                "fast_path": True,
             }
         else:
             # Escalation failed, return None to trigger full agent

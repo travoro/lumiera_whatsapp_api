@@ -1,16 +1,19 @@
 """Twilio WhatsApp client for messaging."""
-from typing import Optional, List, Dict, Any
+
 import json
-import requests
-import tempfile
 import os
+import tempfile
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import requests
 from requests.auth import HTTPBasicAuth
-from twilio.rest import Client
 from twilio.request_validator import RequestValidator
+from twilio.rest import Client
+
 from src.config import settings
-from src.utils.logger import log
 from src.services.retry import retry_on_network_error
+from src.utils.logger import log
 
 
 class TwilioClient:
@@ -18,10 +21,7 @@ class TwilioClient:
 
     def __init__(self):
         """Initialize Twilio client."""
-        self.client = Client(
-            settings.twilio_account_sid,
-            settings.twilio_auth_token
-        )
+        self.client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
         self.whatsapp_number = settings.twilio_whatsapp_number
         self.validator = RequestValidator(settings.twilio_auth_token)
         log.info("Twilio client initialized")
@@ -99,6 +99,7 @@ class TwilioClient:
 
             if content_variables:
                 import json
+
                 message_params["content_variables"] = json.dumps(content_variables)
 
             log.info(f"📤 Sending message with content_sid: {content_sid}")
@@ -154,13 +155,8 @@ class TwilioClient:
             # Build the interactive structure
             interactive_payload = {
                 "type": "list",
-                "body": {
-                    "text": body
-                },
-                "action": {
-                    "button": button_text,
-                    "sections": sections
-                }
+                "body": {"text": body},
+                "action": {"button": button_text, "sections": sections},
             }
 
             log.info(f"🚀 Sending interactive list via direct API to {to}")
@@ -168,8 +164,10 @@ class TwilioClient:
             log.info(f"📋 Sections: {len(sections)} sections")
             if sections:
                 log.info(f"📋 Section 0: {len(sections[0].get('rows', []))} items")
-                for idx, row in enumerate(sections[0].get('rows', [])):
-                    log.info(f"   - Item {idx+1}: id={row.get('id')}, title={row.get('title')}, desc={row.get('description')}")
+                for idx, row in enumerate(sections[0].get("rows", [])):
+                    log.info(
+                        f"   - Item {idx+1}: id={row.get('id')}, title={row.get('title')}, desc={row.get('description')}"
+                    )
 
             log.info(f"🔧 Interactive payload structure:")
             log.info(f"--- START INTERACTIVE ---")
@@ -184,12 +182,13 @@ class TwilioClient:
                     "To": to,
                     "From": from_number,
                     "Body": body,  # Fallback text
-                    "Interactive": json.dumps(interactive_payload)  # JSON string in form data
+                    "Interactive": json.dumps(
+                        interactive_payload
+                    ),  # JSON string in form data
                 },
                 auth=HTTPBasicAuth(
-                    settings.twilio_account_sid,
-                    settings.twilio_auth_token
-                )
+                    settings.twilio_account_sid, settings.twilio_auth_token
+                ),
             )
 
             log.info(f"📊 Response status code: {response.status_code}")
@@ -200,7 +199,9 @@ class TwilioClient:
                 log.info(f"✅ Interactive list sent to {to}, SID: {message_sid}")
                 log.info(f"📊 Message status: {response_data.get('status')}")
                 log.info(f"📊 Message direction: {response_data.get('direction')}")
-                log.info(f"🔗 Check details: https://console.twilio.com/us1/monitor/logs/sms/{message_sid}")
+                log.info(
+                    f"🔗 Check details: https://console.twilio.com/us1/monitor/logs/sms/{message_sid}"
+                )
                 return message_sid
             else:
                 log.error(f"❌ Failed to send interactive list")
@@ -246,13 +247,8 @@ class TwilioClient:
             # Build interactive message payload (correct format!)
             interactive_payload = {
                 "type": "list",
-                "body": {
-                    "text": body
-                },
-                "action": {
-                    "button": button_text,
-                    "sections": sections
-                }
+                "body": {"text": body},
+                "action": {"button": button_text, "sections": sections},
             }
 
             log.info(f"🚀 Attempting to send interactive list to {to}")
@@ -263,8 +259,10 @@ class TwilioClient:
             log.info(f"📋 Sections: {len(sections)} sections")
             if sections:
                 log.info(f"📋 Section 0: {len(sections[0].get('rows', []))} items")
-                for idx, row in enumerate(sections[0].get('rows', [])):
-                    log.info(f"   - Item {idx+1}: id={row.get('id')}, title={row.get('title')}, desc={row.get('description')}")
+                for idx, row in enumerate(sections[0].get("rows", [])):
+                    log.info(
+                        f"   - Item {idx+1}: id={row.get('id')}, title={row.get('title')}, desc={row.get('description')}"
+                    )
 
             log.info(f"🔧 FULL Interactive payload:")
             log.info(f"--- START INTERACTIVE ---")
@@ -278,9 +276,7 @@ class TwilioClient:
 
             # Send message with interactive parameter (CORRECT!)
             message = self.client.messages.create(
-                from_=from_number,
-                to=to,
-                interactive=interactive_payload
+                from_=from_number, to=to, interactive=interactive_payload
             )
 
             log.info(f"✅ Interactive list sent to {to}, SID: {message.sid}")
@@ -289,7 +285,9 @@ class TwilioClient:
             log.info(f"📊 Message price: {message.price}")
             log.info(f"📊 Message error_code: {message.error_code}")
             log.info(f"📊 Message error_message: {message.error_message}")
-            log.info(f"🔗 Check full details: https://console.twilio.com/us1/monitor/logs/sms/{message.sid}")
+            log.info(
+                f"🔗 Check full details: https://console.twilio.com/us1/monitor/logs/sms/{message.sid}"
+            )
 
             # Fetch the message again to see if status changed
             try:
@@ -307,7 +305,9 @@ class TwilioClient:
             log.error(f"❌ Error sending interactive list: {e}")
             log.error(f"Error type: {type(e).__name__}")
             log.error(f"Error details: {str(e)}")
-            log.warning("Interactive lists may not be supported on your Twilio account tier")
+            log.warning(
+                "Interactive lists may not be supported on your Twilio account tier"
+            )
             return None
 
     @retry_on_network_error(max_attempts=3)
@@ -339,34 +339,32 @@ class TwilioClient:
 
             # Build persistent action for interactive buttons
             persistent_action = [
-                json.dumps({
-                    "type": "button",
-                    "buttons": [
-                        {
-                            "type": "reply",
-                            "reply": {
-                                "id": btn["id"],
-                                "title": btn["title"]
+                json.dumps(
+                    {
+                        "type": "button",
+                        "buttons": [
+                            {
+                                "type": "reply",
+                                "reply": {"id": btn["id"], "title": btn["title"]},
                             }
-                        }
-                        for btn in buttons[:3]  # Max 3 buttons
-                    ]
-                })
+                            for btn in buttons[:3]  # Max 3 buttons
+                        ],
+                    }
+                )
             ]
 
             # Send message with persistent action (interactive buttons)
             message = self.client.messages.create(
-                from_=from_number,
-                to=to,
-                body=body,
-                persistent_action=persistent_action
+                from_=from_number, to=to, body=body, persistent_action=persistent_action
             )
 
             log.info(f"Interactive buttons sent to {to}, SID: {message.sid}")
             return message.sid
         except Exception as e:
             log.error(f"Error sending interactive buttons: {e}")
-            log.warning("Interactive buttons may not be supported on your Twilio account tier")
+            log.warning(
+                "Interactive buttons may not be supported on your Twilio account tier"
+            )
             return None
 
     def download_and_upload_media(
@@ -400,7 +398,9 @@ class TwilioClient:
             response.raise_for_status()
 
             file_size = len(response.content)
-            log.info(f"   ✅ Downloaded {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+            log.info(
+                f"   ✅ Downloaded {file_size} bytes ({file_size/1024/1024:.2f} MB)"
+            )
 
             # Determine file extension from content type or URL
             extension = ".bin"  # Default
@@ -413,21 +413,21 @@ class TwilioClient:
                     extension = ".jpg"
             else:
                 # Try to extract from URL
-                url_path = media_url.split('?')[0]  # Remove query params
-                if url_path.endswith('.pdf'):
-                    extension = '.pdf'
-                elif url_path.endswith('.png'):
-                    extension = '.png'
-                elif url_path.endswith('.jpg') or url_path.endswith('.jpeg'):
-                    extension = '.jpg'
+                url_path = media_url.split("?")[0]  # Remove query params
+                if url_path.endswith(".pdf"):
+                    extension = ".pdf"
+                elif url_path.endswith(".png"):
+                    extension = ".png"
+                elif url_path.endswith(".jpg") or url_path.endswith(".jpeg"):
+                    extension = ".jpg"
 
             log.info(f"   📄 File extension: {extension}")
 
             # Use provided filename or generate temp name
             if filename:
                 # Save with a simplified filename to avoid URL encoding issues
-                import re
                 import hashlib
+                import re
 
                 # Create a hash of the original filename for uniqueness
                 name_hash = hashlib.md5(filename.encode()).hexdigest()[:8]
@@ -435,11 +435,11 @@ class TwilioClient:
                 # Extract just the base name without path, and limit length
                 base_name = os.path.basename(filename)
                 # Keep only alphanumeric, hyphens, and underscores
-                clean_name = re.sub(r'[^\w\-]', '_', base_name)
+                clean_name = re.sub(r"[^\w\-]", "_", base_name)
                 # Remove multiple consecutive underscores
-                clean_name = re.sub(r'_+', '_', clean_name)
+                clean_name = re.sub(r"_+", "_", clean_name)
                 # Remove leading/trailing underscores
-                clean_name = clean_name.strip('_')
+                clean_name = clean_name.strip("_")
                 # Limit length to 50 chars (excluding extension)
                 if len(clean_name) > 50:
                     clean_name = clean_name[:50]
@@ -451,14 +451,16 @@ class TwilioClient:
                 log.info(f"   🏷️ Sanitized filename: {filename} → {safe_filename}")
             else:
                 # Save to temporary file with auto-generated name
-                with tempfile.NamedTemporaryFile(mode='wb', suffix=extension, delete=False) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", suffix=extension, delete=False
+                ) as temp_file:
                     temp_file.write(response.content)
                     temp_file_path = temp_file.name
                     log.info(f"   💾 Saved to temporary file: {temp_file_path}")
                     return temp_file_path
 
             # Write content to the named file
-            with open(temp_file_path, 'wb') as f:
+            with open(temp_file_path, "wb") as f:
                 f.write(response.content)
 
             log.info(f"   💾 Saved to: {temp_file_path}")
@@ -512,6 +514,7 @@ class TwilioClient:
 
             # Register the file for temporary hosting
             from src.handlers.media import register_temp_file
+
             temp_url_path = register_temp_file(local_file_path)
 
             # Build full URL
@@ -520,10 +523,7 @@ class TwilioClient:
 
             # Send message with media URL
             message = self.client.messages.create(
-                from_=from_number,
-                to=to,
-                body=body,
-                media_url=[media_url]
+                from_=from_number, to=to, body=body, media_url=[media_url]
             )
 
             log.info(f"   ✅ Message sent with temp hosted file, SID: {message.sid}")
@@ -532,6 +532,7 @@ class TwilioClient:
         except Exception as e:
             log.error(f"   ❌ Error sending message with local media: {e}")
             import traceback
+
             log.error(f"   Traceback: {traceback.format_exc()}")
             return None
 

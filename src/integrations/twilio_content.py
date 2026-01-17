@@ -1,11 +1,14 @@
 """Twilio Content API client for creating interactive message templates."""
-from typing import Optional, List, Dict, Any
+
 import hashlib
 import json
+from typing import Any, Dict, List, Optional
+
 from twilio.rest import Client
+
 from src.config import settings
-from src.utils.logger import log
 from src.services.retry import retry_on_network_error
+from src.utils.logger import log
 
 
 class TwilioContentClient:
@@ -13,10 +16,7 @@ class TwilioContentClient:
 
     def __init__(self):
         """Initialize Twilio Content API client."""
-        self.client = Client(
-            settings.twilio_account_sid,
-            settings.twilio_auth_token
-        )
+        self.client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
         log.info("Twilio Content API client initialized")
 
     def _generate_template_name(self, items: List[Dict[str, Any]]) -> str:
@@ -39,7 +39,7 @@ class TwilioContentClient:
         body_text: str,
         button_text: str,
         items: List[Dict[str, str]],
-        variables: Optional[Dict[str, str]] = None
+        variables: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """Create a list-picker content template dynamically.
 
@@ -60,7 +60,9 @@ class TwilioContentClient:
             existing_templates = self.client.content.v1.contents.list(limit=100)
             for template in existing_templates:
                 if template.friendly_name == friendly_name:
-                    log.info(f"♻️ Reusing existing template: {friendly_name} (SID: {template.sid})")
+                    log.info(
+                        f"♻️ Reusing existing template: {friendly_name} (SID: {template.sid})"
+                    )
                     return template.sid
 
             # Prepare items in correct format
@@ -68,10 +70,14 @@ class TwilioContentClient:
             for item_data in items[:10]:  # WhatsApp limit: 10 items
                 formatted_item = {
                     "id": item_data.get("id", ""),
-                    "item": item_data.get("item", item_data.get("title", ""))[:24],  # Max 24 chars
+                    "item": item_data.get("item", item_data.get("title", ""))[
+                        :24
+                    ],  # Max 24 chars
                 }
                 if "description" in item_data and item_data["description"]:
-                    formatted_item["description"] = item_data["description"][:72]  # Max 72 chars
+                    formatted_item["description"] = item_data["description"][
+                        :72
+                    ]  # Max 72 chars
                 formatted_items.append(formatted_item)
 
             # Build template structure
@@ -79,14 +85,12 @@ class TwilioContentClient:
                 "twilio/list-picker": {
                     "body": body_text,
                     "button": button_text[:20],  # Max 20 chars for button
-                    "items": formatted_items
+                    "items": formatted_items,
                 }
             }
 
             # Add text fallback for non-WhatsApp channels
-            template_types["twilio/text"] = {
-                "body": body_text
-            }
+            template_types["twilio/text"] = {"body": body_text}
 
             log.info(f"🏗️ Creating new list-picker template: {friendly_name}")
             log.info(f"📝 Body: {body_text[:100]}...")
@@ -97,7 +101,7 @@ class TwilioContentClient:
                 friendly_name=friendly_name,
                 language="fr",  # French as primary language
                 variables=variables or {},
-                types=template_types
+                types=template_types,
             )
 
             log.info(f"✅ Created template SID: {content.sid}")

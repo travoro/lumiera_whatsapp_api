@@ -1,7 +1,10 @@
 """Supabase client for database operations."""
-from typing import Optional, List, Dict, Any
-from supabase import create_client, Client
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from supabase import Client, create_client
+
 from src.config import settings
 from src.utils.logger import log
 
@@ -12,8 +15,7 @@ class SupabaseClient:
     def __init__(self):
         """Initialize Supabase client."""
         self.client: Client = create_client(
-            settings.supabase_url,
-            settings.supabase_service_role_key
+            settings.supabase_url, settings.supabase_service_role_key
         )
         log.info("Supabase client initialized")
 
@@ -27,9 +29,12 @@ class SupabaseClient:
             Subcontractor dict if found, None otherwise
         """
         try:
-            response = self.client.table("subcontractors").select("*").eq(
-                "id", user_id
-            ).execute()
+            response = (
+                self.client.table("subcontractors")
+                .select("*")
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
@@ -51,14 +56,16 @@ class SupabaseClient:
             user = self.get_user(user_id)
             if user:
                 # Try different name fields in order of preference
-                return (user.get('contact_prenom') or
-                       user.get('contact_name') or
-                       user.get('raison_sociale') or
-                       '')
-            return ''
+                return (
+                    user.get("contact_prenom")
+                    or user.get("contact_name")
+                    or user.get("raison_sociale")
+                    or ""
+                )
+            return ""
         except Exception as e:
             log.error(f"Error getting user name for {user_id}: {e}")
-            return ''
+            return ""
 
     async def get_user_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
         """Get subcontractor by WhatsApp phone number.
@@ -74,9 +81,12 @@ class SupabaseClient:
             Subcontractor dict if found, None otherwise
         """
         try:
-            response = self.client.table("subcontractors").select("*").eq(
-                "contact_telephone", phone_number
-            ).execute()
+            response = (
+                self.client.table("subcontractors")
+                .select("*")
+                .eq("contact_telephone", phone_number)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
@@ -99,9 +109,12 @@ class SupabaseClient:
             True if update successful, False otherwise
         """
         try:
-            response = self.client.table("subcontractors").update({
-                "language": language
-            }).eq("id", user_id).execute()
+            response = (
+                self.client.table("subcontractors")
+                .update({"language": language})
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 log.info(
@@ -118,10 +131,7 @@ class SupabaseClient:
             return False
 
     async def create_or_update_user(
-        self,
-        phone_number: str,
-        language: str = "fr",
-        **kwargs
+        self, phone_number: str, language: str = "fr", **kwargs
     ) -> Optional[Dict[str, Any]]:
         """Update existing subcontractor profile (lookup only - no auto-create).
 
@@ -135,16 +145,27 @@ class SupabaseClient:
 
             if existing_user:
                 # Update existing subcontractor's language
-                response = self.client.table("subcontractors").update({
-                    "language": language,
-                    "updated_at": datetime.utcnow().isoformat(),
-                    **kwargs
-                }).eq("id", existing_user["id"]).execute()
-                log.info(f"Updated subcontractor {existing_user['id']} language to {language}")
+                response = (
+                    self.client.table("subcontractors")
+                    .update(
+                        {
+                            "language": language,
+                            "updated_at": datetime.utcnow().isoformat(),
+                            **kwargs,
+                        }
+                    )
+                    .eq("id", existing_user["id"])
+                    .execute()
+                )
+                log.info(
+                    f"Updated subcontractor {existing_user['id']} language to {language}"
+                )
                 return response.data[0] if response.data else existing_user
             else:
                 # Subcontractor not found - cannot auto-create
-                log.warning(f"Subcontractor with phone {phone_number} not found. Create manually in Supabase first.")
+                log.warning(
+                    f"Subcontractor with phone {phone_number} not found. Create manually in Supabase first."
+                )
                 return None
         except Exception as e:
             log.error(f"Error updating subcontractor: {e}")
@@ -214,7 +235,9 @@ class SupabaseClient:
 
             # BACKWARD COMPATIBILITY: Convert need_human to is_escalation
             if need_human and not is_escalation:
-                log.warning("need_human parameter is deprecated. Converting to is_escalation=True")
+                log.warning(
+                    "need_human parameter is deprecated. Converting to is_escalation=True"
+                )
                 is_escalation = True
 
             # Add escalation metadata if applicable (standardized format)
@@ -257,21 +280,25 @@ class SupabaseClient:
             duration_ms: Duration in milliseconds
         """
         try:
-            self.client.table("action_logs").insert({
-                "subcontractor_id": user_id,
-                "action_name": action_name,
-                "action_type": action_type,
-                "parameters": parameters,
-                "result": result,
-                "error": error,
-                "duration_ms": duration_ms,
-                "created_at": datetime.utcnow().isoformat(),
-            }).execute()
+            self.client.table("action_logs").insert(
+                {
+                    "subcontractor_id": user_id,
+                    "action_name": action_name,
+                    "action_type": action_type,
+                    "parameters": parameters,
+                    "result": result,
+                    "error": error,
+                    "duration_ms": duration_ms,
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            ).execute()
             log.info(f"Action logged: {action_name} for user {user_id}")
             return True
         except Exception as e:
             # Log warning but don't fail the main operation
-            log.warning(f"Could not save action log (table may not exist - run migrations): {e}")
+            log.warning(
+                f"Could not save action log (table may not exist - run migrations): {e}"
+            )
             return False
 
     async def list_projects(self, user_id: str) -> List[Dict[str, Any]]:
@@ -280,17 +307,25 @@ class SupabaseClient:
         SECURITY: Filters projects by subcontractor_id to prevent unauthorized access.
         """
         try:
-            response = self.client.table("projects").select(
-                "*"
-            ).eq("active", True).eq("subcontractor_id", user_id).execute()
+            response = (
+                self.client.table("projects")
+                .select("*")
+                .eq("active", True)
+                .eq("subcontractor_id", user_id)
+                .execute()
+            )
 
-            log.info(f"Retrieved {len(response.data) if response.data else 0} projects for user {user_id}")
+            log.info(
+                f"Retrieved {len(response.data) if response.data else 0} projects for user {user_id}"
+            )
             return response.data if response.data else []
         except Exception as e:
             log.error(f"Error listing projects for user {user_id}: {e}")
             return []
 
-    async def get_project(self, project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_project(
+        self, project_id: str, user_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """Get specific project details.
 
         Args:
@@ -322,16 +357,22 @@ class SupabaseClient:
         No separate escalations table needed.
         """
         try:
-            response = self.client.table("messages").select("*").eq(
-                "subcontractor_id", user_id
-            ).order("created_at", desc=True).limit(limit * 2).execute()
+            response = (
+                self.client.table("messages")
+                .select("*")
+                .eq("subcontractor_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit * 2)
+                .execute()
+            )
 
             if not response.data:
                 return []
 
             # Filter for escalation messages
             escalations = [
-                msg for msg in response.data
+                msg
+                for msg in response.data
                 if msg.get("metadata", {}).get("is_escalation", False)
             ]
 
@@ -357,16 +398,20 @@ class SupabaseClient:
             Note: Filters out messages with null/empty content
         """
         try:
-            response = self.client.table("messages").select(
-                "id, direction, content, language, created_at"
-            ).eq("subcontractor_id", user_id).order(
-                "created_at", desc=True
-            ).limit(limit * 2).execute()  # Get more to account for filtering
+            response = (
+                self.client.table("messages")
+                .select("id, direction, content, language, created_at")
+                .eq("subcontractor_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit * 2)
+                .execute()
+            )  # Get more to account for filtering
 
             if response.data:
                 # Filter out messages with null or empty content
                 valid_messages = [
-                    msg for msg in response.data
+                    msg
+                    for msg in response.data
                     if msg.get("content") and msg["content"].strip()
                 ]
 
@@ -422,11 +467,9 @@ class SupabaseClient:
     ) -> Optional[str]:
         """Upload media file to Supabase storage."""
         try:
-            response = self.client.storage.from_(
-                settings.media_storage_bucket
-            ).upload(file_name, file_data, {
-                "content-type": content_type
-            })
+            response = self.client.storage.from_(settings.media_storage_bucket).upload(
+                file_name, file_data, {"content-type": content_type}
+            )
 
             # Get public URL
             public_url = self.client.storage.from_(
@@ -451,8 +494,7 @@ class SupabaseClient:
         """
         try:
             result = self.client.rpc(
-                'get_or_create_session',
-                {'p_subcontractor_id': subcontractor_id}
+                "get_or_create_session", {"p_subcontractor_id": subcontractor_id}
             ).execute()
             return result.data if result.data else None
         except Exception as e:
@@ -469,9 +511,12 @@ class SupabaseClient:
             Session dict if found, None otherwise
         """
         try:
-            response = self.client.table('conversation_sessions').select('*').eq(
-                'id', session_id
-            ).execute()
+            response = (
+                self.client.table("conversation_sessions")
+                .select("*")
+                .eq("id", session_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
@@ -480,7 +525,9 @@ class SupabaseClient:
             log.error(f"Error getting session {session_id}: {e}")
             return None
 
-    async def create_session(self, subcontractor_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def create_session(
+        self, subcontractor_id: str, data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Create a new conversation session.
 
         Args:
@@ -491,7 +538,7 @@ class SupabaseClient:
             Created session dict if successful, None otherwise
         """
         try:
-            response = self.client.table('conversation_sessions').insert(data).execute()
+            response = self.client.table("conversation_sessions").insert(data).execute()
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
@@ -511,13 +558,17 @@ class SupabaseClient:
             True if successful, False otherwise
         """
         try:
-            self.client.table('conversation_sessions').update(data).eq('id', session_id).execute()
+            self.client.table("conversation_sessions").update(data).eq(
+                "id", session_id
+            ).execute()
             return True
         except Exception as e:
             log.error(f"Error updating session {session_id}: {e}")
             return False
 
-    async def end_sessions_for_user(self, subcontractor_id: str, end_data: Dict[str, Any]) -> bool:
+    async def end_sessions_for_user(
+        self, subcontractor_id: str, end_data: Dict[str, Any]
+    ) -> bool:
         """End all active sessions for a user.
 
         Args:
@@ -528,9 +579,9 @@ class SupabaseClient:
             True if successful, False otherwise
         """
         try:
-            self.client.table('conversation_sessions').update(
-                end_data
-            ).eq('subcontractor_id', subcontractor_id).eq('status', 'active').execute()
+            self.client.table("conversation_sessions").update(end_data).eq(
+                "subcontractor_id", subcontractor_id
+            ).eq("status", "active").execute()
             return True
         except Exception as e:
             log.error(f"Error ending sessions for user {subcontractor_id}: {e}")
@@ -547,15 +598,16 @@ class SupabaseClient:
         """
         try:
             result = self.client.rpc(
-                'generate_session_summary',
-                {'p_session_id': session_id}
+                "generate_session_summary", {"p_session_id": session_id}
             ).execute()
             return result.data if result.data else None
         except Exception as e:
             log.error(f"Error calling generate_session_summary RPC: {e}")
             return None
 
-    async def get_messages_by_session(self, session_id: str, fields: str = '*') -> List[Dict[str, Any]]:
+    async def get_messages_by_session(
+        self, session_id: str, fields: str = "*"
+    ) -> List[Dict[str, Any]]:
         """Get messages for a specific session.
 
         Args:
@@ -566,13 +618,20 @@ class SupabaseClient:
             List of message dicts
         """
         try:
-            response = self.client.table('messages').select(fields).eq('session_id', session_id).execute()
+            response = (
+                self.client.table("messages")
+                .select(fields)
+                .eq("session_id", session_id)
+                .execute()
+            )
             return response.data if response.data else []
         except Exception as e:
             log.error(f"Error getting messages for session {session_id}: {e}")
             return []
 
-    async def get_sessions_for_user(self, subcontractor_id: str) -> List[Dict[str, Any]]:
+    async def get_sessions_for_user(
+        self, subcontractor_id: str
+    ) -> List[Dict[str, Any]]:
         """Get all sessions for a user.
 
         Args:
@@ -582,9 +641,12 @@ class SupabaseClient:
             List of session dicts
         """
         try:
-            response = self.client.table('conversation_sessions').select('*').eq(
-                'subcontractor_id', subcontractor_id
-            ).execute()
+            response = (
+                self.client.table("conversation_sessions")
+                .select("*")
+                .eq("subcontractor_id", subcontractor_id)
+                .execute()
+            )
             return response.data if response.data else []
         except Exception as e:
             log.error(f"Error getting sessions for user {subcontractor_id}: {e}")
@@ -592,7 +654,9 @@ class SupabaseClient:
 
     # ==================== TEMPLATE OPERATIONS ====================
 
-    async def get_template(self, template_name: str, language: str, is_active: bool = True) -> Optional[Dict[str, Any]]:
+    async def get_template(
+        self, template_name: str, language: str, is_active: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """Get template by name and language.
 
         Args:
@@ -604,9 +668,15 @@ class SupabaseClient:
             Template dict if found, None otherwise
         """
         try:
-            response = self.client.table('templates').select('twilio_content_sid').eq(
-                'template_name', template_name
-            ).eq('language', language).eq('is_active', is_active).single().execute()
+            response = (
+                self.client.table("templates")
+                .select("twilio_content_sid")
+                .eq("template_name", template_name)
+                .eq("language", language)
+                .eq("is_active", is_active)
+                .single()
+                .execute()
+            )
 
             return response.data if response.data else None
         except Exception as e:
@@ -625,7 +695,7 @@ class SupabaseClient:
             True if successful, False otherwise
         """
         try:
-            self.client.table('intent_classifications').insert(data).execute()
+            self.client.table("intent_classifications").insert(data).execute()
             return True
         except Exception as e:
             log.warning(f"Error logging intent classification: {e}")
@@ -633,11 +703,7 @@ class SupabaseClient:
 
     # ==================== PROGRESS UPDATE HELPERS ====================
 
-    async def get_recent_messages(
-        self,
-        user_id: str,
-        limit: int = 5
-    ) -> list:
+    async def get_recent_messages(self, user_id: str, limit: int = 5) -> list:
         """Get recent message history for user.
 
         Args:
@@ -648,11 +714,14 @@ class SupabaseClient:
             List of recent messages (dicts with role, content)
         """
         try:
-            response = self.client.table("messages").select(
-                "content, direction, created_at"
-            ).eq("subcontractor_id", user_id).order(
-                "created_at", desc=True
-            ).limit(limit).execute()
+            response = (
+                self.client.table("messages")
+                .select("content, direction, created_at")
+                .eq("subcontractor_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
 
             if response.data:
                 messages = []
@@ -663,10 +732,7 @@ class SupabaseClient:
                         continue
 
                     role = "user" if msg["direction"] == "inbound" else "assistant"
-                    messages.append({
-                        "role": role,
-                        "content": msg["content"]
-                    })
+                    messages.append({"role": role, "content": msg["content"]})
                 return messages
             return []
 
@@ -682,6 +748,7 @@ class SupabaseClient:
 # Global instance
 # Skip instantiation in test environment to avoid API key validation
 import os
+
 if os.getenv("ENVIRONMENT") == "test":
     supabase_client = None  # Will be mocked by pytest fixtures
 else:

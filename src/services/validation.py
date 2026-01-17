@@ -1,6 +1,8 @@
 """Input validation and sanitization service."""
+
 import re
-from typing import Dict, Any
+from typing import Any, Dict
+
 from src.utils.logger import log
 
 # Suspicious patterns that might indicate prompt injection or malicious input
@@ -43,7 +45,7 @@ async def validate_input(message: str, user_id: str) -> Dict[str, Any]:
         return {
             "is_valid": False,
             "reason": "empty_message",
-            "message": "Message cannot be empty"
+            "message": "Message cannot be empty",
         }
 
     # Length check - minimum
@@ -51,7 +53,7 @@ async def validate_input(message: str, user_id: str) -> Dict[str, Any]:
         return {
             "is_valid": False,
             "reason": "message_too_short",
-            "message": "Message is too short"
+            "message": "Message is too short",
         }
 
     # Length check - maximum
@@ -60,32 +62,31 @@ async def validate_input(message: str, user_id: str) -> Dict[str, Any]:
         return {
             "is_valid": False,
             "reason": "message_too_long",
-            "message": f"Message too long (max {MAX_MESSAGE_LENGTH} characters)"
+            "message": f"Message too long (max {MAX_MESSAGE_LENGTH} characters)",
         }
 
     # Injection detection
     message_lower = message.lower()
     for pattern in SUSPICIOUS_PATTERNS:
         if re.search(pattern, message_lower, re.IGNORECASE):
-            log.warning(f"Suspicious pattern detected for user {user_id}: pattern='{pattern}', message='{message[:100]}'")
+            log.warning(
+                f"Suspicious pattern detected for user {user_id}: pattern='{pattern}', message='{message[:100]}'"
+            )
             return {
                 "is_valid": False,
                 "reason": "suspicious_pattern",
-                "message": "Your message contains suspicious content. Please rephrase your message."
+                "message": "Your message contains suspicious content. Please rephrase your message.",
             }
 
     # Sanitize - basic cleanup
     sanitized = message.strip()
 
     # Remove excessive whitespace
-    sanitized = re.sub(r'\s+', ' ', sanitized)
+    sanitized = re.sub(r"\s+", " ", sanitized)
 
     log.info(f"Input validated successfully for user {user_id}: {len(sanitized)} chars")
 
-    return {
-        "is_valid": True,
-        "sanitized": sanitized
-    }
+    return {"is_valid": True, "sanitized": sanitized}
 
 
 def is_safe_for_sql(value: str) -> bool:
@@ -119,7 +120,9 @@ def is_safe_for_sql(value: str) -> bool:
     value_lower = value.lower()
     for pattern in sql_patterns:
         if re.search(pattern, value_lower):
-            log.error(f"SQL injection pattern detected: {pattern} in value: {value[:100]}")
+            log.error(
+                f"SQL injection pattern detected: {pattern} in value: {value[:100]}"
+            )
             return False
 
     return True
@@ -138,15 +141,15 @@ def sanitize_filename(filename: str) -> str:
         return "unnamed"
 
     # Remove path components
-    filename = filename.split('/')[-1]
-    filename = filename.split('\\')[-1]
+    filename = filename.split("/")[-1]
+    filename = filename.split("\\")[-1]
 
     # Remove dangerous characters
-    filename = re.sub(r'[^\w\s\-\.]', '', filename)
+    filename = re.sub(r"[^\w\s\-\.]", "", filename)
 
     # Limit length
     if len(filename) > 255:
-        name, ext = filename.rsplit('.', 1) if '.' in filename else (filename, '')
-        filename = name[:250] + ('.' + ext if ext else '')
+        name, ext = filename.rsplit(".", 1) if "." in filename else (filename, "")
+        filename = name[:250] + ("." + ext if ext else "")
 
     return filename or "unnamed"

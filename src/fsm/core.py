@@ -3,20 +3,21 @@
 This module combines StateManager (database operations) and FSMEngine
 (business logic) into a cohesive system for managing user session states.
 """
-from typing import Optional, Dict, Any, List, Callable
-from datetime import datetime, timedelta
-from contextlib import asynccontextmanager
 
-from src.fsm.models import (
-    SessionState,
-    FSMContext,
-    TransitionRule,
-    TransitionResult,
-    IdempotencyRecord,
-)
-from src.utils.structured_logger import get_structured_logger, set_correlation_id
-from src.integrations.supabase import supabase_client
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional
+
 from src.config import settings
+from src.fsm.models import (
+    FSMContext,
+    IdempotencyRecord,
+    SessionState,
+    TransitionResult,
+    TransitionRule,
+)
+from src.integrations.supabase import supabase_client
+from src.utils.structured_logger import get_structured_logger, set_correlation_id
 
 logger = get_structured_logger("fsm.core")
 
@@ -31,101 +32,96 @@ TRANSITION_RULES: List[TransitionRule] = [
         from_state=SessionState.IDLE,
         to_state=SessionState.TASK_SELECTION,
         trigger="start_update",
-        description="User initiates progress update"
+        description="User initiates progress update",
     ),
     TransitionRule(
         from_state=SessionState.IDLE,
         to_state=SessionState.ABANDONED,
         trigger="explicit_cancel",
-        description="User explicitly cancels"
+        description="User explicitly cancels",
     ),
-
     # From TASK_SELECTION
     TransitionRule(
         from_state=SessionState.TASK_SELECTION,
         to_state=SessionState.AWAITING_ACTION,
         trigger="task_selected",
-        description="User selects a task to update"
+        description="User selects a task to update",
     ),
     TransitionRule(
         from_state=SessionState.TASK_SELECTION,
         to_state=SessionState.ABANDONED,
         trigger="cancel",
-        description="User cancels task selection"
+        description="User cancels task selection",
     ),
-
     # From AWAITING_ACTION
     TransitionRule(
         from_state=SessionState.AWAITING_ACTION,
         to_state=SessionState.COLLECTING_DATA,
         trigger="start_collection",
-        description="User starts providing photos/comments"
+        description="User starts providing photos/comments",
     ),
     TransitionRule(
         from_state=SessionState.AWAITING_ACTION,
         to_state=SessionState.CONFIRMATION_PENDING,
         trigger="request_confirmation",
-        description="User requests to finalize update"
+        description="User requests to finalize update",
     ),
     TransitionRule(
         from_state=SessionState.AWAITING_ACTION,
         to_state=SessionState.ABANDONED,
         trigger="timeout",
-        description="Session timeout due to inactivity"
+        description="Session timeout due to inactivity",
     ),
-
     # From COLLECTING_DATA
     TransitionRule(
         from_state=SessionState.COLLECTING_DATA,
         to_state=SessionState.COLLECTING_DATA,
         trigger="add_data",
-        description="User adds more photos/comments (self-loop)"
+        description="User adds more photos/comments (self-loop)",
     ),
     TransitionRule(
         from_state=SessionState.COLLECTING_DATA,
         to_state=SessionState.CONFIRMATION_PENDING,
         trigger="request_confirmation",
-        description="User requests to complete update"
+        description="User requests to complete update",
     ),
     TransitionRule(
         from_state=SessionState.COLLECTING_DATA,
         to_state=SessionState.ABANDONED,
         trigger="cancel",
-        description="User cancels data collection"
+        description="User cancels data collection",
     ),
-
     # From CONFIRMATION_PENDING
     TransitionRule(
         from_state=SessionState.CONFIRMATION_PENDING,
         to_state=SessionState.COMPLETED,
         trigger="confirm",
-        description="User confirms completion"
+        description="User confirms completion",
     ),
     TransitionRule(
         from_state=SessionState.CONFIRMATION_PENDING,
         to_state=SessionState.COLLECTING_DATA,
         trigger="continue_editing",
-        description="User wants to add more data"
+        description="User wants to add more data",
     ),
     TransitionRule(
         from_state=SessionState.CONFIRMATION_PENDING,
         to_state=SessionState.ABANDONED,
         trigger="cancel",
-        description="User cancels before completion"
+        description="User cancels before completion",
     ),
-
     # Global transitions (from any state)
     TransitionRule(
         from_state=None,  # From any state
         to_state=SessionState.ABANDONED,
         trigger="force_abandon",
-        description="Force abandon (system/admin action)"
+        description="Force abandon (system/admin action)",
     ),
     TransitionRule(
         from_state=None,  # From any state
         to_state=SessionState.IDLE,
         trigger="reset",
-        description="Reset to idle state"
+        description="Reset to idle state",
     ),
 ]
 
@@ -133,6 +129,7 @@ TRANSITION_RULES: List[TransitionRule] = [
 # ============================================================================
 # StateManager - Database Operations
 # ============================================================================
+
 
 class StateManager:
     """Manages FSM state persistence in database with transaction support."""
@@ -151,9 +148,12 @@ class StateManager:
             Session dict if found, None otherwise
         """
         try:
-            response = self.db.client.table("progress_update_sessions").select(
-                "*"
-            ).eq("subcontractor_id", user_id).execute()
+            response = (
+                self.db.client.table("progress_update_sessions")
+                .select("*")
+                .eq("subcontractor_id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
@@ -168,7 +168,7 @@ class StateManager:
         task_id: str,
         project_id: str,
         initial_state: SessionState = SessionState.IDLE,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Create new session for user.
 
@@ -194,9 +194,11 @@ class StateManager:
                 "expires_at": (datetime.utcnow() + timedelta(hours=2)).isoformat(),
             }
 
-            response = self.db.client.table("progress_update_sessions").insert(
-                session_data
-            ).execute()
+            response = (
+                self.db.client.table("progress_update_sessions")
+                .insert(session_data)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 session_id = response.data[0]["id"]
@@ -204,7 +206,7 @@ class StateManager:
                     f"Session created: {session_id}",
                     user_id=user_id,
                     task_id=task_id,
-                    initial_state=initial_state.value
+                    initial_state=initial_state.value,
                 )
                 return session_id
             return None
@@ -217,7 +219,7 @@ class StateManager:
         session_id: str,
         new_state: SessionState,
         metadata_update: Optional[Dict[str, Any]] = None,
-        closure_reason: Optional[str] = None
+        closure_reason: Optional[str] = None,
     ) -> bool:
         """Update session state in database.
 
@@ -244,19 +246,17 @@ class StateManager:
             if closure_reason:
                 update_data["closure_reason"] = closure_reason
 
-            self.db.client.table("progress_update_sessions").update(
-                update_data
-            ).eq("id", session_id).execute()
+            self.db.client.table("progress_update_sessions").update(update_data).eq(
+                "id", session_id
+            ).execute()
 
             logger.info(
-                f"Session state updated: {new_state.value}",
-                session_id=session_id
+                f"Session state updated: {new_state.value}", session_id=session_id
             )
             return True
         except Exception as e:
             logger.error(
-                f"Error updating session state: {str(e)}",
-                session_id=session_id
+                f"Error updating session state: {str(e)}", session_id=session_id
             )
             return False
 
@@ -271,7 +271,7 @@ class StateManager:
         error: Optional[str] = None,
         context: Optional[FSMContext] = None,
         side_effects: Optional[List[str]] = None,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
     ) -> None:
         """Log state transition to audit table.
 
@@ -308,9 +308,7 @@ class StateManager:
             logger.warning(f"Error logging transition: {str(e)}")
 
     async def check_idempotency(
-        self,
-        user_id: str,
-        message_id: str
+        self, user_id: str, message_id: str
     ) -> Optional[Dict[str, Any]]:
         """Check if message was already processed (idempotency).
 
@@ -323,14 +321,17 @@ class StateManager:
         """
         try:
             idempotency_key = f"{user_id}:{message_id}"
-            response = self.db.client.table("fsm_idempotency_records").select(
-                "*"
-            ).eq("idempotency_key", idempotency_key).execute()
+            response = (
+                self.db.client.table("fsm_idempotency_records")
+                .select("*")
+                .eq("idempotency_key", idempotency_key)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 logger.info(
                     "Idempotency hit - message already processed",
-                    idempotency_key=idempotency_key
+                    idempotency_key=idempotency_key,
                 )
                 return response.data[0].get("result")
             return None
@@ -339,10 +340,7 @@ class StateManager:
             return None
 
     async def record_idempotency(
-        self,
-        user_id: str,
-        message_id: str,
-        result: Optional[Dict[str, Any]] = None
+        self, user_id: str, message_id: str, result: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Record message as processed for idempotency.
 
@@ -369,10 +367,7 @@ class StateManager:
                 record_data
             ).execute()
 
-            logger.debug(
-                "Idempotency recorded",
-                idempotency_key=idempotency_key
-            )
+            logger.debug("Idempotency recorded", idempotency_key=idempotency_key)
             return True
         except Exception as e:
             logger.warning(f"Error recording idempotency: {str(e)}")
@@ -382,6 +377,7 @@ class StateManager:
 # ============================================================================
 # FSMEngine - Business Logic & Transition Validation
 # ============================================================================
+
 
 class FSMEngine:
     """FSM engine for validating and executing state transitions."""
@@ -396,10 +392,7 @@ class FSMEngine:
         self.transition_rules = TRANSITION_RULES
 
     def validate_transition(
-        self,
-        from_state: SessionState,
-        to_state: SessionState,
-        trigger: str
+        self, from_state: SessionState, to_state: SessionState, trigger: str
     ) -> tuple[bool, Optional[str]]:
         """Validate if a state transition is allowed.
 
@@ -420,9 +413,11 @@ class FSMEngine:
         # Check if transition rule exists
         for rule in self.transition_rules:
             # Match exact from_state or global rule (from_state=None)
-            if (rule.from_state == from_state or rule.from_state is None) and \
-               rule.to_state == to_state and \
-               rule.trigger == trigger:
+            if (
+                (rule.from_state == from_state or rule.from_state is None)
+                and rule.to_state == to_state
+                and rule.trigger == trigger
+            ):
                 return True, None
 
         error = f"Invalid transition: {from_state.value} -> {to_state.value} (trigger: {trigger})"
@@ -430,7 +425,7 @@ class FSMEngine:
             "Transition validation failed",
             from_state=from_state.value,
             to_state=to_state.value,
-            trigger=trigger
+            trigger=trigger,
         )
         return False, error
 
@@ -440,7 +435,7 @@ class FSMEngine:
         to_state: SessionState,
         trigger: str,
         side_effect_fn: Optional[Callable] = None,
-        closure_reason: Optional[str] = None
+        closure_reason: Optional[str] = None,
     ) -> TransitionResult:
         """Execute a state transition with validation and side effects.
 
@@ -470,6 +465,7 @@ class FSMEngine:
         except Exception:
             # In tests, correlation ID may not work properly - that's okay
             import uuid
+
             correlation_id = str(uuid.uuid4())
 
         # Normalize states for processing (validate_transition will also normalize)
@@ -483,7 +479,7 @@ class FSMEngine:
             from_state=from_state.value,
             to_state=to_state.value,
             trigger=trigger,
-            success=True  # Will update if fails
+            success=True,  # Will update if fails
         )
 
         # Validate transition
@@ -495,7 +491,7 @@ class FSMEngine:
                 to_state=from_state,  # Stay in current state
                 trigger=trigger,
                 error=error,
-                context=context
+                context=context,
             )
 
         # Update state in database (atomic operation)
@@ -504,7 +500,7 @@ class FSMEngine:
                 session_id=context.session_id,
                 new_state=to_state,
                 metadata_update=context.metadata,
-                closure_reason=closure_reason
+                closure_reason=closure_reason,
             )
 
             if not success:
@@ -514,7 +510,7 @@ class FSMEngine:
                     to_state=from_state,
                     trigger=trigger,
                     error="Failed to update session state in database",
-                    context=context
+                    context=context,
                 )
 
         # Execute side effects
@@ -524,10 +520,7 @@ class FSMEngine:
                 await side_effect_fn(context)
                 side_effects_executed.append(side_effect_fn.__name__)
             except Exception as e:
-                logger.error(
-                    f"Side effect failed: {str(e)}",
-                    trigger=trigger
-                )
+                logger.error(f"Side effect failed: {str(e)}", trigger=trigger)
                 # Don't fail transition if side effect fails
                 side_effects_executed.append(f"{side_effect_fn.__name__} (failed)")
 
@@ -546,7 +539,7 @@ class FSMEngine:
                 success=True,
                 context=context,
                 side_effects=side_effects_executed,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
         return TransitionResult(
@@ -555,7 +548,7 @@ class FSMEngine:
             to_state=to_state,
             trigger=trigger,
             context=context,
-            side_effects=side_effects_executed
+            side_effects=side_effects_executed,
         )
 
     @asynccontextmanager

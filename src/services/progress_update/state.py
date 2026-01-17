@@ -1,6 +1,8 @@
 """Progress update session state management."""
-from typing import Optional, Dict, Any
+
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
 
@@ -19,7 +21,7 @@ class ProgressUpdateState:
         trigger: str,
         success: bool = True,
         error: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Log FSM state transition to audit table.
 
@@ -34,28 +36,45 @@ class ProgressUpdateState:
             context: Additional context data
         """
         try:
-            result = supabase_client.client.table("fsm_transition_log").insert({
-                "user_id": user_id,
-                "session_id": session_id,
-                "from_state": from_state,
-                "to_state": to_state,
-                "trigger": trigger,
-                "success": success,
-                "error": error,
-                "context": context or {}
-            }).execute()
+            result = (
+                supabase_client.client.table("fsm_transition_log")
+                .insert(
+                    {
+                        "user_id": user_id,
+                        "session_id": session_id,
+                        "from_state": from_state,
+                        "to_state": to_state,
+                        "trigger": trigger,
+                        "success": success,
+                        "error": error,
+                        "context": context or {},
+                    }
+                )
+                .execute()
+            )
 
             # Log detailed result for debugging
             if result and result.data:
                 inserted_id = result.data[0]["id"]
-                log.info(f"📊 FSM Transition logged: {from_state} → {to_state} (trigger: {trigger}, session: {session_id}, id: {inserted_id})")
+                log.info(
+                    f"📊 FSM Transition logged: {from_state} → {to_state} (trigger: {trigger}, session: {session_id}, id: {inserted_id})"
+                )
 
                 # VERIFICATION: Immediately query back to confirm persistence
-                verify_result = supabase_client.client.table("fsm_transition_log").select("*").eq("id", inserted_id).execute()
+                verify_result = (
+                    supabase_client.client.table("fsm_transition_log")
+                    .select("*")
+                    .eq("id", inserted_id)
+                    .execute()
+                )
                 if verify_result and verify_result.data:
-                    log.info(f"   ✅ Verified: Transition {inserted_id} exists in database")
+                    log.info(
+                        f"   ✅ Verified: Transition {inserted_id} exists in database"
+                    )
                 else:
-                    log.error(f"   ❌ CRITICAL: Transition {inserted_id} NOT found immediately after insert!")
+                    log.error(
+                        f"   ❌ CRITICAL: Transition {inserted_id} NOT found immediately after insert!"
+                    )
             else:
                 log.warning(f"⚠️ FSM transition log returned no data")
 
@@ -63,13 +82,11 @@ class ProgressUpdateState:
             # Non-fatal: logging shouldn't break the flow
             log.error(f"⚠️ Failed to log FSM transition {from_state} → {to_state}: {e}")
             import traceback
+
             log.error(f"   Traceback: {traceback.format_exc()}")
 
     async def create_session(
-        self,
-        user_id: str,
-        task_id: str,
-        project_id: str
+        self, user_id: str, task_id: str, project_id: str
     ) -> Optional[str]:
         """Create a new progress update session.
 
@@ -86,18 +103,29 @@ class ProgressUpdateState:
             await self.clear_session(user_id)
 
             # Create new session
-            response = supabase_client.client.table("progress_update_sessions").insert({
-                "subcontractor_id": user_id,
-                "task_id": task_id,
-                "project_id": project_id,
-                "current_step": "awaiting_action",
-                "fsm_state": "awaiting_action",  # Set initial FSM state
-                "expires_at": (datetime.utcnow() + timedelta(hours=self.SESSION_EXPIRY_HOURS)).isoformat()
-            }).execute()
+            response = (
+                supabase_client.client.table("progress_update_sessions")
+                .insert(
+                    {
+                        "subcontractor_id": user_id,
+                        "task_id": task_id,
+                        "project_id": project_id,
+                        "current_step": "awaiting_action",
+                        "fsm_state": "awaiting_action",  # Set initial FSM state
+                        "expires_at": (
+                            datetime.utcnow()
+                            + timedelta(hours=self.SESSION_EXPIRY_HOURS)
+                        ).isoformat(),
+                    }
+                )
+                .execute()
+            )
 
             if response.data:
                 session_id = response.data[0]["id"]
-                log.info(f"✅ Created progress update session {session_id} for user {user_id}")
+                log.info(
+                    f"✅ Created progress update session {session_id} for user {user_id}"
+                )
 
                 # Set expecting_response flag immediately after session creation
                 # This ensures FSM context preservation works from the first user message
@@ -107,8 +135,12 @@ class ProgressUpdateState:
                     session_metadata={
                         "expecting_response": True,
                         "last_bot_action": "session_started",
-                        "available_actions": ["add_comment", "add_photo", "mark_complete"]
-                    }
+                        "available_actions": [
+                            "add_comment",
+                            "add_photo",
+                            "mark_complete",
+                        ],
+                    },
                 )
                 log.info(f"🔄 FSM: Set expecting_response=True at session creation")
 
@@ -119,10 +151,7 @@ class ProgressUpdateState:
                     from_state="idle",
                     to_state="awaiting_action",
                     trigger="start_update",
-                    context={
-                        "task_id": task_id,
-                        "project_id": project_id
-                    }
+                    context={"task_id": task_id, "project_id": project_id},
                 )
 
                 return session_id
@@ -138,7 +167,7 @@ class ProgressUpdateState:
                 to_state="awaiting_action",
                 trigger="start_update",
                 success=False,
-                error=str(e)
+                error=str(e),
             )
             return None
 
@@ -152,15 +181,21 @@ class ProgressUpdateState:
             Session dict if active and not expired, None otherwise
         """
         try:
-            response = supabase_client.client.table("progress_update_sessions").select("*").eq(
-                "subcontractor_id", user_id
-            ).execute()
+            response = (
+                supabase_client.client.table("progress_update_sessions")
+                .select("*")
+                .eq("subcontractor_id", user_id)
+                .execute()
+            )
 
             if response.data:
                 session = response.data[0]
                 # Check expiration
                 from datetime import timezone
-                expires_at = datetime.fromisoformat(session["expires_at"].replace('Z', '+00:00'))
+
+                expires_at = datetime.fromisoformat(
+                    session["expires_at"].replace("Z", "+00:00")
+                )
 
                 # Ensure timezone-aware comparison
                 if expires_at.tzinfo is None:
@@ -179,11 +214,7 @@ class ProgressUpdateState:
             log.error(f"Error getting progress update session: {e}")
             return None
 
-    async def update_session(
-        self,
-        user_id: str,
-        **updates
-    ) -> bool:
+    async def update_session(self, user_id: str, **updates) -> bool:
         """Update session state fields.
 
         Args:
@@ -196,9 +227,12 @@ class ProgressUpdateState:
         try:
             updates["last_activity"] = datetime.utcnow().isoformat()
 
-            response = supabase_client.client.table("progress_update_sessions").update(
-                updates
-            ).eq("subcontractor_id", user_id).execute()
+            response = (
+                supabase_client.client.table("progress_update_sessions")
+                .update(updates)
+                .eq("subcontractor_id", user_id)
+                .execute()
+            )
 
             return bool(response.data)
 
@@ -207,9 +241,7 @@ class ProgressUpdateState:
             return False
 
     async def add_action(
-        self,
-        user_id: str,
-        action_type: str  # 'image', 'comment', 'complete'
+        self, user_id: str, action_type: str  # 'image', 'comment', 'complete'
     ) -> bool:
         """Record that user completed an action.
 
@@ -247,10 +279,16 @@ class ProgressUpdateState:
             session_metadata = session.get("session_metadata", {})
             session_metadata["expecting_response"] = True
             session_metadata["last_bot_action"] = f"added_{action_type}"
-            session_metadata["available_actions"] = ["add_comment", "add_photo", "mark_complete"]
+            session_metadata["available_actions"] = [
+                "add_comment",
+                "add_photo",
+                "mark_complete",
+            ]
             updates["session_metadata"] = session_metadata
 
-            log.info(f"🔄 FSM: Setting state='{new_state}', expecting_response=True after {action_type}")
+            log.info(
+                f"🔄 FSM: Setting state='{new_state}', expecting_response=True after {action_type}"
+            )
 
             # Update session
             success = await self.update_session(user_id, **updates)
@@ -265,10 +303,16 @@ class ProgressUpdateState:
                     trigger=f"add_{action_type}",
                     context={
                         "action_type": action_type,
-                        "images_uploaded": updates.get("images_uploaded", session.get("images_uploaded")),
-                        "comments_added": updates.get("comments_added", session.get("comments_added")),
-                        "status_changed": updates.get("status_changed", session.get("status_changed"))
-                    }
+                        "images_uploaded": updates.get(
+                            "images_uploaded", session.get("images_uploaded")
+                        ),
+                        "comments_added": updates.get(
+                            "comments_added", session.get("comments_added")
+                        ),
+                        "status_changed": updates.get(
+                            "status_changed", session.get("status_changed")
+                        ),
+                    },
                 )
             else:
                 await self._log_transition(
@@ -278,7 +322,7 @@ class ProgressUpdateState:
                     to_state=new_state,
                     trigger=f"add_{action_type}",
                     success=False,
-                    error="Failed to update session"
+                    error="Failed to update session",
                 )
 
             return success
@@ -288,11 +332,13 @@ class ProgressUpdateState:
             await self._log_transition(
                 user_id=user_id,
                 session_id=session.get("id") if session else None,
-                from_state=session.get("fsm_state", "unknown") if session else "unknown",
+                from_state=(
+                    session.get("fsm_state", "unknown") if session else "unknown"
+                ),
                 to_state="collecting_data",
                 trigger=f"add_{action_type}",
                 success=False,
-                error=str(e)
+                error=str(e),
             )
             return False
 
@@ -321,18 +367,21 @@ class ProgressUpdateState:
                     from_state=old_state,
                     to_state="abandoned",
                     trigger=reason,
-                    context={
-                        "reason": reason
-                    }
+                    context={"reason": reason},
                 )
 
             # Now delete the session
-            response = supabase_client.client.table("progress_update_sessions").delete().eq(
-                "subcontractor_id", user_id
-            ).execute()
+            response = (
+                supabase_client.client.table("progress_update_sessions")
+                .delete()
+                .eq("subcontractor_id", user_id)
+                .execute()
+            )
 
             if response.data:
-                log.info(f"🧹 Cleared progress update session for user {user_id} (reason: {reason})")
+                log.info(
+                    f"🧹 Cleared progress update session for user {user_id} (reason: {reason})"
+                )
             return True
 
         except Exception as e:
@@ -348,9 +397,12 @@ class ProgressUpdateState:
         try:
             # Get all expired sessions
             now = datetime.utcnow().isoformat()
-            response = supabase_client.client.table("progress_update_sessions").select(
-                "id, subcontractor_id"
-            ).lt("expires_at", now).execute()
+            response = (
+                supabase_client.client.table("progress_update_sessions")
+                .select("id, subcontractor_id")
+                .lt("expires_at", now)
+                .execute()
+            )
 
             if not response.data:
                 return 0
@@ -361,7 +413,9 @@ class ProgressUpdateState:
                 cleaned_count += 1
 
             if cleaned_count > 0:
-                log.info(f"🧹 Cleaned up {cleaned_count} expired progress update sessions")
+                log.info(
+                    f"🧹 Cleaned up {cleaned_count} expired progress update sessions"
+                )
 
             return cleaned_count
 

@@ -1,16 +1,15 @@
 """Configuration management using Pydantic settings."""
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from typing import List
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     # Application Settings
@@ -62,9 +61,15 @@ class Settings(BaseSettings):
     supported_languages: str = "fr,en,es,pt,ar,de,it"
 
     # Language Detection Policy
-    auto_update_user_language: bool = True  # Auto-update user profile language on detection
-    language_update_min_message_length: int = 10  # Minimum message length to trigger language update
-    language_greeting_exceptions: str = "bonjour,hello,hi,hola,ciao,salut,bună,buna"  # Don't update language for these greetings
+    auto_update_user_language: bool = (
+        True  # Auto-update user profile language on detection
+    )
+    language_update_min_message_length: int = (
+        10  # Minimum message length to trigger language update
+    )
+    language_greeting_exceptions: str = (
+        "bonjour,hello,hi,hola,ciao,salut,bună,buna"  # Don't update language for these greetings
+    )
 
     # Audio Transcription
     openai_api_key: str
@@ -88,9 +93,13 @@ class Settings(BaseSettings):
     intent_classification_cache_ttl: int = 300  # 5 minutes in seconds
 
     # Media Storage
-    media_storage_bucket: str = "conversations"  # Supabase storage bucket for media files
+    media_storage_bucket: str = (
+        "conversations"  # Supabase storage bucket for media files
+    )
     max_file_size_mb: int = 10
-    allowed_media_types: str = "image/jpeg,image/png,image/gif,audio/ogg,audio/mpeg,audio/mp4"
+    allowed_media_types: str = (
+        "image/jpeg,image/png,image/gif,audio/ogg,audio/mpeg,audio/mp4"
+    )
 
     # Security
     secret_key: str
@@ -124,7 +133,10 @@ class Settings(BaseSettings):
     @property
     def language_greeting_exceptions_list(self) -> List[str]:
         """Get list of greeting exceptions (lowercase) that don't trigger language updates."""
-        return [greeting.strip().lower() for greeting in self.language_greeting_exceptions.split(",")]
+        return [
+            greeting.strip().lower()
+            for greeting in self.language_greeting_exceptions.split(",")
+        ]
 
     @property
     def is_production(self) -> bool:

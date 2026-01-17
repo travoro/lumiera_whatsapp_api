@@ -3,8 +3,9 @@
 This module provides domain-specific exceptions with error codes for
 proper error context propagation throughout the application.
 """
-from typing import Optional, Dict, Any
+
 from enum import Enum
+from typing import Any, Dict, Optional
 
 
 class ErrorCode(str, Enum):
@@ -55,7 +56,7 @@ class LumieraException(Exception):
         error_code: ErrorCode,
         user_message: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        original_exception: Optional[Exception] = None
+        original_exception: Optional[Exception] = None,
     ):
         """Initialize exception with structured error information.
 
@@ -79,7 +80,7 @@ class LumieraException(Exception):
             "error_code": self.error_code.value,
             "message": str(self),
             "user_message": self.user_message,
-            "details": self.details
+            "details": self.details,
         }
 
 
@@ -92,20 +93,28 @@ class UserNotFoundException(LumieraException):
             error_code=ErrorCode.USER_NOT_FOUND,
             user_message="Utilisateur non trouvé",
             details={"user_id": user_id},
-            **kwargs
+            **kwargs,
         )
 
 
 class ProjectNotFoundException(LumieraException):
     """Raised when project is not found or user has no access."""
 
-    def __init__(self, project_id: Optional[str] = None, user_id: Optional[str] = None, **kwargs):
+    def __init__(
+        self, project_id: Optional[str] = None, user_id: Optional[str] = None, **kwargs
+    ):
         super().__init__(
-            message=f"Project not found: {project_id}" if project_id else "No projects found",
-            error_code=ErrorCode.PROJECT_NOT_FOUND if project_id else ErrorCode.NO_PROJECTS,
+            message=(
+                f"Project not found: {project_id}"
+                if project_id
+                else "No projects found"
+            ),
+            error_code=(
+                ErrorCode.PROJECT_NOT_FOUND if project_id else ErrorCode.NO_PROJECTS
+            ),
             user_message="Projet non trouvé" if project_id else "Aucun projet trouvé",
             details={"project_id": project_id, "user_id": user_id},
-            **kwargs
+            **kwargs,
         )
 
 
@@ -118,7 +127,7 @@ class IntegrationException(LumieraException):
             error_code=ErrorCode.DATABASE_ERROR,  # Will be overridden by specific integrations
             user_message=f"Erreur de connexion avec {service}",
             details={"service": service, "operation": operation},
-            **kwargs
+            **kwargs,
         )
 
 
@@ -126,7 +135,7 @@ class DatabaseException(IntegrationException):
     """Raised when database operation fails."""
 
     def __init__(self, operation: str, **kwargs):
-        kwargs['error_code'] = ErrorCode.DATABASE_ERROR
+        kwargs["error_code"] = ErrorCode.DATABASE_ERROR
         super().__init__(service="Database", operation=operation, **kwargs)
 
 
@@ -134,7 +143,7 @@ class PlanRadarException(IntegrationException):
     """Raised when PlanRadar API call fails."""
 
     def __init__(self, operation: str, **kwargs):
-        kwargs['error_code'] = ErrorCode.PLANRADAR_API_ERROR
+        kwargs["error_code"] = ErrorCode.PLANRADAR_API_ERROR
         super().__init__(service="PlanRadar", operation=operation, **kwargs)
 
 
@@ -147,7 +156,7 @@ class HandlerNotFoundException(LumieraException):
             error_code=ErrorCode.HANDLER_NOT_FOUND,
             user_message="Action non reconnue",
             details={"intent": intent},
-            **kwargs
+            **kwargs,
         )
 
 
@@ -160,7 +169,7 @@ class ValidationException(LumieraException):
             error_code=ErrorCode.VALIDATION_ERROR,
             user_message=f"Données invalides: {field}",
             details={"field": field, "reason": reason},
-            **kwargs
+            **kwargs,
         )
 
 
@@ -173,5 +182,5 @@ class AgentExecutionException(LumieraException):
             error_code=ErrorCode.AGENT_ERROR,
             user_message="Erreur de traitement du message",
             details={"stage": stage},
-            **kwargs
+            **kwargs,
         )

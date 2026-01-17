@@ -1,11 +1,14 @@
 """Translation service using LLM for high-quality contextual translation."""
+
 from typing import Optional
+
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langsmith import traceable
+
 from src.config import settings
-from src.utils.logger import log
 from src.services.retry import retry_on_api_error, retry_on_rate_limit
+from src.utils.logger import log
 
 
 class TranslationService:
@@ -18,7 +21,7 @@ class TranslationService:
                 model="gpt-4o-mini",  # Cheaper, faster for translation
                 api_key=settings.openai_api_key,
                 temperature=0,
-                max_tokens=1000
+                max_tokens=1000,
             )
             log.info("Translation service initialized with OpenAI (gpt-4o-mini)")
         else:
@@ -26,7 +29,7 @@ class TranslationService:
                 model="claude-3-5-haiku-20241022",
                 api_key=settings.anthropic_api_key,
                 temperature=0,
-                max_tokens=1000
+                max_tokens=1000,
             )
             log.info("Translation service initialized with ChatAnthropic")
         self.default_language = settings.default_language

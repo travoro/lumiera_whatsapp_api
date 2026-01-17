@@ -1,9 +1,12 @@
 """Conversation memory management service."""
-from typing import List, Dict, Any, Optional
+
 from datetime import datetime, timedelta
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from typing import Any, Dict, List, Optional
+
 from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+
 from src.config import settings
 from src.utils.logger import log
 
@@ -36,10 +39,7 @@ class ConversationMemoryService:
         self._summary_cache = {}
         self._cache_duration = timedelta(minutes=5)
 
-    async def summarize_conversation(
-        self,
-        messages: List[Dict[str, Any]]
-    ) -> str:
+    async def summarize_conversation(self, messages: List[Dict[str, Any]]) -> str:
         """Summarize a conversation history.
 
         Args:
@@ -69,10 +69,14 @@ Conversation:
 Résumé:"""
 
             # Generate summary
-            response = await self.llm.ainvoke([
-                SystemMessage(content="Tu es un assistant qui résume des conversations de manière concise et factuelle."),
-                HumanMessage(content=summary_prompt)
-            ])
+            response = await self.llm.ainvoke(
+                [
+                    SystemMessage(
+                        content="Tu es un assistant qui résume des conversations de manière concise et factuelle."
+                    ),
+                    HumanMessage(content=summary_prompt),
+                ]
+            )
 
             summary = response.content.strip()
             log.info(f"Generated conversation summary: {len(summary)} chars")
@@ -94,10 +98,7 @@ Résumé:"""
         return message_count >= self.max_messages_before_summary
 
     def _should_skip_summarization(
-        self,
-        user_id: str,
-        messages: List[Dict[str, Any]],
-        recent_message_count: int
+        self, user_id: str, messages: List[Dict[str, Any]], recent_message_count: int
     ) -> Optional[str]:
         """Check if we should skip summarization and use cached summary.
 
@@ -136,9 +137,13 @@ Résumé:"""
                 last_message = messages[-1]
                 last_message_time_str = last_message.get("created_at", "")
                 # Parse as naive datetime (remove timezone info to match 'now')
-                last_message_time = datetime.fromisoformat(last_message_time_str.replace("Z", "").replace("+00:00", ""))
+                last_message_time = datetime.fromisoformat(
+                    last_message_time_str.replace("Z", "").replace("+00:00", "")
+                )
                 if now - last_message_time < timedelta(minutes=1):
-                    log.info(f"Rapid-fire detected for user {user_id}, using cached summary")
+                    log.info(
+                        f"Rapid-fire detected for user {user_id}, using cached summary"
+                    )
                     return cache_entry["summary"]
             except Exception as e:
                 log.warning(f"Error checking rapid-fire timing: {e}")
@@ -151,7 +156,7 @@ Résumé:"""
         self,
         messages: List[Dict[str, Any]],
         recent_message_count: int = 15,  # Increased from 6/8 to 15
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
     ) -> tuple[List, str]:
         """Get optimized conversation history.
 
@@ -169,12 +174,16 @@ Résumé:"""
         """
         if len(messages) <= recent_message_count:
             # Short conversation, no need to summarize
-            log.info(f"Conversation has {len(messages)} messages, no summarization needed (threshold: {recent_message_count})")
+            log.info(
+                f"Conversation has {len(messages)} messages, no summarization needed (threshold: {recent_message_count})"
+            )
             return messages, ""
 
         # Check if we can use cached summary
         if user_id:
-            cached_summary = self._should_skip_summarization(user_id, messages, recent_message_count)
+            cached_summary = self._should_skip_summarization(
+                user_id, messages, recent_message_count
+            )
             if cached_summary:
                 recent_messages = messages[-recent_message_count:]
                 return recent_messages, cached_summary
@@ -191,11 +200,13 @@ Résumé:"""
             self._summary_cache[user_id] = {
                 "summary": summary,
                 "timestamp": datetime.utcnow(),
-                "message_count": len(older_messages)
+                "message_count": len(older_messages),
             }
             log.info(f"Cached summary for user {user_id}")
 
-        log.info(f"Optimized history: {len(older_messages)} old messages → summary, {len(recent_messages)} recent messages kept")
+        log.info(
+            f"Optimized history: {len(older_messages)} old messages → summary, {len(recent_messages)} recent messages kept"
+        )
 
         return recent_messages, summary
 

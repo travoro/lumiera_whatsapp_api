@@ -7,24 +7,30 @@ This test suite simulates actual user behavior patterns observed in production:
 4. Frequent edge cases
 5. Multi-language interactions
 """
-import pytest
-import asyncio
-from unittest.mock import AsyncMock, Mock, patch
-from datetime import datetime, timedelta
-from tests.test_integration_comprehensive import ConversationSimulator
 
+import asyncio
+from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+from tests.test_integration_comprehensive import ConversationSimulator
 
 # ============================================================================
 # Test Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def mock_environment():
     """Set up mocked environment for user pattern tests."""
-    with patch("src.handlers.message.twilio_client") as mock_twilio, \
-         patch("src.integrations.supabase.supabase_client") as mock_supabase, \
-         patch("langchain_anthropic.ChatAnthropic") as mock_anthropic, \
-         patch("src.integrations.planradar.PlanRadarClient") as mock_planradar:
+    with patch("src.handlers.message.twilio_client") as mock_twilio, patch(
+        "src.integrations.supabase.supabase_client"
+    ) as mock_supabase, patch(
+        "langchain_anthropic.ChatAnthropic"
+    ) as mock_anthropic, patch(
+        "src.integrations.planradar.PlanRadarClient"
+    ) as mock_planradar:
 
         # Mock Twilio
         mock_twilio.send_message = AsyncMock(return_value="SM_mock_123")
@@ -35,7 +41,7 @@ def mock_environment():
             "id": "user_test_123",
             "whatsapp_number": "+1234567890",
             "name": "Test User",
-            "language": "fr"
+            "language": "fr",
         }
         mock_supabase.get_user_by_phone = Mock(return_value=mock_user)
         mock_supabase.get_user_name = Mock(return_value="Test User")
@@ -55,13 +61,14 @@ def mock_environment():
                 "twilio": mock_twilio,
                 "supabase": mock_supabase,
                 "anthropic": mock_anthropic,
-                "planradar": mock_planradar
+                "planradar": mock_planradar,
             }
 
 
 # ============================================================================
 # Common User Patterns (from log analysis)
 # ============================================================================
+
 
 class TestCommonUserPatterns:
     """Test common user interaction patterns."""
@@ -79,9 +86,15 @@ class TestCommonUserPatterns:
         await sim.send_message("Update task")
 
         # Rapid photo uploads (< 1 second apart)
-        await sim.send_message("", media_url="https://ex.com/1.jpg", media_type="image/jpeg")
-        await sim.send_message("", media_url="https://ex.com/2.jpg", media_type="image/jpeg")
-        await sim.send_message("", media_url="https://ex.com/3.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/1.jpg", media_type="image/jpeg"
+        )
+        await sim.send_message(
+            "", media_url="https://ex.com/2.jpg", media_type="image/jpeg"
+        )
+        await sim.send_message(
+            "", media_url="https://ex.com/3.jpg", media_type="image/jpeg"
+        )
 
         # Then comment
         await sim.send_message("Work completed on all three walls")
@@ -102,8 +115,12 @@ class TestCommonUserPatterns:
 
         # Photos arrive 30 seconds later (slow network)
         await asyncio.sleep(0.1)  # Simulate delay
-        await sim.send_message("", media_url="https://ex.com/1.jpg", media_type="image/jpeg")
-        await sim.send_message("", media_url="https://ex.com/2.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/1.jpg", media_type="image/jpeg"
+        )
+        await sim.send_message(
+            "", media_url="https://ex.com/2.jpg", media_type="image/jpeg"
+        )
 
         assert len(sim.message_history) == 4
 
@@ -166,6 +183,7 @@ class TestCommonUserPatterns:
 # Timing-Sensitive Patterns
 # ============================================================================
 
+
 class TestTimingPatterns:
     """Test patterns related to message timing."""
 
@@ -198,7 +216,9 @@ class TestTimingPatterns:
         # Burst of activity
         await sim.send_message("Update task")
         await sim.send_message("", button_payload="task_3", button_text="Task 3")
-        await sim.send_message("", media_url="https://ex.com/1.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/1.jpg", media_type="image/jpeg"
+        )
         await sim.send_message("Progress on walls")
 
         # Then silence (session times out)
@@ -210,6 +230,7 @@ class TestTimingPatterns:
 # ============================================================================
 # Error Recovery Patterns
 # ============================================================================
+
 
 class TestErrorRecoveryPatterns:
     """Test patterns where users recover from errors."""
@@ -238,9 +259,13 @@ class TestErrorRecoveryPatterns:
         sim = ConversationSimulator()
 
         await sim.send_message("Update task")
-        await sim.send_message("", media_url="https://ex.com/wrong.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/wrong.jpg", media_type="image/jpeg"
+        )
         await sim.send_message("Sorry wrong photo")
-        await sim.send_message("", media_url="https://ex.com/correct.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/correct.jpg", media_type="image/jpeg"
+        )
 
         assert len(sim.message_history) == 4
 
@@ -268,6 +293,7 @@ class TestErrorRecoveryPatterns:
 # ============================================================================
 # Multi-Language Patterns
 # ============================================================================
+
 
 class TestMultiLanguagePatterns:
     """Test patterns involving multiple languages."""
@@ -305,6 +331,7 @@ class TestMultiLanguagePatterns:
 # Edge Case Patterns
 # ============================================================================
 
+
 class TestEdgeCasePatterns:
     """Test edge cases observed in production."""
 
@@ -318,7 +345,9 @@ class TestEdgeCasePatterns:
         sim = ConversationSimulator()
 
         await sim.send_message("Update task")
-        await sim.send_message("", media_url="https://ex.com/1.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/1.jpg", media_type="image/jpeg"
+        )
         await sim.send_message("")  # Empty
 
         assert len(sim.message_history) == 3
@@ -371,6 +400,7 @@ class TestEdgeCasePatterns:
 # Statistical Pattern Tests
 # ============================================================================
 
+
 class TestStatisticalPatterns:
     """Test patterns based on usage statistics."""
 
@@ -412,7 +442,9 @@ class TestStatisticalPatterns:
 
         await sim.send_message("Update task")
         await sim.send_message("", button_payload="task_3", button_text="Task 3")
-        await sim.send_message("", media_url="https://ex.com/1.jpg", media_type="image/jpeg")
+        await sim.send_message(
+            "", media_url="https://ex.com/1.jpg", media_type="image/jpeg"
+        )
         await sim.send_message("Work completed")
         await sim.send_message("Yes, mark complete")
 

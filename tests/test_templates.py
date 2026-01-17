@@ -6,14 +6,17 @@ Tests cover:
 - Template validation
 - List formatting
 """
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from src.services.dynamic_templates import DynamicTemplateService
 
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+from src.services.dynamic_templates import DynamicTemplateService
 
 # ============================================================================
 # List Item Truncation Tests (Critical - Fixes 42 Production Errors)
 # ============================================================================
+
 
 class TestListItemTruncation:
     """Test list item truncation to WhatsApp's 24-character limit."""
@@ -98,6 +101,7 @@ class TestListItemTruncation:
 # Template Validation Tests
 # ============================================================================
 
+
 class TestTemplateValidation:
     """Test template validation logic."""
 
@@ -110,7 +114,7 @@ class TestTemplateValidation:
         items = [
             {"id": "1", "item": "Option 1"},
             {"id": "2", "item": "Option 2"},
-            {"id": "3", "item": "Option 3"}
+            {"id": "3", "item": "Option 3"},
         ]
 
         is_valid, error = self.service.validate_list_items(items)
@@ -122,7 +126,7 @@ class TestTemplateValidation:
         """Test rejection of items exceeding 24 characters."""
         items = [
             {"id": "1", "item": "This text is way too long for WhatsApp list"},
-            {"id": "2", "item": "Short"}
+            {"id": "2", "item": "Short"},
         ]
 
         is_valid, error = self.service.validate_list_items(items)
@@ -132,9 +136,7 @@ class TestTemplateValidation:
 
     def test_rejects_missing_id(self):
         """Test rejection of items missing 'id' field."""
-        items = [
-            {"item": "Option without ID"}
-        ]
+        items = [{"item": "Option without ID"}]
 
         is_valid, error = self.service.validate_list_items(items)
 
@@ -143,9 +145,7 @@ class TestTemplateValidation:
 
     def test_rejects_missing_item_text(self):
         """Test rejection of items missing 'item' field."""
-        items = [
-            {"id": "1", "description": "Description but no item text"}
-        ]
+        items = [{"id": "1", "description": "Description but no item text"}]
 
         is_valid, error = self.service.validate_list_items(items)
 
@@ -158,7 +158,7 @@ class TestTemplateValidation:
             {
                 "id": "1",
                 "item": "Option 1",
-                "description": "This is a valid description under 72 characters"
+                "description": "This is a valid description under 72 characters",
             }
         ]
 
@@ -172,7 +172,7 @@ class TestTemplateValidation:
             {
                 "id": "1",
                 "item": "Option",
-                "description": "This description is way too long and exceeds the 72 character limit for WhatsApp"
+                "description": "This description is way too long and exceeds the 72 character limit for WhatsApp",
             }
         ]
 
@@ -203,6 +203,7 @@ class TestTemplateValidation:
 # List Formatting Tests
 # ============================================================================
 
+
 class TestListFormatting:
     """Test list formatting with emoji placement."""
 
@@ -215,13 +216,11 @@ class TestListFormatting:
         items = [
             {"id": "1", "item": "Task A"},
             {"id": "2", "item": "Task B"},
-            {"id": "3", "item": "Task C"}
+            {"id": "3", "item": "Task C"},
         ]
 
         result = self.service.add_emoji_to_items(
-            items,
-            emojis=["✅", "✅", "✅"],
-            position="start"
+            items, emojis=["✅", "✅", "✅"], position="start"
         )
 
         # Check that emojis were added
@@ -232,11 +231,7 @@ class TestListFormatting:
         """Test emoji placement at start of text."""
         items = [{"id": "1", "item": "Task"}]
 
-        result = self.service.add_emoji_to_items(
-            items,
-            emojis=["📋"],
-            position="start"
-        )
+        result = self.service.add_emoji_to_items(items, emojis=["📋"], position="start")
 
         assert result[0]["item"].startswith("📋")
 
@@ -244,25 +239,15 @@ class TestListFormatting:
         """Test emoji placement at end of text."""
         items = [{"id": "1", "item": "Task"}]
 
-        result = self.service.add_emoji_to_items(
-            items,
-            emojis=["✅"],
-            position="end"
-        )
+        result = self.service.add_emoji_to_items(items, emojis=["✅"], position="end")
 
         assert result[0]["item"].endswith("✅")
 
     def test_ensures_24_char_limit_after_emoji(self):
         """Test that items don't exceed 24 chars after adding emoji."""
-        items = [
-            {"id": "1", "item": "This is a long task name"}  # 24 chars exactly
-        ]
+        items = [{"id": "1", "item": "This is a long task name"}]  # 24 chars exactly
 
-        result = self.service.add_emoji_to_items(
-            items,
-            emojis=["✅"],
-            position="end"
-        )
+        result = self.service.add_emoji_to_items(items, emojis=["✅"], position="end")
 
         # Should truncate to fit emoji within 24 chars
         assert len(result[0]["item"]) <= 24
@@ -271,7 +256,7 @@ class TestListFormatting:
         """Test that item IDs are preserved when adding emojis."""
         items = [
             {"id": "task_123", "item": "Task"},
-            {"id": "task_456", "item": "Another"}
+            {"id": "task_456", "item": "Another"},
         ]
 
         result = self.service.add_emoji_to_items(items, emojis=["✅", "✅"])
@@ -282,11 +267,7 @@ class TestListFormatting:
     def test_preserves_description(self):
         """Test that descriptions are preserved when adding emojis."""
         items = [
-            {
-                "id": "1",
-                "item": "Task",
-                "description": "Important task description"
-            }
+            {"id": "1", "item": "Task", "description": "Important task description"}
         ]
 
         result = self.service.add_emoji_to_items(items, emojis=["✅"])
@@ -298,15 +279,16 @@ class TestListFormatting:
 # Template Creation Tests (Mocked)
 # ============================================================================
 
+
 class TestTemplateCreation:
     """Test template creation with mocked Twilio API."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        with patch('src.services.dynamic_templates.Client'):
+        with patch("src.services.dynamic_templates.Client"):
             self.service = DynamicTemplateService()
 
-    @patch('src.services.dynamic_templates.requests.post')
+    @patch("src.services.dynamic_templates.requests.post")
     def test_creates_list_picker_template(self, mock_post):
         """Test creation of list-picker template."""
         # Mock successful response
@@ -318,21 +300,17 @@ class TestTemplateCreation:
         content_data = {
             "body": "Choose an option:",
             "button": "Select",
-            "items": [
-                {"id": "1", "item": "Option 1"},
-                {"id": "2", "item": "Option 2"}
-            ]
+            "items": [{"id": "1", "item": "Option 1"}, {"id": "2", "item": "Option 2"}],
         }
 
         result = self.service.create_dynamic_template(
-            "twilio/list-picker",
-            content_data
+            "twilio/list-picker", content_data
         )
 
         assert result == "HX1234567890"
         assert mock_post.called
 
-    @patch('src.services.dynamic_templates.requests.post')
+    @patch("src.services.dynamic_templates.requests.post")
     def test_handles_template_creation_failure(self, mock_post):
         """Test handling of template creation failure."""
         # Mock failed response
@@ -346,17 +324,16 @@ class TestTemplateCreation:
             "button": "Click",
             "items": [
                 {"id": "1", "item": "This item text is way too long for WhatsApp"}
-            ]
+            ],
         }
 
         result = self.service.create_dynamic_template(
-            "twilio/list-picker",
-            content_data
+            "twilio/list-picker", content_data
         )
 
         assert result is None
 
-    @patch('src.services.dynamic_templates.requests.post')
+    @patch("src.services.dynamic_templates.requests.post")
     def test_increments_stats_on_success(self, mock_post):
         """Test that stats are incremented on successful creation."""
         mock_response = Mock()
@@ -364,19 +341,20 @@ class TestTemplateCreation:
         mock_response.json.return_value = {"sid": "HX1234567890"}
         mock_post.return_value = mock_response
 
-        initial_count = self.service.stats['created']
+        initial_count = self.service.stats["created"]
 
         self.service.create_dynamic_template(
             "twilio/list-picker",
-            {"body": "Test", "button": "Click", "items": [{"id": "1", "item": "OK"}]}
+            {"body": "Test", "button": "Click", "items": [{"id": "1", "item": "OK"}]},
         )
 
-        assert self.service.stats['created'] == initial_count + 1
+        assert self.service.stats["created"] == initial_count + 1
 
 
 # ============================================================================
 # Real-World Scenario Tests
 # ============================================================================
+
 
 class TestRealWorldScenarios:
     """Test scenarios based on actual production errors."""
@@ -408,7 +386,7 @@ class TestRealWorldScenarios:
             {"id": "1", "item": "Install electrical wiring in main building"},
             {"id": "2", "item": "Fix water leak in basement room 5"},
             {"id": "3", "item": "Paint walls in office area floor 3"},
-            {"id": "4", "item": "Install hardwood flooring bedroom"}
+            {"id": "4", "item": "Install hardwood flooring bedroom"},
         ]
 
         # Truncate all items
@@ -425,7 +403,7 @@ class TestRealWorldScenarios:
         tasks = [
             {"id": "1", "item": "Install electrical..."},
             {"id": "2", "item": "Fix water leak..."},
-            {"id": "3", "item": "Paint walls..."}
+            {"id": "3", "item": "Paint walls..."},
         ]
 
         is_valid, error = self.service.validate_list_items(tasks)
@@ -436,6 +414,7 @@ class TestRealWorldScenarios:
 # ============================================================================
 # Edge Cases
 # ============================================================================
+
 
 class TestEdgeCases:
     """Test edge cases and special scenarios."""

@@ -6,11 +6,14 @@ Tests:
 - Idempotency
 - Session management
 """
-import pytest
+
 from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
-from src.fsm.core import FSMEngine, StateManager, TRANSITION_RULES
-from src.fsm.models import SessionState, FSMContext, TransitionResult
+
+import pytest
+
+from src.fsm.core import TRANSITION_RULES, FSMEngine, StateManager
+from src.fsm.models import FSMContext, SessionState, TransitionResult
 
 
 class TestTransitionValidation:
@@ -26,7 +29,7 @@ class TestTransitionValidation:
         is_valid, error = self.fsm_engine.validate_transition(
             from_state=SessionState.IDLE,
             to_state=SessionState.TASK_SELECTION,
-            trigger="start_update"
+            trigger="start_update",
         )
         assert is_valid is True
         assert error is None
@@ -36,7 +39,7 @@ class TestTransitionValidation:
         is_valid, error = self.fsm_engine.validate_transition(
             from_state=SessionState.AWAITING_ACTION,
             to_state=SessionState.COLLECTING_DATA,
-            trigger="start_collection"
+            trigger="start_collection",
         )
         assert is_valid is True
         assert error is None
@@ -46,7 +49,7 @@ class TestTransitionValidation:
         is_valid, error = self.fsm_engine.validate_transition(
             from_state=SessionState.COLLECTING_DATA,
             to_state=SessionState.COLLECTING_DATA,
-            trigger="add_data"
+            trigger="add_data",
         )
         assert is_valid is True
         assert error is None
@@ -56,7 +59,7 @@ class TestTransitionValidation:
         is_valid, error = self.fsm_engine.validate_transition(
             from_state=SessionState.IDLE,
             to_state=SessionState.COMPLETED,
-            trigger="complete"
+            trigger="complete",
         )
         assert is_valid is False
         assert error is not None
@@ -67,7 +70,7 @@ class TestTransitionValidation:
         is_valid, error = self.fsm_engine.validate_transition(
             from_state=SessionState.IDLE,
             to_state=SessionState.TASK_SELECTION,
-            trigger="wrong_trigger"
+            trigger="wrong_trigger",
         )
         assert is_valid is False
         assert error is not None
@@ -78,12 +81,12 @@ class TestTransitionValidation:
         for from_state in [
             SessionState.IDLE,
             SessionState.TASK_SELECTION,
-            SessionState.COLLECTING_DATA
+            SessionState.COLLECTING_DATA,
         ]:
             is_valid, error = self.fsm_engine.validate_transition(
                 from_state=from_state,
                 to_state=SessionState.ABANDONED,
-                trigger="force_abandon"
+                trigger="force_abandon",
             )
             assert is_valid is True, f"Should allow abandon from {from_state}"
             assert error is None
@@ -114,16 +117,18 @@ class TestStateTransitions:
             session_id="session_456",
             task_id="task_789",
             collected_data={},
-            metadata={}
+            metadata={},
         )
 
     @pytest.mark.asyncio
-    async def test_successful_transition(self, fsm_engine, sample_context, mock_state_manager):
+    async def test_successful_transition(
+        self, fsm_engine, sample_context, mock_state_manager
+    ):
         """Test successful state transition."""
         result = await fsm_engine.transition(
             context=sample_context,
             to_state=SessionState.TASK_SELECTION,
-            trigger="start_update"
+            trigger="start_update",
         )
 
         assert result.success is True
@@ -139,9 +144,7 @@ class TestStateTransitions:
     async def test_failed_transition_invalid(self, fsm_engine, sample_context):
         """Test failed transition due to invalid rule."""
         result = await fsm_engine.transition(
-            context=sample_context,
-            to_state=SessionState.COMPLETED,
-            trigger="complete"
+            context=sample_context, to_state=SessionState.COMPLETED, trigger="complete"
         )
 
         assert result.success is False
@@ -151,7 +154,9 @@ class TestStateTransitions:
         assert "Invalid transition" in result.error
 
     @pytest.mark.asyncio
-    async def test_transition_with_side_effects(self, fsm_engine, sample_context, mock_state_manager):
+    async def test_transition_with_side_effects(
+        self, fsm_engine, sample_context, mock_state_manager
+    ):
         """Test transition with side effects execution."""
         side_effect_executed = False
 
@@ -163,7 +168,7 @@ class TestStateTransitions:
             context=sample_context,
             to_state=SessionState.TASK_SELECTION,
             trigger="start_update",
-            side_effect_fn=mock_side_effect
+            side_effect_fn=mock_side_effect,
         )
 
         assert result.success is True
@@ -171,8 +176,11 @@ class TestStateTransitions:
         assert "mock_side_effect" in result.side_effects
 
     @pytest.mark.asyncio
-    async def test_transition_with_failing_side_effect(self, fsm_engine, sample_context, mock_state_manager):
+    async def test_transition_with_failing_side_effect(
+        self, fsm_engine, sample_context, mock_state_manager
+    ):
         """Test that transition succeeds even if side effect fails."""
+
         async def failing_side_effect(context):
             raise Exception("Side effect failed")
 
@@ -180,7 +188,7 @@ class TestStateTransitions:
             context=sample_context,
             to_state=SessionState.TASK_SELECTION,
             trigger="start_update",
-            side_effect_fn=failing_side_effect
+            side_effect_fn=failing_side_effect,
         )
 
         # Transition should still succeed
@@ -190,7 +198,9 @@ class TestStateTransitions:
         assert any("failed" in se for se in result.side_effects)
 
     @pytest.mark.asyncio
-    async def test_transition_with_closure_reason(self, fsm_engine, sample_context, mock_state_manager):
+    async def test_transition_with_closure_reason(
+        self, fsm_engine, sample_context, mock_state_manager
+    ):
         """Test transition to terminal state with closure reason."""
         sample_context.current_state = SessionState.AWAITING_ACTION
 
@@ -198,7 +208,7 @@ class TestStateTransitions:
             context=sample_context,
             to_state=SessionState.ABANDONED,
             trigger="timeout",
-            closure_reason="session_timeout"
+            closure_reason="session_timeout",
         )
 
         assert result.success is True
@@ -223,11 +233,12 @@ class TestIdempotency:
     @pytest.mark.asyncio
     async def test_idempotency_miss(self, state_manager):
         """Test idempotency check when message not processed."""
-        state_manager.db.client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+        state_manager.db.client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = (
+            []
+        )
 
         result = await state_manager.check_idempotency(
-            user_id="user_123",
-            message_id="msg_456"
+            user_id="user_123", message_id="msg_456"
         )
 
         assert result is None
@@ -241,8 +252,7 @@ class TestIdempotency:
         ]
 
         result = await state_manager.check_idempotency(
-            user_id="user_123",
-            message_id="msg_456"
+            user_id="user_123", message_id="msg_456"
         )
 
         assert result == cached_result
@@ -250,12 +260,12 @@ class TestIdempotency:
     @pytest.mark.asyncio
     async def test_record_idempotency(self, state_manager):
         """Test recording message for idempotency."""
-        state_manager.db.client.table.return_value.insert.return_value.execute.return_value = Mock()
+        state_manager.db.client.table.return_value.insert.return_value.execute.return_value = (
+            Mock()
+        )
 
         success = await state_manager.record_idempotency(
-            user_id="user_123",
-            message_id="msg_456",
-            result={"status": "processed"}
+            user_id="user_123", message_id="msg_456", result={"status": "processed"}
         )
 
         assert success is True
@@ -279,7 +289,7 @@ class TestSessionManagement:
         mock_session = {
             "id": "session_123",
             "subcontractor_id": "user_456",
-            "fsm_state": "idle"
+            "fsm_state": "idle",
         }
         state_manager.db.client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
             mock_session
@@ -292,7 +302,9 @@ class TestSessionManagement:
     @pytest.mark.asyncio
     async def test_get_session_not_exists(self, state_manager):
         """Test getting non-existent session."""
-        state_manager.db.client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+        state_manager.db.client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = (
+            []
+        )
 
         session = await state_manager.get_session("user_456")
 
@@ -305,16 +317,14 @@ class TestSessionManagement:
             "id": "session_123",
             "subcontractor_id": "user_456",
             "task_id": "task_789",
-            "fsm_state": "idle"
+            "fsm_state": "idle",
         }
         state_manager.db.client.table.return_value.insert.return_value.execute.return_value.data = [
             mock_created_session
         ]
 
         session_id = await state_manager.create_session(
-            user_id="user_456",
-            task_id="task_789",
-            project_id="project_012"
+            user_id="user_456", task_id="task_789", project_id="project_012"
         )
 
         assert session_id == "session_123"
@@ -322,12 +332,14 @@ class TestSessionManagement:
     @pytest.mark.asyncio
     async def test_update_session_state(self, state_manager):
         """Test updating session state."""
-        state_manager.db.client.table.return_value.update.return_value.eq.return_value.execute.return_value = Mock()
+        state_manager.db.client.table.return_value.update.return_value.eq.return_value.execute.return_value = (
+            Mock()
+        )
 
         success = await state_manager.update_session_state(
             session_id="session_123",
             new_state=SessionState.COLLECTING_DATA,
-            metadata_update={"photos": 2}
+            metadata_update={"photos": 2},
         )
 
         assert success is True

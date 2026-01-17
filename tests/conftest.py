@@ -5,37 +5,32 @@ This module provides common fixtures that can be used across all test files:
 - Test data (users, tasks, messages)
 - Helper utilities
 """
-import pytest
-from unittest.mock import AsyncMock, Mock, patch
-from datetime import datetime
 
+from datetime import datetime
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # ============================================================================
 # Pytest Configuration
 # ============================================================================
+
 
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(
         "markers", "integration: mark test as integration test (slow)"
     )
-    config.addinivalue_line(
-        "markers", "unit: mark test as unit test (fast)"
-    )
-    config.addinivalue_line(
-        "markers", "fsm: mark test as FSM-related test"
-    )
-    config.addinivalue_line(
-        "markers", "pipeline: mark test as pipeline test"
-    )
-    config.addinivalue_line(
-        "markers", "pattern: mark test as user pattern test"
-    )
+    config.addinivalue_line("markers", "unit: mark test as unit test (fast)")
+    config.addinivalue_line("markers", "fsm: mark test as FSM-related test")
+    config.addinivalue_line("markers", "pipeline: mark test as pipeline test")
+    config.addinivalue_line("markers", "pattern: mark test as user pattern test")
 
 
 # ============================================================================
 # Mock Service Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def mock_twilio_client():
@@ -60,7 +55,7 @@ def mock_supabase_client():
             "name": "Test User",
             "language": "fr",
             "active_project_id": "project_123",
-            "active_task_id": "task_456"
+            "active_task_id": "task_456",
         }
 
         # Mock user methods
@@ -100,15 +95,23 @@ def mock_planradar_client():
     """Mock PlanRadar API client."""
     with patch("src.integrations.planradar.PlanRadarClient") as mock:
         # Mock task list
-        mock.return_value.get_tasks = AsyncMock(return_value=[
-            {"id": "task_1", "title": "Install electrical wiring", "status": "open"},
-            {"id": "task_2", "title": "Fix water leak", "status": "open"},
-            {"id": "task_3", "title": "Paint walls", "status": "in_progress"}
-        ])
+        mock.return_value.get_tasks = AsyncMock(
+            return_value=[
+                {
+                    "id": "task_1",
+                    "title": "Install electrical wiring",
+                    "status": "open",
+                },
+                {"id": "task_2", "title": "Fix water leak", "status": "open"},
+                {"id": "task_3", "title": "Paint walls", "status": "in_progress"},
+            ]
+        )
         # Mock task update
         mock.return_value.update_task = AsyncMock(return_value=True)
         # Mock photo upload
-        mock.return_value.upload_photo = AsyncMock(return_value={"photo_id": "photo_123"})
+        mock.return_value.upload_photo = AsyncMock(
+            return_value={"photo_id": "photo_123"}
+        )
         yield mock
 
 
@@ -117,7 +120,7 @@ async def all_mocked_services(
     mock_twilio_client,
     mock_supabase_client,
     mock_anthropic_client,
-    mock_planradar_client
+    mock_planradar_client,
 ):
     """Fixture that provides all mocked services together."""
     with patch("src.config.settings.enable_fsm", True):
@@ -125,13 +128,14 @@ async def all_mocked_services(
             "twilio": mock_twilio_client,
             "supabase": mock_supabase_client,
             "anthropic": mock_anthropic_client,
-            "planradar": mock_planradar_client
+            "planradar": mock_planradar_client,
         }
 
 
 # ============================================================================
 # Test Data Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def sample_user():
@@ -144,7 +148,7 @@ def sample_user():
         "language": "fr",
         "active_project_id": "project_123",
         "active_task_id": "task_456",
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.utcnow().isoformat(),
     }
 
 
@@ -158,7 +162,7 @@ def sample_tasks():
             "description": "Install wiring in main building",
             "status": "open",
             "priority": "high",
-            "assigned_to": "user_test_123"
+            "assigned_to": "user_test_123",
         },
         {
             "id": "task_2",
@@ -166,7 +170,7 @@ def sample_tasks():
             "description": "Repair leak in basement",
             "status": "open",
             "priority": "critical",
-            "assigned_to": "user_test_123"
+            "assigned_to": "user_test_123",
         },
         {
             "id": "task_3",
@@ -174,7 +178,7 @@ def sample_tasks():
             "description": "Paint walls in office area",
             "status": "in_progress",
             "priority": "medium",
-            "assigned_to": "user_test_123"
+            "assigned_to": "user_test_123",
         },
         {
             "id": "task_4",
@@ -182,8 +186,8 @@ def sample_tasks():
             "description": "Install hardwood flooring",
             "status": "open",
             "priority": "low",
-            "assigned_to": "user_test_123"
-        }
+            "assigned_to": "user_test_123",
+        },
     ]
 
 
@@ -195,30 +199,25 @@ def sample_messages():
         "greeting_french": "Bonjour",
         "greeting_english": "Hello",
         "greeting_casual": "Hey",
-
         # Task operations
         "update_task": "Update task",
         "view_tasks": "Show my tasks",
         "complete_task": "Mark as complete",
         "cancel": "Cancel",
-
         # Vague messages
         "vague_done": "Done",
         "vague_finished": "Finished",
         "vague_ok": "OK",
-
         # Detailed messages
         "detailed_update": "Wall painting is 80% complete, need one more day",
         "problem_report": "There's a problem with the electrical wiring in room 5",
-
         # Questions
         "ask_address": "What's the project address?",
         "ask_deadline": "When is the deadline?",
-
         # Confirmation
         "yes": "Yes",
         "no": "No",
-        "confirm": "Yes, confirm"
+        "confirm": "Yes, confirm",
     }
 
 
@@ -232,7 +231,7 @@ def sample_webhook_data():
         "MediaUrl0": None,
         "MediaContentType0": None,
         "ButtonPayload": None,
-        "ButtonText": None
+        "ButtonText": None,
     }
 
 
@@ -240,28 +239,34 @@ def sample_webhook_data():
 # Helper Utilities
 # ============================================================================
 
+
 @pytest.fixture
 def freeze_time():
     """Utility to freeze time for tests."""
+
     def _freeze(frozen_time):
         with patch("datetime.datetime") as mock_datetime:
             mock_datetime.utcnow.return_value = frozen_time
             return mock_datetime
+
     return _freeze
 
 
 @pytest.fixture
 def assert_no_errors(caplog):
     """Utility to assert no errors were logged during test."""
+
     def _check():
         errors = [record for record in caplog.records if record.levelname == "ERROR"]
         assert len(errors) == 0, f"Found {len(errors)} errors in logs: {errors}"
+
     return _check
 
 
 # ============================================================================
 # FSM-Specific Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def mock_fsm_state_manager():
@@ -280,16 +285,16 @@ def mock_fsm_state_manager():
 def mock_intent_router():
     """Mock IntentRouter for routing tests."""
     with patch("src.fsm.routing.IntentRouter") as mock:
-        mock.return_value.route = AsyncMock(return_value={
-            "intent": "greeting",
-            "confidence": 0.95
-        })
+        mock.return_value.route = AsyncMock(
+            return_value={"intent": "greeting", "confidence": 0.95}
+        )
         yield mock
 
 
 # ============================================================================
 # Test Environment Configuration
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def setup_test_environment(monkeypatch):
@@ -321,6 +326,7 @@ def setup_test_environment(monkeypatch):
 # Cleanup Fixtures
 # ============================================================================
 
+
 @pytest.fixture(autouse=True)
 async def cleanup_after_test():
     """Cleanup resources after each test."""
@@ -332,6 +338,7 @@ async def cleanup_after_test():
 # ============================================================================
 # Performance Monitoring
 # ============================================================================
+
 
 @pytest.fixture
 def performance_tracker():

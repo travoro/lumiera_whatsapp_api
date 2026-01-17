@@ -1,10 +1,13 @@
 """PlanRadar API client for project and task management."""
-from typing import Optional, List, Dict, Any
-import httpx
+
 import base64
-import uuid
 import time
+import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import httpx
+
 from src.config import settings
 from src.utils.logger import log
 
@@ -67,7 +70,9 @@ class PlanRadarClient:
                 duration_ms = int((time.time() - start_time) * 1000)
 
                 # Log response status with timing
-                log.info(f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {response.status_code} | Duration: {duration_ms}ms")
+                log.info(
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {response.status_code} | Duration: {duration_ms}ms"
+                )
 
                 response.raise_for_status()
                 result = response.json()
@@ -75,7 +80,11 @@ class PlanRadarClient:
                 # Log response summary
                 if isinstance(result, dict):
                     if "data" in result:
-                        data_count = len(result["data"]) if isinstance(result["data"], list) else 1
+                        data_count = (
+                            len(result["data"])
+                            if isinstance(result["data"], list)
+                            else 1
+                        )
                         log.info(f"   📊 Response data: {data_count} item(s)")
                     else:
                         log.info(f"   📊 Response keys: {list(result.keys())}")
@@ -87,8 +96,12 @@ class PlanRadarClient:
 
             # Differentiate between rate limit and other errors
             if e.response.status_code == 429:
-                log.warning(f"🔵 PLANRADAR_API_CALL #{request_id} | RATE_LIMIT | 429 Too Many Requests | Duration: {duration_ms}ms")
-                log.warning(f"   ⚠️ PlanRadar API rate limit exceeded (30 requests/minute)")
+                log.warning(
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | RATE_LIMIT | 429 Too Many Requests | Duration: {duration_ms}ms"
+                )
+                log.warning(
+                    f"   ⚠️ PlanRadar API rate limit exceeded (30 requests/minute)"
+                )
                 log.warning(f"   URL was: {url}")
 
                 # Try to read the error response body
@@ -99,20 +112,30 @@ class PlanRadarClient:
                     try:
                         error_text = e.response.text
                         if error_text:
-                            log.warning(f"   📄 Rate limit response (text): {error_text[:500]}")
+                            log.warning(
+                                f"   📄 Rate limit response (text): {error_text[:500]}"
+                            )
                     except:
                         pass
 
                 # Check response headers for rate limit info
                 headers = dict(e.response.headers)
-                rate_limit_headers = {k: v for k, v in headers.items() if 'rate' in k.lower() or 'limit' in k.lower() or 'retry' in k.lower()}
+                rate_limit_headers = {
+                    k: v
+                    for k, v in headers.items()
+                    if "rate" in k.lower()
+                    or "limit" in k.lower()
+                    or "retry" in k.lower()
+                }
                 if rate_limit_headers:
                     log.warning(f"   📊 Rate limit headers: {rate_limit_headers}")
 
                 # Return special error structure for rate limits
                 return {"_rate_limited": True, "error": "Rate limit exceeded"}
             else:
-                log.error(f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {e.response.status_code} {e.response.reason_phrase} | Duration: {duration_ms}ms")
+                log.error(
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {e.response.status_code} {e.response.reason_phrase} | Duration: {duration_ms}ms"
+                )
                 log.error(f"   URL was: {url}")
                 try:
                     error_body = e.response.json()
@@ -122,7 +145,9 @@ class PlanRadarClient:
                 return None
         except httpx.HTTPError as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            log.error(f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {type(e).__name__} | Duration: {duration_ms}ms")
+            log.error(
+                f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {type(e).__name__} | Duration: {duration_ms}ms"
+            )
             log.error(f"   Error: {e}")
             log.error(f"   URL was: {url}")
             return None
@@ -141,7 +166,9 @@ class PlanRadarClient:
         Returns:
             List of tasks/tickets for the project
         """
-        log.info(f"📋 list_tasks called: project_id={project_id[:8]}..., status={status}")
+        log.info(
+            f"📋 list_tasks called: project_id={project_id[:8]}..., status={status}"
+        )
 
         # PlanRadar v2 API requires customer_id in path
         endpoint = f"{self.account_id}/projects/{project_id}/tickets"
@@ -152,7 +179,9 @@ class PlanRadarClient:
         result = await self._request("GET", endpoint, params=params)
         # Check for rate limit error
         if result and result.get("_rate_limited"):
-            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+            raise Exception(
+                "PlanRadar API rate limit exceeded. Please try again in a few moments."
+            )
         # PlanRadar uses JSON:API format with nested "data" array
         tasks = result.get("data", []) if result else []
         log.info(f"   ✅ Retrieved {len(tasks)} tasks")
@@ -165,8 +194,12 @@ class PlanRadarClient:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID (required for API v2)
         """
-        log.info(f"📄 get_task called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
-        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}")
+        log.info(
+            f"📄 get_task called: task_id={task_id[:8]}..., project_id={project_id[:8]}..."
+        )
+        result = await self._request(
+            "GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}"
+        )
         task_data = result.get("data") if result else None
         if task_data:
             log.info(f"   ✅ Task retrieved: {task_data.get('id')}")
@@ -174,14 +207,18 @@ class PlanRadarClient:
             log.warning(f"   ⚠️ Task not found")
         return task_data
 
-    async def get_task_description(self, task_id: str, project_id: str) -> Optional[str]:
+    async def get_task_description(
+        self, task_id: str, project_id: str
+    ) -> Optional[str]:
         """Get task description.
 
         Args:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
         """
-        log.info(f"📝 get_task_description called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
+        log.info(
+            f"📝 get_task_description called: task_id={task_id[:8]}..., project_id={project_id[:8]}..."
+        )
         task = await self.get_task(task_id, project_id)
         description = task.get("description") if task else None
         if description:
@@ -190,20 +227,28 @@ class PlanRadarClient:
             log.info(f"   ℹ️ No description available")
         return description
 
-    async def get_task_plans(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
+    async def get_task_plans(
+        self, task_id: str, project_id: str
+    ) -> List[Dict[str, Any]]:
         """Get plans/blueprints associated with a task.
 
         Args:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
         """
-        log.info(f"🗺️ get_task_plans called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
-        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/plans")
+        log.info(
+            f"🗺️ get_task_plans called: task_id={task_id[:8]}..., project_id={project_id[:8]}..."
+        )
+        result = await self._request(
+            "GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/plans"
+        )
         plans = result.get("data", []) if result else []
         log.info(f"   ✅ Retrieved {len(plans)} plans")
         return plans
 
-    async def get_task_images(self, task_id: str, project_id: str, task_uuid: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_task_images(
+        self, task_id: str, project_id: str, task_uuid: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get all attachments (images, documents, etc.) attached to a task.
 
         Args:
@@ -218,10 +263,15 @@ class PlanRadarClient:
         """
         # Use task_uuid if provided (backward compatibility), otherwise use task_id (which is now UUID)
         uuid_to_use = task_uuid if task_uuid else task_id
-        log.info(f"📎 get_task_images called (returns all attachments): task_uuid={uuid_to_use[:8]}..., project_id={project_id[:8]}...")
+        log.info(
+            f"📎 get_task_images called (returns all attachments): task_uuid={uuid_to_use[:8]}..., project_id={project_id[:8]}..."
+        )
 
         # Use UUID for attachments endpoint (required by PlanRadar API)
-        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{uuid_to_use}/attachments")
+        result = await self._request(
+            "GET",
+            f"{self.account_id}/projects/{project_id}/tickets/{uuid_to_use}/attachments",
+        )
 
         if result and result.get("data"):
             attachments = result.get("data", [])
@@ -242,30 +292,44 @@ class PlanRadarClient:
 
                         # Handle images
                         if "image" in inc_type:
-                            all_attachments.append({
-                                "id": att_id,
-                                "type": "image",
-                                "title": att_title,
-                                "url": inc_attributes.get("image-url"),
-                                "thumbnail_url": inc_attributes.get("image-url-thumb"),
-                                "content_type": inc_attributes.get("image-content-type"),
-                                "file_size": inc_attributes.get("image-file-size"),
-                                "metadata": inc_attributes.get("metadata"),
-                            })
+                            all_attachments.append(
+                                {
+                                    "id": att_id,
+                                    "type": "image",
+                                    "title": att_title,
+                                    "url": inc_attributes.get("image-url"),
+                                    "thumbnail_url": inc_attributes.get(
+                                        "image-url-thumb"
+                                    ),
+                                    "content_type": inc_attributes.get(
+                                        "image-content-type"
+                                    ),
+                                    "file_size": inc_attributes.get("image-file-size"),
+                                    "metadata": inc_attributes.get("metadata"),
+                                }
+                            )
                         # Handle documents (PDFs, etc.)
                         elif "document" in inc_type:
-                            all_attachments.append({
-                                "id": att_id,
-                                "type": "document",
-                                "title": att_title,
-                                "url": inc_attributes.get("url"),
-                                "content_type": inc_attributes.get("document-content-type"),
-                                "file_size": inc_attributes.get("document-file-size"),
-                                "metadata": inc_attributes.get("metadata"),
-                            })
+                            all_attachments.append(
+                                {
+                                    "id": att_id,
+                                    "type": "document",
+                                    "title": att_title,
+                                    "url": inc_attributes.get("url"),
+                                    "content_type": inc_attributes.get(
+                                        "document-content-type"
+                                    ),
+                                    "file_size": inc_attributes.get(
+                                        "document-file-size"
+                                    ),
+                                    "metadata": inc_attributes.get("metadata"),
+                                }
+                            )
                         # Handle any other attachment types
                         else:
-                            log.debug(f"   Unknown attachment type: {inc_type}, attempting to extract URL")
+                            log.debug(
+                                f"   Unknown attachment type: {inc_type}, attempting to extract URL"
+                            )
                             # Try to find any URL field
                             url = None
                             for key, value in inc_attributes.items():
@@ -274,19 +338,27 @@ class PlanRadarClient:
                                     break
 
                             if url:
-                                all_attachments.append({
-                                    "id": att_id,
-                                    "type": inc_type,
-                                    "title": att_title,
-                                    "url": url,
-                                    "content_type": inc_attributes.get("content-type"),
-                                    "file_size": inc_attributes.get("file-size"),
-                                    "metadata": inc_attributes.get("metadata"),
-                                })
+                                all_attachments.append(
+                                    {
+                                        "id": att_id,
+                                        "type": inc_type,
+                                        "title": att_title,
+                                        "url": url,
+                                        "content_type": inc_attributes.get(
+                                            "content-type"
+                                        ),
+                                        "file_size": inc_attributes.get("file-size"),
+                                        "metadata": inc_attributes.get("metadata"),
+                                    }
+                                )
                         break
 
-            log.info(f"   ✅ Retrieved {len(all_attachments)} attachments (from {len(attachments)} total)")
-            log.info(f"   Types: {', '.join(set(att.get('type', 'unknown') for att in all_attachments))}")
+            log.info(
+                f"   ✅ Retrieved {len(all_attachments)} attachments (from {len(attachments)} total)"
+            )
+            log.info(
+                f"   Types: {', '.join(set(att.get('type', 'unknown') for att in all_attachments))}"
+            )
             return all_attachments
 
         log.info(f"   ℹ️ No attachments found")
@@ -315,7 +387,9 @@ class PlanRadarClient:
         result = await self._request("GET", endpoint, params=params)
         # Check for rate limit error
         if result and result.get("_rate_limited"):
-            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+            raise Exception(
+                "PlanRadar API rate limit exceeded. Please try again in a few moments."
+            )
         # PlanRadar uses JSON:API format with nested "data" array
         return result.get("data", []) if result else []
 
@@ -335,7 +409,9 @@ class PlanRadarClient:
         """
         log.info(f"🏗️ STEP 1: Fetching project components")
         log.info(f"   Project ID: {project_id}")
-        endpoint = f"{self.account_id}/projects/{project_id}/components/project_components"
+        endpoint = (
+            f"{self.account_id}/projects/{project_id}/components/project_components"
+        )
         params = {}
         if last_sync_date:
             params["last_sync_date"] = last_sync_date
@@ -345,7 +421,9 @@ class PlanRadarClient:
 
         # Check for rate limit error
         if result and result.get("_rate_limited"):
-            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+            raise Exception(
+                "PlanRadar API rate limit exceeded. Please try again in a few moments."
+            )
 
         # PlanRadar uses JSON:API format with nested "data" array
         components = result.get("data", []) if result else []
@@ -397,7 +475,9 @@ class PlanRadarClient:
             List of plans for the component with original-url for PDF download
         """
         log.info(f"📐 STEP 2: Fetching plans for component {component_id}")
-        endpoint = f"{self.account_id}/projects/{project_id}/components/{component_id}/plans"
+        endpoint = (
+            f"{self.account_id}/projects/{project_id}/components/{component_id}/plans"
+        )
         params = {}
         if is_simple:
             params["is_simple"] = "true"
@@ -407,7 +487,9 @@ class PlanRadarClient:
 
         # Check for rate limit error
         if result and result.get("_rate_limited"):
-            raise Exception("PlanRadar API rate limit exceeded. Please try again in a few moments.")
+            raise Exception(
+                "PlanRadar API rate limit exceeded. Please try again in a few moments."
+            )
 
         # PlanRadar uses JSON:API format
         if result and result.get("data"):
@@ -415,7 +497,9 @@ class PlanRadarClient:
             included = result.get("included", [])
 
             log.info(f"   📊 Response contains {len(plans)} plan(s) in data section")
-            log.info(f"   📦 Response contains {len(included)} item(s) in included section")
+            log.info(
+                f"   📦 Response contains {len(included)} item(s) in included section"
+            )
 
             # Log included section IDs for debugging
             if included:
@@ -437,13 +521,19 @@ class PlanRadarClient:
                 # Extract key plan info
                 plan_name = plan_attributes.get("name", "Unnamed Plan")
                 file_size = plan_attributes.get("download-filesize")
-                content_type = (plan_attributes.get("planfile-content-type") or
-                               plan_attributes.get("content-type") or
-                               plan_attributes.get("image-content-type"))
+                content_type = (
+                    plan_attributes.get("planfile-content-type")
+                    or plan_attributes.get("content-type")
+                    or plan_attributes.get("image-content-type")
+                )
 
                 log.info(f"      Name: {plan_name}")
                 log.info(f"      Content-Type: {content_type}")
-                log.info(f"      File Size: {file_size} bytes" if file_size else "      File Size: unknown")
+                log.info(
+                    f"      File Size: {file_size} bytes"
+                    if file_size
+                    else "      File Size: unknown"
+                )
 
                 # PRIORITY 1: Try to extract original-url (the actual PDF)
                 original_url = plan_attributes.get("original-url")
@@ -464,12 +554,14 @@ class PlanRadarClient:
                     log.info(f"      📦 Plan ZIP: {zip_url[:80]}...")
 
                 # Select the best URL (prioritize original-url for full PDF)
-                direct_url = (original_url or
-                             thumb_big_url or
-                             thumb_small_url or
-                             plan_attributes.get("image-url") or
-                             plan_attributes.get("url") or
-                             plan_attributes.get("file-url"))
+                direct_url = (
+                    original_url
+                    or thumb_big_url
+                    or thumb_small_url
+                    or plan_attributes.get("image-url")
+                    or plan_attributes.get("url")
+                    or plan_attributes.get("file-url")
+                )
 
                 if direct_url:
                     # Determine which URL we're using
@@ -485,24 +577,29 @@ class PlanRadarClient:
                     log.info(f"      🔗 Selected URL source: {url_source}")
 
                     # Default to PDF if filename suggests it's a PDF and no content_type
-                    if not content_type and plan_name.lower().endswith('.pdf'):
+                    if not content_type and plan_name.lower().endswith(".pdf"):
                         content_type = "application/pdf"
-                        log.info(f"      ℹ️ Inferred content-type as application/pdf from filename")
+                        log.info(
+                            f"      ℹ️ Inferred content-type as application/pdf from filename"
+                        )
 
                     plan_data = {
                         "id": plan_id,
                         "name": plan_name,
                         "url": direct_url,
-                        "thumbnail_url": thumb_small_url or plan_attributes.get("image-url-thumb"),
+                        "thumbnail_url": thumb_small_url
+                        or plan_attributes.get("image-url-thumb"),
                         "content_type": content_type,
                         "file_size": file_size,
-                        "attributes": plan_attributes
+                        "attributes": plan_attributes,
                     }
                     all_plans.append(plan_data)
                     log.info(f"      ✅ Plan successfully extracted with URL")
                 else:
                     # Try to find in included section (fallback)
-                    log.info(f"      ⚠️ No direct URL in plan attributes, checking included section...")
+                    log.info(
+                        f"      ⚠️ No direct URL in plan attributes, checking included section..."
+                    )
                     found_in_included = False
                     for inc in included:
                         inc_id = inc.get("id")
@@ -510,36 +607,53 @@ class PlanRadarClient:
 
                         if inc_id == plan_id:
                             inc_attributes = inc.get("attributes", {})
-                            log.info(f"      📦 Found plan in included section (type: {inc_type})")
-                            log.info(f"         Included attributes: {list(inc_attributes.keys())}")
+                            log.info(
+                                f"      📦 Found plan in included section (type: {inc_type})"
+                            )
+                            log.info(
+                                f"         Included attributes: {list(inc_attributes.keys())}"
+                            )
 
                             # Extract plan URL from included section
-                            plan_url = (inc_attributes.get("original-url") or
-                                       inc_attributes.get("image-url") or
-                                       inc_attributes.get("url") or
-                                       inc_attributes.get("file-url"))
+                            plan_url = (
+                                inc_attributes.get("original-url")
+                                or inc_attributes.get("image-url")
+                                or inc_attributes.get("url")
+                                or inc_attributes.get("file-url")
+                            )
 
                             if plan_url:
-                                log.info(f"      ✅ Found URL in included section: {plan_url[:80]}...")
+                                log.info(
+                                    f"      ✅ Found URL in included section: {plan_url[:80]}..."
+                                )
                                 plan_data = {
                                     "id": plan_id,
                                     "name": plan_name,
                                     "url": plan_url,
-                                    "thumbnail_url": inc_attributes.get("image-url-thumb"),
-                                    "content_type": inc_attributes.get("content-type") or inc_attributes.get("image-content-type"),
+                                    "thumbnail_url": inc_attributes.get(
+                                        "image-url-thumb"
+                                    ),
+                                    "content_type": inc_attributes.get("content-type")
+                                    or inc_attributes.get("image-content-type"),
                                     "file_size": inc_attributes.get("file-size"),
-                                    "attributes": plan_attributes
+                                    "attributes": plan_attributes,
                                 }
                                 all_plans.append(plan_data)
                             else:
-                                log.warning(f"      ❌ No URL found in included section")
-                                log.warning(f"         Available keys: {list(inc_attributes.keys())}")
+                                log.warning(
+                                    f"      ❌ No URL found in included section"
+                                )
+                                log.warning(
+                                    f"         Available keys: {list(inc_attributes.keys())}"
+                                )
 
                             found_in_included = True
                             break
 
                     if not found_in_included:
-                        log.warning(f"      ❌ Plan {plan_id} not found in included section either")
+                        log.warning(
+                            f"      ❌ Plan {plan_id} not found in included section either"
+                        )
 
             log.info(f"   ✅ Successfully extracted {len(all_plans)} plan(s) with URLs")
             return all_plans
@@ -587,7 +701,9 @@ class PlanRadarClient:
                 component_attrs = component.get("attributes", {})
                 component_name = component_attrs.get("name", "Composant")
 
-                log.info(f"\n   🔄 Processing component {idx}/{len(components)}: {component_name}")
+                log.info(
+                    f"\n   🔄 Processing component {idx}/{len(components)}: {component_name}"
+                )
                 log.info(f"      Component ID: {component_id}")
 
                 plans = await self.get_component_plans(project_id, component_id)
@@ -599,7 +715,9 @@ class PlanRadarClient:
                     all_plans.append(plan)
 
             if not all_plans:
-                log.info(f"\n   ℹ️ No plans found across all {len(components)} components")
+                log.info(
+                    f"\n   ℹ️ No plans found across all {len(components)} components"
+                )
                 return []
 
             log.info(f"\n   📊 Total plans collected: {len(all_plans)}")
@@ -610,32 +728,45 @@ class PlanRadarClient:
             plans_without_urls = [p for p in all_plans if not p.get("url")]
 
             if plans_without_urls:
-                log.warning(f"   ⚠️ Filtered out {len(plans_without_urls)} plan(s) without URLs:")
+                log.warning(
+                    f"   ⚠️ Filtered out {len(plans_without_urls)} plan(s) without URLs:"
+                )
                 for p in plans_without_urls[:3]:  # Show first 3
-                    log.warning(f"      - {p.get('name')} (component: {p.get('component_name')})")
+                    log.warning(
+                        f"      - {p.get('name')} (component: {p.get('component_name')})"
+                    )
 
             if plans_with_urls:
-                log.info(f"\n   ✅ Successfully recovered {len(plans_with_urls)} document(s) with URLs:")
+                log.info(
+                    f"\n   ✅ Successfully recovered {len(plans_with_urls)} document(s) with URLs:"
+                )
                 for idx, p in enumerate(plans_with_urls, 1):
-                    content_type = p.get('content_type', 'unknown')
-                    file_size = p.get('file_size')
+                    content_type = p.get("content_type", "unknown")
+                    file_size = p.get("file_size")
                     file_type = "PDF" if "pdf" in content_type.lower() else content_type
 
                     log.info(f"      {idx}. {p.get('name')}")
                     log.info(f"         Type: {file_type}")
-                    log.info(f"         Size: {file_size} bytes" if file_size else "         Size: unknown")
+                    log.info(
+                        f"         Size: {file_size} bytes"
+                        if file_size
+                        else "         Size: unknown"
+                    )
                     log.info(f"         Component: {p.get('component_name')}")
                     log.info(f"         URL: {p.get('url')[:100]}...")
             else:
                 log.warning(f"   ⚠️ No documents with valid URLs found")
 
-            log.info(f"\n📚 ========== WORKFLOW COMPLETE: {len(plans_with_urls)} documents ready ==========\n")
+            log.info(
+                f"\n📚 ========== WORKFLOW COMPLETE: {len(plans_with_urls)} documents ready ==========\n"
+            )
 
             return plans_with_urls
 
         except Exception as e:
             log.error(f"\n   ❌ Error fetching project documents: {e}")
             import traceback
+
             log.error(f"   Traceback: {traceback.format_exc()}")
             return []
 
@@ -652,20 +783,20 @@ class PlanRadarClient:
             project_id: The PlanRadar project ID
             comment_text: The comment text to add
         """
-        log.info(f"💬 add_task_comment called: task_id={task_id[:8]}..., project_id={project_id[:8]}..., comment_length={len(comment_text)}")
+        log.info(
+            f"💬 add_task_comment called: task_id={task_id[:8]}..., project_id={project_id[:8]}..., comment_length={len(comment_text)}"
+        )
 
         # Use correct JSON:API format from PlanRadar documentation
         # Endpoint: /comment (singular, not /comments plural!)
         # Field: "comment" (not "text")
-        data = {
-            "data": {
-                "attributes": {
-                    "comment": comment_text
-                }
-            }
-        }
+        data = {"data": {"attributes": {"comment": comment_text}}}
 
-        result = await self._request("POST", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comment", data=data)
+        result = await self._request(
+            "POST",
+            f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comment",
+            data=data,
+        )
         success = result is not None
         if success:
             log.info(f"   ✅ Comment added successfully")
@@ -673,15 +804,21 @@ class PlanRadarClient:
             log.warning(f"   ⚠️ Failed to add comment")
         return success
 
-    async def get_task_comments(self, task_id: str, project_id: str) -> List[Dict[str, Any]]:
+    async def get_task_comments(
+        self, task_id: str, project_id: str
+    ) -> List[Dict[str, Any]]:
         """Get all comments for a task.
 
         Args:
             task_id: The task UUID (primary identifier, latest API standard)
             project_id: The PlanRadar project ID
         """
-        log.info(f"💬 get_task_comments called: task_id={task_id[:8]}..., project_id={project_id[:8]}...")
-        result = await self._request("GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comments")
+        log.info(
+            f"💬 get_task_comments called: task_id={task_id[:8]}..., project_id={project_id[:8]}..."
+        )
+        result = await self._request(
+            "GET", f"{self.account_id}/projects/{project_id}/tickets/{task_id}/comments"
+        )
         comments = result.get("data", []) if result else []
         log.info(f"   ✅ Retrieved {len(comments)} comments")
         return comments
@@ -728,7 +865,7 @@ class PlanRadarClient:
         task_id: str,
         project_id: str,
         image_url: str,
-        caption: str = "Progress update image"
+        caption: str = "Progress update image",
     ) -> bool:
         """Helper method to download and upload an image to PlanRadar.
 
@@ -749,6 +886,7 @@ class PlanRadarClient:
             if "api.twilio.com" in image_url:
                 # Twilio media URLs require basic auth
                 from src.config import settings
+
                 auth = (settings.twilio_account_sid, settings.twilio_auth_token)
                 log.info("   🔐 Using Twilio authentication for media download")
 
@@ -766,14 +904,14 @@ class PlanRadarClient:
                 log.info(f"   ✅ Downloaded {len(image_data)} bytes ({content_type})")
 
                 # Encode to base64
-                base64_data = base64.b64encode(image_data).decode('utf-8')
+                base64_data = base64.b64encode(image_data).decode("utf-8")
                 data_uri = f"data:{content_type};base64,{base64_data}"
 
                 # Extract filename from URL or use default
-                filename = image_url.split('/')[-1].split('?')[0] or "image.jpg"
-                if '.' not in filename:
+                filename = image_url.split("/")[-1].split("?")[0] or "image.jpg"
+                if "." not in filename:
                     # Add extension based on content type
-                    ext = content_type.split('/')[-1].split(';')[0]
+                    ext = content_type.split("/")[-1].split(";")[0]
                     filename = f"image.{ext}"
 
                 # Use correct JSON:API format from PlanRadar documentation
@@ -786,7 +924,7 @@ class PlanRadarClient:
                             "uuid": attachment_uuid,
                             "attachment": data_uri,
                             "attachment-name": filename,
-                            "caption": caption
+                            "caption": caption,
                         }
                     }
                 }
@@ -795,13 +933,15 @@ class PlanRadarClient:
                 result = await self._request(
                     "POST",
                     f"{self.account_id}/projects/{project_id}/tickets/{task_id}/attachments",
-                    data=data
+                    data=data,
                 )
 
                 # Check for rate limiting or errors
                 if result and isinstance(result, dict):
                     if result.get("_rate_limited"):
-                        log.error(f"   ❌ Rate limit exceeded - please wait before uploading more images")
+                        log.error(
+                            f"   ❌ Rate limit exceeded - please wait before uploading more images"
+                        )
                         return False
                     # Success if result has data
                     if "data" in result or result.get("id"):
@@ -814,6 +954,7 @@ class PlanRadarClient:
         except Exception as e:
             log.error(f"   ❌ Error processing image: {e}")
             import traceback
+
             log.error(f"   Traceback: {traceback.format_exc()}")
             return False
 
@@ -839,7 +980,9 @@ class PlanRadarClient:
 
         # Add comment if text provided
         if additional_text:
-            comment_result = await self.add_task_comment(task_id, project_id, additional_text)
+            comment_result = await self.add_task_comment(
+                task_id, project_id, additional_text
+            )
             if not comment_result:
                 success = False
 
@@ -850,10 +993,12 @@ class PlanRadarClient:
                     task_id,
                     project_id,
                     image_url,
-                    caption=f"Progress update image {idx}"
+                    caption=f"Progress update image {idx}",
                 )
                 if not upload_result:
-                    log.error(f"❌ Failed to upload image {idx}/{len(additional_images)}")
+                    log.error(
+                        f"❌ Failed to upload image {idx}/{len(additional_images)}"
+                    )
                     success = False
 
         return success
@@ -885,13 +1030,7 @@ class PlanRadarClient:
             True if successful
         """
         # Update status and progress using JSON:API format
-        data = {
-            "data": {
-                "attributes": {
-                    "status-id": status_id
-                }
-            }
-        }
+        data = {"data": {"attributes": {"status-id": status_id}}}
 
         if progress is not None:
             data["data"]["attributes"]["progress"] = progress
@@ -899,7 +1038,7 @@ class PlanRadarClient:
         result = await self._request(
             "PUT",
             f"{self.account_id}/projects/{project_id}/tickets/{task_id}",
-            data=data
+            data=data,
         )
 
         if not result:
@@ -913,19 +1052,13 @@ class PlanRadarClient:
         if image_urls:
             for idx, image_url in enumerate(image_urls, 1):
                 await self._upload_image_attachment(
-                    task_id,
-                    project_id,
-                    image_url,
-                    caption=f"Progress image {idx}"
+                    task_id, project_id, image_url, caption=f"Progress image {idx}"
                 )
 
         return True
 
     async def mark_task_complete(
-        self,
-        task_id: str,
-        project_id: str,
-        set_progress_100: bool = True
+        self, task_id: str, project_id: str, set_progress_100: bool = True
     ) -> bool:
         """Mark a task as complete (Resolved status).
 
@@ -958,7 +1091,7 @@ class PlanRadarClient:
         result = await self._request(
             "PUT",
             f"{self.account_id}/projects/{project_id}/tickets/{task_id}",
-            data=data
+            data=data,
         )
         return result is not None
 

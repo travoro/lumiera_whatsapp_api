@@ -4,17 +4,20 @@ This service creates templates on-the-fly, uses them, and deletes them automatic
 to avoid piling up templates in Twilio. Supports all WhatsApp interactive content types
 with full emoji support.
 """
-from typing import Optional, List, Dict, Any, Tuple
+
 import time
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import requests
 from requests.auth import HTTPBasicAuth
-from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
+from twilio.rest import Client
+
 from src.config import settings
 from src.integrations.supabase import supabase_client
-from src.utils.logger import log
 from src.services.retry import retry_on_network_error
+from src.utils.logger import log
 
 
 class DynamicTemplateService:
@@ -22,16 +25,13 @@ class DynamicTemplateService:
 
     def __init__(self):
         """Initialize dynamic template service."""
-        self.client = Client(
-            settings.twilio_account_sid,
-            settings.twilio_auth_token
-        )
+        self.client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
         self.stats = {
-            'created': 0,
-            'sent': 0,
-            'deleted': 0,
-            'failed_deletions': 0,
-            'total_time_ms': 0
+            "created": 0,
+            "sent": 0,
+            "deleted": 0,
+            "failed_deletions": 0,
+            "total_time_ms": 0,
         }
         log.info("Dynamic template service initialized")
 
@@ -41,10 +41,7 @@ class DynamicTemplateService:
 
     @retry_on_network_error(max_attempts=3)
     def create_dynamic_template(
-        self,
-        content_type: str,
-        content_data: Dict[str, Any],
-        language: str = "en"
+        self, content_type: str, content_data: Dict[str, Any], language: str = "en"
     ) -> Optional[str]:
         """Base method for creating any template type.
 
@@ -57,7 +54,9 @@ class DynamicTemplateService:
             Content SID if successful, None otherwise
         """
         try:
-            friendly_name = f"dynamic_{content_type.split('/')[-1]}_{int(time.time() * 1000)}"
+            friendly_name = (
+                f"dynamic_{content_type.split('/')[-1]}_{int(time.time() * 1000)}"
+            )
 
             create_start = time.time()
 
@@ -65,15 +64,14 @@ class DynamicTemplateService:
             response = requests.post(
                 "https://content.twilio.com/v1/Content",
                 auth=HTTPBasicAuth(
-                    settings.twilio_account_sid,
-                    settings.twilio_auth_token
+                    settings.twilio_account_sid, settings.twilio_auth_token
                 ),
                 json={
                     "friendly_name": friendly_name,
                     "language": language,
-                    "types": {content_type: content_data}
+                    "types": {content_type: content_data},
                 },
-                timeout=10
+                timeout=10,
             )
 
             create_time = (time.time() - create_start) * 1000
@@ -81,13 +79,17 @@ class DynamicTemplateService:
             if response.status_code != 201:
                 raise Exception(f"Create failed: {response.text}")
 
-            content_sid = response.json()['sid']
-            self.stats['created'] += 1
+            content_sid = response.json()["sid"]
+            self.stats["created"] += 1
 
-            log.info(f"✅ Created {content_type} template: {content_sid} ({create_time:.0f}ms)")
+            log.info(
+                f"✅ Created {content_type} template: {content_sid} ({create_time:.0f}ms)"
+            )
 
             # Log to database
-            self.log_template_created(content_sid, content_type, friendly_name, language)
+            self.log_template_created(
+                content_sid, content_type, friendly_name, language
+            )
 
             return content_sid
 
@@ -100,7 +102,7 @@ class DynamicTemplateService:
         self,
         to_number: str,
         content_sid: str,
-        content_variables: Optional[Dict[str, str]] = None
+        content_variables: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """Send message using a template.
 
@@ -113,20 +115,20 @@ class DynamicTemplateService:
             Message SID if successful, None otherwise
         """
         try:
-            if not to_number.startswith('whatsapp:'):
-                to_number = f'whatsapp:{to_number}'
+            if not to_number.startswith("whatsapp:"):
+                to_number = f"whatsapp:{to_number}"
 
             send_start = time.time()
             message = self.client.messages.create(
                 from_=f"whatsapp:{settings.twilio_whatsapp_number}",
                 to=to_number,
                 content_sid=content_sid,
-                content_variables=content_variables or {}
+                content_variables=content_variables or {},
             )
             send_time = (time.time() - send_start) * 1000
 
             message_sid = message.sid
-            self.stats['sent'] += 1
+            self.stats["sent"] += 1
 
             log.info(f"✅ Sent message: {message_sid} ({send_time:.0f}ms)")
 
@@ -153,15 +155,14 @@ class DynamicTemplateService:
             response = requests.delete(
                 f"https://content.twilio.com/v1/Content/{content_sid}",
                 auth=HTTPBasicAuth(
-                    settings.twilio_account_sid,
-                    settings.twilio_auth_token
+                    settings.twilio_account_sid, settings.twilio_auth_token
                 ),
-                timeout=10
+                timeout=10,
             )
             delete_time = (time.time() - delete_start) * 1000
 
             if response.status_code == 204:
-                self.stats['deleted'] += 1
+                self.stats["deleted"] += 1
                 log.info(f"✅ Deleted template: {content_sid} ({delete_time:.0f}ms)")
                 self.log_template_deleted(content_sid, success=True)
                 return True
@@ -171,11 +172,13 @@ class DynamicTemplateService:
                 self.log_template_deleted(content_sid, success=True)
                 return True
             else:
-                raise Exception(f"Delete failed: {response.status_code} - {response.text}")
+                raise Exception(
+                    f"Delete failed: {response.status_code} - {response.text}"
+                )
 
         except Exception as e:
             log.error(f"❌ Error deleting template {content_sid}: {e}")
-            self.stats['failed_deletions'] += 1
+            self.stats["failed_deletions"] += 1
             self.log_template_deleted(content_sid, success=False, error=str(e))
             return False
 
@@ -196,7 +199,9 @@ class DynamicTemplateService:
                 log.info(f"✅ Template {content_sid} verified deleted")
                 return True
             else:
-                log.warning(f"⚠️ Template {content_sid} deleted but still exists in Twilio")
+                log.warning(
+                    f"⚠️ Template {content_sid} deleted but still exists in Twilio"
+                )
                 return False
 
         return False
@@ -212,32 +217,43 @@ class DynamicTemplateService:
         """
         try:
             # Get template info from database
-            result = supabase_client.client.table('templates').select('*').eq('twilio_content_sid', content_sid).execute()
+            result = (
+                supabase_client.client.table("templates")
+                .select("*")
+                .eq("twilio_content_sid", content_sid)
+                .execute()
+            )
 
             if result.data:
                 template_data = result.data[0]
-                created_at = datetime.fromisoformat(template_data['created_at'].replace('Z', '+00:00'))
+                created_at = datetime.fromisoformat(
+                    template_data["created_at"].replace("Z", "+00:00")
+                )
 
                 return {
-                    'content_sid': content_sid,
-                    'created_at': created_at,
-                    'age_seconds': (datetime.now(created_at.tzinfo) - created_at).total_seconds(),
-                    'template_type': template_data.get('template_type', 'unknown'),
-                    'template_name': template_data.get('template_name', 'unknown'),
-                    'is_active': template_data.get('is_active', False)
+                    "content_sid": content_sid,
+                    "created_at": created_at,
+                    "age_seconds": (
+                        datetime.now(created_at.tzinfo) - created_at
+                    ).total_seconds(),
+                    "template_type": template_data.get("template_type", "unknown"),
+                    "template_name": template_data.get("template_name", "unknown"),
+                    "is_active": template_data.get("is_active", False),
                 }
 
-            return {'content_sid': content_sid, 'found': False}
+            return {"content_sid": content_sid, "found": False}
 
         except Exception as e:
             log.error(f"❌ Error getting template stats for {content_sid}: {e}")
-            return {'content_sid': content_sid, 'error': str(e)}
+            return {"content_sid": content_sid, "error": str(e)}
 
     # ============================================================================
     # LIST PICKER METHODS (twilio/list-picker)
     # ============================================================================
 
-    def validate_list_items(self, items: List[Dict[str, str]]) -> Tuple[bool, Optional[str]]:
+    def validate_list_items(
+        self, items: List[Dict[str, str]]
+    ) -> Tuple[bool, Optional[str]]:
         """Validate list items.
 
         Args:
@@ -251,16 +267,22 @@ class DynamicTemplateService:
 
         for i, item in enumerate(items):
             # Check required fields
-            if 'item' not in item or 'id' not in item:
+            if "item" not in item or "id" not in item:
                 return False, f"Item {i} missing 'item' or 'id' field"
 
             # Check item text length (max 24 chars)
-            if len(item['item']) > 24:
-                return False, f"Item {i} text '{item['item']}' exceeds 24 chars (length: {len(item['item'])})"
+            if len(item["item"]) > 24:
+                return (
+                    False,
+                    f"Item {i} text '{item['item']}' exceeds 24 chars (length: {len(item['item'])})",
+                )
 
             # Check description length if present (max 72 chars recommended)
-            if 'description' in item and len(item['description']) > 72:
-                return False, f"Item {i} description exceeds 72 chars (length: {len(item['description'])})"
+            if "description" in item and len(item["description"]) > 72:
+                return (
+                    False,
+                    f"Item {i} description exceeds 72 chars (length: {len(item['description'])})",
+                )
 
         return True, None
 
@@ -269,7 +291,7 @@ class DynamicTemplateService:
         body_text: str,
         button_text: str,
         items: List[Dict[str, str]],
-        language: str = "en"
+        language: str = "en",
     ) -> Optional[str]:
         """Create list picker with up to 10 items + emojis.
 
@@ -297,10 +319,12 @@ class DynamicTemplateService:
         content_data = {
             "body": body_text,
             "button": button_text,
-            "items": items[:10]  # Max 10 items
+            "items": items[:10],  # Max 10 items
         }
 
-        return self.create_dynamic_template("twilio/list-picker", content_data, language)
+        return self.create_dynamic_template(
+            "twilio/list-picker", content_data, language
+        )
 
     def send_list_picker(
         self,
@@ -309,7 +333,7 @@ class DynamicTemplateService:
         button_text: str,
         items: List[Dict[str, str]],
         cleanup: bool = True,
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Full workflow: create → send → delete list picker.
 
@@ -329,34 +353,36 @@ class DynamicTemplateService:
         # Create template
         content_sid = self.create_list_picker(body_text, button_text, items, language)
         if not content_sid:
-            return {'success': False, 'error': 'Failed to create template'}
+            return {"success": False, "error": "Failed to create template"}
 
         # Send message
         message_sid = self.send_with_template(to_number, content_sid)
         if not message_sid:
             # Failed to send, cleanup template
             self.delete_template(content_sid)
-            return {'success': False, 'error': 'Failed to send message'}
+            return {"success": False, "error": "Failed to send message"}
 
         # Cleanup if requested
         if cleanup:
             self.schedule_deletion(content_sid, delay_seconds=2)
 
         total_time = (time.time() - workflow_start) * 1000
-        self.stats['total_time_ms'] += total_time
+        self.stats["total_time_ms"] += total_time
 
         return {
-            'success': True,
-            'content_sid': content_sid,
-            'message_sid': message_sid,
-            'total_ms': total_time
+            "success": True,
+            "content_sid": content_sid,
+            "message_sid": message_sid,
+            "total_ms": total_time,
         }
 
     # ============================================================================
     # QUICK REPLY METHODS (twilio/quick-reply)
     # ============================================================================
 
-    def validate_quick_reply_buttons(self, buttons: List[Dict[str, str]]) -> Tuple[bool, Optional[str]]:
+    def validate_quick_reply_buttons(
+        self, buttons: List[Dict[str, str]]
+    ) -> Tuple[bool, Optional[str]]:
         """Validate quick reply buttons.
 
         Args:
@@ -369,19 +395,19 @@ class DynamicTemplateService:
             return False, f"Buttons must be 1-3, got {len(buttons)}"
 
         for i, button in enumerate(buttons):
-            if 'text' not in button or 'id' not in button:
+            if "text" not in button or "id" not in button:
                 return False, f"Button {i} missing 'text' or 'id' field"
 
-            if len(button['text']) > 20:
-                return False, f"Button {i} text '{button['text']}' exceeds 20 chars (length: {len(button['text'])})"
+            if len(button["text"]) > 20:
+                return (
+                    False,
+                    f"Button {i} text '{button['text']}' exceeds 20 chars (length: {len(button['text'])})",
+                )
 
         return True, None
 
     def create_quick_reply(
-        self,
-        body_text: str,
-        buttons: List[Dict[str, str]],
-        language: str = "en"
+        self, body_text: str, buttons: List[Dict[str, str]], language: str = "en"
     ) -> Optional[str]:
         """Create quick reply with up to 3 buttons + emojis.
 
@@ -404,17 +430,18 @@ class DynamicTemplateService:
         # Truncate button texts if needed
         formatted_buttons = []
         for button in buttons[:3]:
-            formatted_buttons.append({
-                'text': self.truncate_with_emoji(button['text'], 20),
-                'id': button['id']
-            })
+            formatted_buttons.append(
+                {
+                    "text": self.truncate_with_emoji(button["text"], 20),
+                    "id": button["id"],
+                }
+            )
 
-        content_data = {
-            "body": body_text,
-            "actions": formatted_buttons
-        }
+        content_data = {"body": body_text, "actions": formatted_buttons}
 
-        return self.create_dynamic_template("twilio/quick-reply", content_data, language)
+        return self.create_dynamic_template(
+            "twilio/quick-reply", content_data, language
+        )
 
     def send_quick_reply(
         self,
@@ -422,7 +449,7 @@ class DynamicTemplateService:
         body_text: str,
         buttons: List[Dict[str, str]],
         cleanup: bool = True,
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Full workflow: create → send → delete quick reply.
 
@@ -440,12 +467,12 @@ class DynamicTemplateService:
 
         content_sid = self.create_quick_reply(body_text, buttons, language)
         if not content_sid:
-            return {'success': False, 'error': 'Failed to create template'}
+            return {"success": False, "error": "Failed to create template"}
 
         message_sid = self.send_with_template(to_number, content_sid)
         if not message_sid:
             self.delete_template(content_sid)
-            return {'success': False, 'error': 'Failed to send message'}
+            return {"success": False, "error": "Failed to send message"}
 
         if cleanup:
             self.schedule_deletion(content_sid, delay_seconds=2)
@@ -453,17 +480,19 @@ class DynamicTemplateService:
         total_time = (time.time() - workflow_start) * 1000
 
         return {
-            'success': True,
-            'content_sid': content_sid,
-            'message_sid': message_sid,
-            'total_ms': total_time
+            "success": True,
+            "content_sid": content_sid,
+            "message_sid": message_sid,
+            "total_ms": total_time,
         }
 
     # ============================================================================
     # CALL-TO-ACTION METHODS (twilio/call-to-action)
     # ============================================================================
 
-    def validate_cta_buttons(self, buttons: List[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
+    def validate_cta_buttons(
+        self, buttons: List[Dict[str, Any]]
+    ) -> Tuple[bool, Optional[str]]:
         """Validate CTA buttons.
 
         Args:
@@ -476,26 +505,29 @@ class DynamicTemplateService:
             return False, f"CTA buttons must be 1-2, got {len(buttons)}"
 
         for i, button in enumerate(buttons):
-            if 'text' not in button or 'type' not in button:
+            if "text" not in button or "type" not in button:
                 return False, f"Button {i} missing 'text' or 'type' field"
 
-            button_type = button['type']
-            if button_type not in ['PHONE_NUMBER', 'URL']:
-                return False, f"Button {i} invalid type '{button_type}', must be PHONE_NUMBER or URL"
+            button_type = button["type"]
+            if button_type not in ["PHONE_NUMBER", "URL"]:
+                return (
+                    False,
+                    f"Button {i} invalid type '{button_type}', must be PHONE_NUMBER or URL",
+                )
 
-            if button_type == 'PHONE_NUMBER' and 'phone_number' not in button:
-                return False, f"Button {i} type PHONE_NUMBER missing 'phone_number' field"
+            if button_type == "PHONE_NUMBER" and "phone_number" not in button:
+                return (
+                    False,
+                    f"Button {i} type PHONE_NUMBER missing 'phone_number' field",
+                )
 
-            if button_type == 'URL' and 'url' not in button:
+            if button_type == "URL" and "url" not in button:
                 return False, f"Button {i} type URL missing 'url' field"
 
         return True, None
 
     def create_call_to_action(
-        self,
-        body_text: str,
-        buttons: List[Dict[str, Any]],
-        language: str = "en"
+        self, body_text: str, buttons: List[Dict[str, Any]], language: str = "en"
     ) -> Optional[str]:
         """Create call-to-action with phone/URL buttons + emojis.
 
@@ -517,12 +549,11 @@ class DynamicTemplateService:
             log.error(f"❌ Invalid CTA buttons: {error}")
             return None
 
-        content_data = {
-            "body": body_text,
-            "actions": buttons[:2]
-        }
+        content_data = {"body": body_text, "actions": buttons[:2]}
 
-        return self.create_dynamic_template("twilio/call-to-action", content_data, language)
+        return self.create_dynamic_template(
+            "twilio/call-to-action", content_data, language
+        )
 
     def send_call_to_action(
         self,
@@ -530,7 +561,7 @@ class DynamicTemplateService:
         body_text: str,
         buttons: List[Dict[str, Any]],
         cleanup: bool = True,
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Full workflow: create → send → delete call-to-action.
 
@@ -548,12 +579,12 @@ class DynamicTemplateService:
 
         content_sid = self.create_call_to_action(body_text, buttons, language)
         if not content_sid:
-            return {'success': False, 'error': 'Failed to create template'}
+            return {"success": False, "error": "Failed to create template"}
 
         message_sid = self.send_with_template(to_number, content_sid)
         if not message_sid:
             self.delete_template(content_sid)
-            return {'success': False, 'error': 'Failed to send message'}
+            return {"success": False, "error": "Failed to send message"}
 
         if cleanup:
             self.schedule_deletion(content_sid, delay_seconds=2)
@@ -561,10 +592,10 @@ class DynamicTemplateService:
         total_time = (time.time() - workflow_start) * 1000
 
         return {
-            'success': True,
-            'content_sid': content_sid,
-            'message_sid': message_sid,
-            'total_ms': total_time
+            "success": True,
+            "content_sid": content_sid,
+            "message_sid": message_sid,
+            "total_ms": total_time,
         }
 
     # ============================================================================
@@ -572,10 +603,7 @@ class DynamicTemplateService:
     # ============================================================================
 
     def create_media_template(
-        self,
-        body_text: str,
-        media_url: str,
-        language: str = "en"
+        self, body_text: str, media_url: str, language: str = "en"
     ) -> Optional[str]:
         """Create media template with image/video/document + emojis.
 
@@ -587,10 +615,7 @@ class DynamicTemplateService:
         Returns:
             Content SID if successful, None otherwise
         """
-        content_data = {
-            "body": body_text,
-            "media": [media_url]
-        }
+        content_data = {"body": body_text, "media": [media_url]}
 
         return self.create_dynamic_template("twilio/media", content_data, language)
 
@@ -600,7 +625,7 @@ class DynamicTemplateService:
         body_text: str,
         media_url: str,
         cleanup: bool = True,
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Full workflow: create → send → delete media message.
 
@@ -618,12 +643,12 @@ class DynamicTemplateService:
 
         content_sid = self.create_media_template(body_text, media_url, language)
         if not content_sid:
-            return {'success': False, 'error': 'Failed to create template'}
+            return {"success": False, "error": "Failed to create template"}
 
         message_sid = self.send_with_template(to_number, content_sid)
         if not message_sid:
             self.delete_template(content_sid)
-            return {'success': False, 'error': 'Failed to send message'}
+            return {"success": False, "error": "Failed to send message"}
 
         if cleanup:
             self.schedule_deletion(content_sid, delay_seconds=2)
@@ -631,10 +656,10 @@ class DynamicTemplateService:
         total_time = (time.time() - workflow_start) * 1000
 
         return {
-            'success': True,
-            'content_sid': content_sid,
-            'message_sid': message_sid,
-            'total_ms': total_time
+            "success": True,
+            "content_sid": content_sid,
+            "message_sid": message_sid,
+            "total_ms": total_time,
         }
 
     # ============================================================================
@@ -646,7 +671,7 @@ class DynamicTemplateService:
         body_text: str,
         media_url: Optional[str] = None,
         buttons: Optional[List[Dict[str, Any]]] = None,
-        language: str = "en"
+        language: str = "en",
     ) -> Optional[str]:
         """Create rich card with media + buttons + emojis.
 
@@ -659,9 +684,7 @@ class DynamicTemplateService:
         Returns:
             Content SID if successful, None otherwise
         """
-        content_data = {
-            "body": body_text
-        }
+        content_data = {"body": body_text}
 
         if media_url:
             content_data["media"] = [media_url]
@@ -678,7 +701,7 @@ class DynamicTemplateService:
         media_url: Optional[str] = None,
         buttons: Optional[List[Dict[str, Any]]] = None,
         cleanup: bool = True,
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Full workflow: create → send → delete card.
 
@@ -697,12 +720,12 @@ class DynamicTemplateService:
 
         content_sid = self.create_card(body_text, media_url, buttons, language)
         if not content_sid:
-            return {'success': False, 'error': 'Failed to create template'}
+            return {"success": False, "error": "Failed to create template"}
 
         message_sid = self.send_with_template(to_number, content_sid)
         if not message_sid:
             self.delete_template(content_sid)
-            return {'success': False, 'error': 'Failed to send message'}
+            return {"success": False, "error": "Failed to send message"}
 
         if cleanup:
             self.schedule_deletion(content_sid, delay_seconds=2)
@@ -710,10 +733,10 @@ class DynamicTemplateService:
         total_time = (time.time() - workflow_start) * 1000
 
         return {
-            'success': True,
-            'content_sid': content_sid,
-            'message_sid': message_sid,
-            'total_ms': total_time
+            "success": True,
+            "content_sid": content_sid,
+            "message_sid": message_sid,
+            "total_ms": total_time,
         }
 
     # ============================================================================
@@ -721,10 +744,7 @@ class DynamicTemplateService:
     # ============================================================================
 
     def create_carousel(
-        self,
-        cards: List[Dict[str, str]],
-        body: str = "",
-        language: str = "en"
+        self, cards: List[Dict[str, str]], body: str = "", language: str = "en"
     ) -> Optional[str]:
         """Create carousel with up to 10 image cards.
 
@@ -741,7 +761,9 @@ class DynamicTemplateService:
         """
         # Validate cards
         if not cards or len(cards) > 10:
-            log.error(f"❌ Invalid card count: {len(cards) if cards else 0} (must be 1-10)")
+            log.error(
+                f"❌ Invalid card count: {len(cards) if cards else 0} (must be 1-10)"
+            )
             return None
 
         # Format cards for Twilio carousel
@@ -751,13 +773,13 @@ class DynamicTemplateService:
                 log.error(f"❌ Card {i} missing required media_url")
                 continue
 
-            card_data = {
-                "media": card.get("media_url")
-            }
+            card_data = {"media": card.get("media_url")}
 
             # Optional: Add title/body if provided
             if card.get("title"):
-                card_data["title"] = card.get("title")[:160]  # Max 160 chars combined with body
+                card_data["title"] = card.get("title")[
+                    :160
+                ]  # Max 160 chars combined with body
             if card.get("body"):
                 card_data["body"] = card.get("body")[:160]
 
@@ -767,10 +789,7 @@ class DynamicTemplateService:
             log.error(f"❌ No valid cards after validation")
             return None
 
-        content_data = {
-            "body": body or "Photos",
-            "cards": formatted_cards
-        }
+        content_data = {"body": body or "Photos", "cards": formatted_cards}
 
         return self.create_dynamic_template("twilio/carousel", content_data, language)
 
@@ -780,7 +799,7 @@ class DynamicTemplateService:
         cards: List[Dict[str, str]],
         body: str = "",
         cleanup: bool = True,
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Full workflow: create → send → delete carousel.
 
@@ -798,12 +817,12 @@ class DynamicTemplateService:
 
         content_sid = self.create_carousel(cards, body, language)
         if not content_sid:
-            return {'success': False, 'error': 'Failed to create carousel template'}
+            return {"success": False, "error": "Failed to create carousel template"}
 
         message_sid = self.send_with_template(to_number, content_sid)
         if not message_sid:
             self.delete_template(content_sid)
-            return {'success': False, 'error': 'Failed to send carousel'}
+            return {"success": False, "error": "Failed to send carousel"}
 
         if cleanup:
             self.schedule_deletion(content_sid, delay_seconds=2)
@@ -811,17 +830,23 @@ class DynamicTemplateService:
         total_time = (time.time() - workflow_start) * 1000
 
         return {
-            'success': True,
-            'content_sid': content_sid,
-            'message_sid': message_sid,
-            'total_ms': total_time
+            "success": True,
+            "content_sid": content_sid,
+            "message_sid": message_sid,
+            "total_ms": total_time,
         }
 
     # ============================================================================
     # DATABASE INTEGRATION METHODS
     # ============================================================================
 
-    def log_template_created(self, content_sid: str, template_type: str, friendly_name: str, language: str = "en") -> bool:
+    def log_template_created(
+        self,
+        content_sid: str,
+        template_type: str,
+        friendly_name: str,
+        language: str = "en",
+    ) -> bool:
         """Log template creation to database.
 
         Args:
@@ -834,16 +859,18 @@ class DynamicTemplateService:
             True if successful, False otherwise
         """
         try:
-            supabase_client.client.table('templates').insert({
-                'template_name': friendly_name,
-                'language': language,
-                'twilio_content_sid': content_sid,
-                'template_type': template_type,
-                'description': f'Dynamic {template_type} template',
-                'is_active': True,
-                'created_at': datetime.utcnow().isoformat(),
-                'updated_at': datetime.utcnow().isoformat()
-            }).execute()
+            supabase_client.client.table("templates").insert(
+                {
+                    "template_name": friendly_name,
+                    "language": language,
+                    "twilio_content_sid": content_sid,
+                    "template_type": template_type,
+                    "description": f"Dynamic {template_type} template",
+                    "is_active": True,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).execute()
 
             return True
 
@@ -851,7 +878,9 @@ class DynamicTemplateService:
             log.error(f"❌ Error logging template creation: {e}")
             return False
 
-    def log_template_deleted(self, content_sid: str, success: bool, error: Optional[str] = None) -> bool:
+    def log_template_deleted(
+        self, content_sid: str, success: bool, error: Optional[str] = None
+    ) -> bool:
         """Log template deletion to database.
 
         Args:
@@ -865,18 +894,22 @@ class DynamicTemplateService:
         try:
             if success:
                 # Mark as inactive instead of deleting
-                supabase_client.client.table('templates').update({
-                    'is_active': False,
-                    'updated_at': datetime.utcnow().isoformat(),
-                    'description': f'Deleted at {datetime.utcnow().isoformat()}'
-                }).eq('twilio_content_sid', content_sid).execute()
+                supabase_client.client.table("templates").update(
+                    {
+                        "is_active": False,
+                        "updated_at": datetime.utcnow().isoformat(),
+                        "description": f"Deleted at {datetime.utcnow().isoformat()}",
+                    }
+                ).eq("twilio_content_sid", content_sid).execute()
             else:
                 # Log error in description
-                error_msg = f'Deletion failed: {error}' if error else 'Deletion failed'
-                supabase_client.client.table('templates').update({
-                    'description': error_msg,
-                    'updated_at': datetime.utcnow().isoformat()
-                }).eq('twilio_content_sid', content_sid).execute()
+                error_msg = f"Deletion failed: {error}" if error else "Deletion failed"
+                supabase_client.client.table("templates").update(
+                    {
+                        "description": error_msg,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("twilio_content_sid", content_sid).execute()
 
             return True
 
@@ -892,7 +925,13 @@ class DynamicTemplateService:
         """
         try:
             # Get templates where description contains "Deletion failed"
-            result = supabase_client.client.table('templates').select('*').like('description', '%Deletion failed%').eq('is_active', True).execute()
+            result = (
+                supabase_client.client.table("templates")
+                .select("*")
+                .like("description", "%Deletion failed%")
+                .eq("is_active", True)
+                .execute()
+            )
 
             return result.data if result.data else []
 
@@ -908,20 +947,18 @@ class DynamicTemplateService:
         """
         pending = self.get_pending_deletions()
 
-        stats = {
-            'total': len(pending),
-            'success': 0,
-            'failed': 0
-        }
+        stats = {"total": len(pending), "success": 0, "failed": 0}
 
         for template in pending:
-            content_sid = template['twilio_content_sid']
+            content_sid = template["twilio_content_sid"]
             if self.delete_template(content_sid):
-                stats['success'] += 1
+                stats["success"] += 1
             else:
-                stats['failed'] += 1
+                stats["failed"] += 1
 
-        log.info(f"🔄 Retried {stats['total']} failed deletions: {stats['success']} success, {stats['failed']} failed")
+        log.info(
+            f"🔄 Retried {stats['total']} failed deletions: {stats['success']} success, {stats['failed']} failed"
+        )
 
         return stats
 
@@ -981,19 +1018,17 @@ class DynamicTemplateService:
         Returns:
             Dict with deletion statistics
         """
-        stats = {
-            'total': len(content_sids),
-            'success': 0,
-            'failed': 0
-        }
+        stats = {"total": len(content_sids), "success": 0, "failed": 0}
 
         for content_sid in content_sids:
             if self.delete_template(content_sid):
-                stats['success'] += 1
+                stats["success"] += 1
             else:
-                stats['failed'] += 1
+                stats["failed"] += 1
 
-        log.info(f"🗑️ Batch deleted {stats['total']} templates: {stats['success']} success, {stats['failed']} failed")
+        log.info(
+            f"🗑️ Batch deleted {stats['total']} templates: {stats['success']} success, {stats['failed']} failed"
+        )
 
         return stats
 
@@ -1003,30 +1038,34 @@ class DynamicTemplateService:
         Returns:
             Dict with cleanup statistics
         """
-        stats = {
-            'found': 0,
-            'deleted': 0,
-            'failed': 0
-        }
+        stats = {"found": 0, "deleted": 0, "failed": 0}
 
         try:
             # Get all templates from Twilio
             twilio_templates = self.client.content.v1.contents.list(limit=1000)
 
             # Get all templates from database
-            db_result = supabase_client.client.table('templates').select('twilio_content_sid').execute()
-            db_sids = {t['twilio_content_sid'] for t in (db_result.data or [])}
+            db_result = (
+                supabase_client.client.table("templates")
+                .select("twilio_content_sid")
+                .execute()
+            )
+            db_sids = {t["twilio_content_sid"] for t in (db_result.data or [])}
 
             # Find orphaned templates (in Twilio but not in DB)
             for template in twilio_templates:
-                if template.sid not in db_sids and template.friendly_name.startswith('dynamic_'):
-                    stats['found'] += 1
+                if template.sid not in db_sids and template.friendly_name.startswith(
+                    "dynamic_"
+                ):
+                    stats["found"] += 1
                     if self.delete_template(template.sid):
-                        stats['deleted'] += 1
+                        stats["deleted"] += 1
                     else:
-                        stats['failed'] += 1
+                        stats["failed"] += 1
 
-            log.info(f"🧹 Cleaned up orphaned templates: {stats['deleted']}/{stats['found']} deleted")
+            log.info(
+                f"🧹 Cleaned up orphaned templates: {stats['deleted']}/{stats['found']} deleted"
+            )
 
             return stats
 
@@ -1044,10 +1083,17 @@ class DynamicTemplateService:
             Age in seconds, None if not found
         """
         try:
-            result = supabase_client.client.table('templates').select('created_at').eq('twilio_content_sid', content_sid).execute()
+            result = (
+                supabase_client.client.table("templates")
+                .select("created_at")
+                .eq("twilio_content_sid", content_sid)
+                .execute()
+            )
 
             if result.data:
-                created_at = datetime.fromisoformat(result.data[0]['created_at'].replace('Z', '+00:00'))
+                created_at = datetime.fromisoformat(
+                    result.data[0]["created_at"].replace("Z", "+00:00")
+                )
                 age = (datetime.now(created_at.tzinfo) - created_at).total_seconds()
                 return age
 
@@ -1066,28 +1112,32 @@ class DynamicTemplateService:
         Returns:
             Dict with deletion statistics
         """
-        stats = {
-            'found': 0,
-            'deleted': 0,
-            'failed': 0
-        }
+        stats = {"found": 0, "deleted": 0, "failed": 0}
 
         try:
             cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
 
-            result = supabase_client.client.table('templates').select('*').eq('is_active', True).lt('created_at', cutoff_time.isoformat()).execute()
+            result = (
+                supabase_client.client.table("templates")
+                .select("*")
+                .eq("is_active", True)
+                .lt("created_at", cutoff_time.isoformat())
+                .execute()
+            )
 
             expired_templates = result.data or []
-            stats['found'] = len(expired_templates)
+            stats["found"] = len(expired_templates)
 
             for template in expired_templates:
-                content_sid = template['twilio_content_sid']
+                content_sid = template["twilio_content_sid"]
                 if self.delete_template(content_sid):
-                    stats['deleted'] += 1
+                    stats["deleted"] += 1
                 else:
-                    stats['failed'] += 1
+                    stats["failed"] += 1
 
-            log.info(f"⏰ Deleted expired templates (>{max_age_hours}h): {stats['deleted']}/{stats['found']}")
+            log.info(
+                f"⏰ Deleted expired templates (>{max_age_hours}h): {stats['deleted']}/{stats['found']}"
+            )
 
             return stats
 
@@ -1100,10 +1150,7 @@ class DynamicTemplateService:
     # ============================================================================
 
     def add_emoji_to_items(
-        self,
-        items: List[Dict[str, str]],
-        emojis: List[str],
-        position: str = "end"
+        self, items: List[Dict[str, str]], emojis: List[str], position: str = "end"
     ) -> List[Dict[str, str]]:
         """Add emojis to list items.
 
@@ -1119,7 +1166,7 @@ class DynamicTemplateService:
 
         for i, item in enumerate(items):
             emoji = emojis[i] if i < len(emojis) else ""
-            text = item['item']
+            text = item["item"]
 
             if position == "start":
                 new_text = f"{emoji} {text}".strip()
@@ -1135,10 +1182,7 @@ class DynamicTemplateService:
             # Ensure it doesn't exceed 24 chars
             new_text = self.truncate_with_emoji(new_text, 24)
 
-            result.append({
-                **item,
-                'item': new_text
-            })
+            result.append({**item, "item": new_text})
 
         return result
 
@@ -1154,7 +1198,9 @@ class DynamicTemplateService:
         """
         return len(text) <= max_length
 
-    def format_text_with_emoji(self, text: str, emoji: str, position: str = "end") -> str:
+    def format_text_with_emoji(
+        self, text: str, emoji: str, position: str = "end"
+    ) -> str:
         """Format text with emoji at specified position.
 
         Args:
@@ -1195,7 +1241,9 @@ class DynamicTemplateService:
     # ANALYTICS & MONITORING METHODS
     # ============================================================================
 
-    def track_template_send(self, content_sid: str, message_sid: str, to_number: str) -> bool:
+    def track_template_send(
+        self, content_sid: str, message_sid: str, to_number: str
+    ) -> bool:
         """Log template usage metrics (updates template's updated_at).
 
         Args:
@@ -1208,10 +1256,12 @@ class DynamicTemplateService:
         """
         try:
             # Update template's updated_at to track last usage
-            supabase_client.client.table('templates').update({
-                'updated_at': datetime.utcnow().isoformat(),
-                'description': f'Last sent: {datetime.utcnow().isoformat()} to {to_number}'
-            }).eq('twilio_content_sid', content_sid).execute()
+            supabase_client.client.table("templates").update(
+                {
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "description": f"Last sent: {datetime.utcnow().isoformat()} to {to_number}",
+                }
+            ).eq("twilio_content_sid", content_sid).execute()
 
             return True
 
@@ -1227,7 +1277,7 @@ class DynamicTemplateService:
         """
         return {
             **self.stats,
-            'average_time_ms': self.stats['total_time_ms'] / max(self.stats['sent'], 1)
+            "average_time_ms": self.stats["total_time_ms"] / max(self.stats["sent"], 1),
         }
 
     def calculate_average_lifecycle(self) -> Optional[float]:
@@ -1237,7 +1287,12 @@ class DynamicTemplateService:
             Average lifecycle in seconds, None if no data
         """
         try:
-            result = supabase_client.client.table('templates').select('created_at, updated_at').eq('is_active', False).execute()
+            result = (
+                supabase_client.client.table("templates")
+                .select("created_at, updated_at")
+                .eq("is_active", False)
+                .execute()
+            )
 
             if not result.data:
                 return None
@@ -1246,9 +1301,13 @@ class DynamicTemplateService:
             count = 0
 
             for template in result.data:
-                if template['created_at'] and template['updated_at']:
-                    created = datetime.fromisoformat(template['created_at'].replace('Z', '+00:00'))
-                    updated = datetime.fromisoformat(template['updated_at'].replace('Z', '+00:00'))
+                if template["created_at"] and template["updated_at"]:
+                    created = datetime.fromisoformat(
+                        template["created_at"].replace("Z", "+00:00")
+                    )
+                    updated = datetime.fromisoformat(
+                        template["updated_at"].replace("Z", "+00:00")
+                    )
                     lifecycle = (updated - created).total_seconds()
                     total_lifecycle += lifecycle
                     count += 1
@@ -1272,25 +1331,33 @@ class DynamicTemplateService:
             Monitoring result dict
         """
         try:
-            result = supabase_client.client.table('templates').select('twilio_content_sid').eq('is_active', True).execute()
+            result = (
+                supabase_client.client.table("templates")
+                .select("twilio_content_sid")
+                .eq("is_active", True)
+                .execute()
+            )
 
             active_count = len(result.data) if result.data else 0
 
             alert = active_count > threshold
 
             if alert:
-                log.warning(f"⚠️ Template pile-up detected: {active_count} active templates (threshold: {threshold})")
+                log.warning(
+                    f"⚠️ Template pile-up detected: {active_count} active templates (threshold: {threshold})"
+                )
 
             return {
-                'active_count': active_count,
-                'threshold': threshold,
-                'alert': alert,
-                'message': f"{active_count} active templates" + (" - THRESHOLD EXCEEDED!" if alert else "")
+                "active_count": active_count,
+                "threshold": threshold,
+                "alert": alert,
+                "message": f"{active_count} active templates"
+                + (" - THRESHOLD EXCEEDED!" if alert else ""),
             }
 
         except Exception as e:
             log.error(f"❌ Error monitoring template pile-up: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
     # ============================================================================
     # UTILITY METHODS
@@ -1319,17 +1386,20 @@ class DynamicTemplateService:
         """
         # Twilio pricing (approximate)
         costs = {
-            'create': 0.00,  # Content API is free
-            'send': 0.005,   # WhatsApp message cost
-            'delete': 0.00   # Content API is free
+            "create": 0.00,  # Content API is free
+            "send": 0.005,  # WhatsApp message cost
+            "delete": 0.00,  # Content API is free
         }
 
-        total = sum(operations.get(op, 0) * costs.get(op, 0) for op in ['create', 'send', 'delete'])
+        total = sum(
+            operations.get(op, 0) * costs.get(op, 0)
+            for op in ["create", "send", "delete"]
+        )
 
         return {
-            'operations': operations,
-            'cost_per_operation': costs,
-            'total_cost_usd': total
+            "operations": operations,
+            "cost_per_operation": costs,
+            "total_cost_usd": total,
         }
 
     def validate_session_window(self, to_number: str) -> bool:

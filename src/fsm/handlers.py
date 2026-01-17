@@ -5,17 +5,18 @@ This module provides:
 - Timeout handling for stale clarifications
 - Session recovery on startup
 """
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from src.config import settings
 from src.fsm.models import (
     ClarificationRequest,
     FSMContext,
     SessionState,
 )
-from src.utils.structured_logger import get_structured_logger
 from src.integrations.supabase import supabase_client
-from src.config import settings
+from src.utils.structured_logger import get_structured_logger
 
 logger = get_structured_logger("fsm.handlers")
 
@@ -32,6 +33,7 @@ SESSION_RECOVERY_THRESHOLD = 30 * 60  # 30 minutes in seconds
 # Clarification Manager
 # ============================================================================
 
+
 class ClarificationManager:
     """Manages clarification requests for ambiguous intents."""
 
@@ -40,11 +42,7 @@ class ClarificationManager:
         self.db = supabase_client
 
     async def create_clarification(
-        self,
-        user_id: str,
-        message: str,
-        options: List[str],
-        context: FSMContext
+        self, user_id: str, message: str, options: List[str], context: FSMContext
     ) -> Optional[str]:
         """Create a clarification request for user.
 
@@ -61,10 +59,7 @@ class ClarificationManager:
             # Check if there's already a pending clarification
             existing = await self.get_pending_clarification(user_id)
             if existing:
-                logger.warning(
-                    "Pending clarification already exists",
-                    user_id=user_id
-                )
+                logger.warning("Pending clarification already exists", user_id=user_id)
                 return existing.get("id")
 
             # Create new clarification request
@@ -80,9 +75,11 @@ class ClarificationManager:
                 "expires_at": expires_at.isoformat(),
             }
 
-            response = self.db.client.table("fsm_clarification_requests").insert(
-                clarification_data
-            ).execute()
+            response = (
+                self.db.client.table("fsm_clarification_requests")
+                .insert(clarification_data)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 clarification_id = response.data[0]["id"]
@@ -90,21 +87,15 @@ class ClarificationManager:
                     "Clarification request created",
                     clarification_id=clarification_id,
                     user_id=user_id,
-                    expires_at=expires_at.isoformat()
+                    expires_at=expires_at.isoformat(),
                 )
                 return clarification_id
             return None
         except Exception as e:
-            logger.error(
-                f"Error creating clarification: {str(e)}",
-                user_id=user_id
-            )
+            logger.error(f"Error creating clarification: {str(e)}", user_id=user_id)
             return None
 
-    async def get_pending_clarification(
-        self,
-        user_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_pending_clarification(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get pending clarification for user.
 
         Args:
@@ -114,25 +105,24 @@ class ClarificationManager:
             Clarification request dict if found, None otherwise
         """
         try:
-            response = self.db.client.table("fsm_clarification_requests").select(
-                "*"
-            ).eq("user_id", user_id).eq("status", "pending").execute()
+            response = (
+                self.db.client.table("fsm_clarification_requests")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("status", "pending")
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
             return None
         except Exception as e:
             logger.error(
-                f"Error getting pending clarification: {str(e)}",
-                user_id=user_id
+                f"Error getting pending clarification: {str(e)}", user_id=user_id
             )
             return None
 
-    async def answer_clarification(
-        self,
-        clarification_id: str,
-        answer: str
-    ) -> bool:
+    async def answer_clarification(self, clarification_id: str, answer: str) -> bool:
         """Mark clarification as answered.
 
         Args:
@@ -143,29 +133,28 @@ class ClarificationManager:
             True if successful, False otherwise
         """
         try:
-            self.db.client.table("fsm_clarification_requests").update({
-                "status": "answered",
-                "answer": answer,
-                "answered_at": datetime.utcnow().isoformat(),
-            }).eq("id", clarification_id).execute()
+            self.db.client.table("fsm_clarification_requests").update(
+                {
+                    "status": "answered",
+                    "answer": answer,
+                    "answered_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("id", clarification_id).execute()
 
             logger.info(
                 "Clarification answered",
                 clarification_id=clarification_id,
-                answer=answer
+                answer=answer,
             )
             return True
         except Exception as e:
             logger.error(
                 f"Error answering clarification: {str(e)}",
-                clarification_id=clarification_id
+                clarification_id=clarification_id,
             )
             return False
 
-    async def cancel_clarification(
-        self,
-        clarification_id: str
-    ) -> bool:
+    async def cancel_clarification(self, clarification_id: str) -> bool:
         """Cancel a clarification request.
 
         Args:
@@ -175,19 +164,18 @@ class ClarificationManager:
             True if successful, False otherwise
         """
         try:
-            self.db.client.table("fsm_clarification_requests").update({
-                "status": "cancelled",
-            }).eq("id", clarification_id).execute()
+            self.db.client.table("fsm_clarification_requests").update(
+                {
+                    "status": "cancelled",
+                }
+            ).eq("id", clarification_id).execute()
 
-            logger.info(
-                "Clarification cancelled",
-                clarification_id=clarification_id
-            )
+            logger.info("Clarification cancelled", clarification_id=clarification_id)
             return True
         except Exception as e:
             logger.error(
                 f"Error cancelling clarification: {str(e)}",
-                clarification_id=clarification_id
+                clarification_id=clarification_id,
             )
             return False
 
@@ -199,11 +187,13 @@ class ClarificationManager:
         """
         try:
             # Find expired pending clarifications
-            response = self.db.client.table("fsm_clarification_requests").select(
-                "id, user_id"
-            ).eq("status", "pending").lt(
-                "expires_at", datetime.utcnow().isoformat()
-            ).execute()
+            response = (
+                self.db.client.table("fsm_clarification_requests")
+                .select("id, user_id")
+                .eq("status", "pending")
+                .lt("expires_at", datetime.utcnow().isoformat())
+                .execute()
+            )
 
             if not response.data:
                 return 0
@@ -213,27 +203,21 @@ class ClarificationManager:
             user_ids = [item["user_id"] for item in response.data]
 
             # Mark as expired
-            self.db.client.table("fsm_clarification_requests").update({
-                "status": "expired"
-            }).in_("id", expired_ids).execute()
+            self.db.client.table("fsm_clarification_requests").update(
+                {"status": "expired"}
+            ).in_("id", expired_ids).execute()
 
             # Abandon associated sessions
             for user_id in user_ids:
                 await self._abandon_user_session(user_id, "clarification_timeout")
 
-            logger.info(
-                f"Cleaned up {expired_count} expired clarifications"
-            )
+            logger.info(f"Cleaned up {expired_count} expired clarifications")
             return expired_count
         except Exception as e:
             logger.error(f"Error cleaning up expired clarifications: {str(e)}")
             return 0
 
-    async def _abandon_user_session(
-        self,
-        user_id: str,
-        reason: str
-    ) -> None:
+    async def _abandon_user_session(self, user_id: str, reason: str) -> None:
         """Internal helper to abandon user's session.
 
         Args:
@@ -241,16 +225,15 @@ class ClarificationManager:
             reason: Abandonment reason
         """
         try:
-            self.db.client.table("progress_update_sessions").update({
-                "fsm_state": SessionState.ABANDONED.value,
-                "closure_reason": reason,
-                "last_activity": datetime.utcnow().isoformat(),
-            }).eq("subcontractor_id", user_id).execute()
+            self.db.client.table("progress_update_sessions").update(
+                {
+                    "fsm_state": SessionState.ABANDONED.value,
+                    "closure_reason": reason,
+                    "last_activity": datetime.utcnow().isoformat(),
+                }
+            ).eq("subcontractor_id", user_id).execute()
 
-            logger.info(
-                f"Abandoned session for user: {reason}",
-                user_id=user_id
-            )
+            logger.info(f"Abandoned session for user: {reason}", user_id=user_id)
         except Exception as e:
             logger.error(f"Error abandoning session: {str(e)}", user_id=user_id)
 
@@ -258,6 +241,7 @@ class ClarificationManager:
 # ============================================================================
 # Session Recovery Manager
 # ============================================================================
+
 
 class SessionRecoveryManager:
     """Manages session recovery on startup and during crashes."""
@@ -276,16 +260,21 @@ class SessionRecoveryManager:
             Number of sessions recovered
         """
         try:
-            threshold = datetime.utcnow() - timedelta(seconds=SESSION_RECOVERY_THRESHOLD)
+            threshold = datetime.utcnow() - timedelta(
+                seconds=SESSION_RECOVERY_THRESHOLD
+            )
 
             # Find sessions with old activity that aren't already terminal
-            response = self.db.client.table("progress_update_sessions").select(
-                "id, subcontractor_id"
-            ).lt(
-                "last_activity", threshold.isoformat()
-            ).not_.in_(
-                "fsm_state", [SessionState.COMPLETED.value, SessionState.ABANDONED.value]
-            ).execute()
+            response = (
+                self.db.client.table("progress_update_sessions")
+                .select("id, subcontractor_id")
+                .lt("last_activity", threshold.isoformat())
+                .not_.in_(
+                    "fsm_state",
+                    [SessionState.COMPLETED.value, SessionState.ABANDONED.value],
+                )
+                .execute()
+            )
 
             if not response.data:
                 logger.info("No orphaned sessions found")
@@ -295,15 +284,15 @@ class SessionRecoveryManager:
             orphaned_ids = [item["id"] for item in response.data]
 
             # Mark as abandoned
-            self.db.client.table("progress_update_sessions").update({
-                "fsm_state": SessionState.ABANDONED.value,
-                "closure_reason": "recovery_orphaned",
-                "last_activity": datetime.utcnow().isoformat(),
-            }).in_("id", orphaned_ids).execute()
+            self.db.client.table("progress_update_sessions").update(
+                {
+                    "fsm_state": SessionState.ABANDONED.value,
+                    "closure_reason": "recovery_orphaned",
+                    "last_activity": datetime.utcnow().isoformat(),
+                }
+            ).in_("id", orphaned_ids).execute()
 
-            logger.info(
-                f"Recovered {orphaned_count} orphaned sessions"
-            )
+            logger.info(f"Recovered {orphaned_count} orphaned sessions")
             return orphaned_count
         except Exception as e:
             logger.error(f"Error recovering orphaned sessions: {str(e)}")
@@ -327,12 +316,11 @@ class SessionRecoveryManager:
 
         # Cleanup expired clarifications
         clarification_manager = ClarificationManager()
-        stats["expired_clarifications"] = await clarification_manager.cleanup_expired_clarifications()
-
-        logger.info(
-            "Session recovery complete",
-            **stats
+        stats["expired_clarifications"] = (
+            await clarification_manager.cleanup_expired_clarifications()
         )
+
+        logger.info("Session recovery complete", **stats)
 
         return stats
 
@@ -340,6 +328,7 @@ class SessionRecoveryManager:
 # ============================================================================
 # Background Cleanup Task
 # ============================================================================
+
 
 async def run_cleanup_task():
     """Background task to periodically cleanup expired records.

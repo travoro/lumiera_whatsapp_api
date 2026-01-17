@@ -3,15 +3,18 @@
 Tests each pipeline stage method in isolation with proper mocking.
 These are TRUE unit tests - fast, isolated, and testing one thing at a time.
 """
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from src.handlers.message_pipeline import MessagePipeline, MessageContext
-from src.utils.result import Result
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from src.handlers.message_pipeline import MessageContext, MessagePipeline
+from src.utils.result import Result
 
 # ============================================================================
 # Utility Method Tests
 # ============================================================================
+
 
 class TestLanguageNormalization:
     """Test language code normalization utility."""
@@ -51,6 +54,7 @@ class TestLanguageNormalization:
 # Stage 1: User Authentication Tests
 # ============================================================================
 
+
 class TestAuthenticateUser:
     """Test user authentication stage."""
 
@@ -58,18 +62,17 @@ class TestAuthenticateUser:
     async def test_authenticates_existing_user(self):
         """Test successful authentication of existing user."""
         pipeline = MessagePipeline()
-        ctx = MessageContext(
-            from_number="+1234567890",
-            message_body="Test"
-        )
+        ctx = MessageContext(from_number="+1234567890", message_body="Test")
 
         with patch("src.handlers.message_pipeline.supabase_client") as mock_sb:
-            mock_sb.get_user_by_phone = AsyncMock(return_value={
-                "id": "user_123",
-                "contact_prenom": "John",
-                "contact_name": "Doe",
-                "language": "fr"
-            })
+            mock_sb.get_user_by_phone = AsyncMock(
+                return_value={
+                    "id": "user_123",
+                    "contact_prenom": "John",
+                    "contact_name": "Doe",
+                    "language": "fr",
+                }
+            )
 
             result = await pipeline._authenticate_user(ctx)
 
@@ -85,10 +88,9 @@ class TestAuthenticateUser:
         ctx = MessageContext(from_number="+1234567890", message_body="Test")
 
         with patch("src.handlers.message_pipeline.supabase_client") as mock_sb:
-            mock_sb.get_user_by_phone = AsyncMock(return_value={
-                "id": "user_123",
-                "language": "french"  # Full name
-            })
+            mock_sb.get_user_by_phone = AsyncMock(
+                return_value={"id": "user_123", "language": "french"}  # Full name
+            )
 
             result = await pipeline._authenticate_user(ctx)
 
@@ -113,6 +115,7 @@ class TestAuthenticateUser:
 # Stage 2: Session Management Tests
 # ============================================================================
 
+
 class TestManageSession:
     """Test session management stage."""
 
@@ -123,13 +126,15 @@ class TestManageSession:
         ctx = MessageContext(from_number="+1234567890", message_body="Test")
         ctx.user_id = "user_123"
 
-        with patch("src.handlers.message_pipeline.session_service") as mock_session, \
-             patch("src.handlers.message_pipeline.supabase_client") as mock_sb:
+        with patch(
+            "src.handlers.message_pipeline.session_service"
+        ) as mock_session, patch(
+            "src.handlers.message_pipeline.supabase_client"
+        ) as mock_sb:
 
-            mock_session.get_or_create_session = AsyncMock(return_value={
-                "id": "session_abc",
-                "user_id": "user_123"
-            })
+            mock_session.get_or_create_session = AsyncMock(
+                return_value={"id": "session_abc", "user_id": "user_123"}
+            )
             mock_sb.get_messages_by_session = AsyncMock(return_value=[])
 
             result = await pipeline._manage_session(ctx)
@@ -145,15 +150,32 @@ class TestManageSession:
         ctx.user_id = "user_123"
 
         messages = [
-            {"content": "Msg 1", "direction": "inbound", "created_at": "2026-01-17T00:00:00"},
-            {"content": "Msg 2", "direction": "outbound", "created_at": "2026-01-17T00:01:00"},
-            {"content": "Msg 3", "direction": "inbound", "created_at": "2026-01-17T00:02:00"}
+            {
+                "content": "Msg 1",
+                "direction": "inbound",
+                "created_at": "2026-01-17T00:00:00",
+            },
+            {
+                "content": "Msg 2",
+                "direction": "outbound",
+                "created_at": "2026-01-17T00:01:00",
+            },
+            {
+                "content": "Msg 3",
+                "direction": "inbound",
+                "created_at": "2026-01-17T00:02:00",
+            },
         ]
 
-        with patch("src.handlers.message_pipeline.session_service") as mock_session, \
-             patch("src.handlers.message_pipeline.supabase_client") as mock_sb:
+        with patch(
+            "src.handlers.message_pipeline.session_service"
+        ) as mock_session, patch(
+            "src.handlers.message_pipeline.supabase_client"
+        ) as mock_sb:
 
-            mock_session.get_or_create_session = AsyncMock(return_value={"id": "session_abc"})
+            mock_session.get_or_create_session = AsyncMock(
+                return_value={"id": "session_abc"}
+            )
             mock_sb.get_messages_by_session = AsyncMock(return_value=messages)
 
             result = await pipeline._manage_session(ctx)
@@ -165,6 +187,7 @@ class TestManageSession:
 # ============================================================================
 # Stage 6: Intent Classification Tests
 # ============================================================================
+
 
 class TestClassifyIntent:
     """Test intent classification stage."""
@@ -178,10 +201,9 @@ class TestClassifyIntent:
         ctx.message_in_french = "Bonjour"
 
         with patch("src.handlers.message_pipeline.intent_classifier") as mock_intent:
-            mock_intent.classify = AsyncMock(return_value={
-                "intent": "greeting",
-                "confidence": 0.95
-            })
+            mock_intent.classify = AsyncMock(
+                return_value={"intent": "greeting", "confidence": 0.95}
+            )
 
             result = await pipeline._classify_intent(ctx)
 
@@ -198,16 +220,15 @@ class TestClassifyIntent:
             from_number="+1234567890",
             message_body="Photo",
             media_url="https://example.com/photo.jpg",
-            media_type="image/jpeg"
+            media_type="image/jpeg",
         )
         ctx.user_id = "user_123"
         ctx.message_in_french = "Photo"
 
         with patch("src.handlers.message_pipeline.intent_classifier") as mock_intent:
-            mock_intent.classify = AsyncMock(return_value={
-                "intent": "report_incident",
-                "confidence": 0.88
-            })
+            mock_intent.classify = AsyncMock(
+                return_value={"intent": "report_incident", "confidence": 0.88}
+            )
 
             result = await pipeline._classify_intent(ctx)
 
@@ -222,6 +243,7 @@ class TestClassifyIntent:
 # Stage 9: Message Persistence Tests
 # ============================================================================
 
+
 class TestPersistMessages:
     """Test message persistence stage."""
 
@@ -230,9 +252,7 @@ class TestPersistMessages:
         """Test saving both inbound and outbound messages."""
         pipeline = MessagePipeline()
         ctx = MessageContext(
-            from_number="+1234567890",
-            message_body="Hello",
-            message_sid="SM123"
+            from_number="+1234567890", message_body="Hello", message_sid="SM123"
         )
         ctx.user_id = "user_123"
         ctx.session_id = "session_abc"
@@ -308,15 +328,13 @@ class TestPersistMessages:
 # MessageContext Tests
 # ============================================================================
 
+
 class TestMessageContext:
     """Test MessageContext dataclass."""
 
     def test_creates_context_with_required_fields(self):
         """Test creation with required fields only."""
-        ctx = MessageContext(
-            from_number="+1234567890",
-            message_body="Hello"
-        )
+        ctx = MessageContext(from_number="+1234567890", message_body="Hello")
 
         assert ctx.from_number == "+1234567890"
         assert ctx.message_body == "Hello"
@@ -331,7 +349,7 @@ class TestMessageContext:
             message_sid="SM123",
             media_url="https://example.com/photo.jpg",
             media_type="image/jpeg",
-            interactive_data={"button": "clicked"}
+            interactive_data={"button": "clicked"},
         )
 
         assert ctx.message_sid == "SM123"

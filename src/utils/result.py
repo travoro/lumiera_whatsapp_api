@@ -3,11 +3,13 @@
 Provides a consistent way to return success/failure results with
 proper error context throughout the application.
 """
-from typing import Generic, TypeVar, Optional, Dict, Any, Union
-from dataclasses import dataclass
-from src.exceptions import LumieraException, ErrorCode
 
-T = TypeVar('T')
+from dataclasses import dataclass
+from typing import Any, Dict, Generic, Optional, TypeVar, Union
+
+from src.exceptions import ErrorCode, LumieraException
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -26,7 +28,7 @@ class Result(Generic[T]):
     details: Optional[Dict[str, Any]] = None
 
     @staticmethod
-    def ok(data: T) -> 'Result[T]':
+    def ok(data: T) -> "Result[T]":
         """Create a successful result.
 
         Args:
@@ -42,8 +44,8 @@ class Result(Generic[T]):
         error_code: ErrorCode,
         error_message: str,
         user_message: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
-    ) -> 'Result[T]':
+        details: Optional[Dict[str, Any]] = None,
+    ) -> "Result[T]":
         """Create a failed result.
 
         Args:
@@ -61,11 +63,11 @@ class Result(Generic[T]):
             error_code=error_code,
             error_message=error_message,
             user_message=user_message or "Une erreur s'est produite",
-            details=details or {}
+            details=details or {},
         )
 
     @staticmethod
-    def from_exception(exc: Union[LumieraException, Exception]) -> 'Result[T]':
+    def from_exception(exc: Union[LumieraException, Exception]) -> "Result[T]":
         """Create a failed result from an exception.
 
         Args:
@@ -81,7 +83,7 @@ class Result(Generic[T]):
                 error_code=exc.error_code,
                 error_message=str(exc),
                 user_message=exc.user_message,
-                details=exc.details
+                details=exc.details,
             )
         else:
             return Result(
@@ -90,7 +92,7 @@ class Result(Generic[T]):
                 error_code=ErrorCode.INTERNAL_ERROR,
                 error_message=str(exc),
                 user_message="Une erreur interne s'est produite",
-                details={"exception_type": type(exc).__name__}
+                details={"exception_type": type(exc).__name__},
             )
 
     def unwrap(self) -> T:
@@ -124,15 +126,12 @@ class Result(Generic[T]):
             Dictionary representation
         """
         if self.success:
-            return {
-                "success": True,
-                "data": self.data
-            }
+            return {"success": True, "data": self.data}
         else:
             return {
                 "success": False,
                 "error_code": self.error_code.value if self.error_code else None,
                 "error_message": self.error_message,
                 "user_message": self.user_message,
-                "details": self.details
+                "details": self.details,
             }

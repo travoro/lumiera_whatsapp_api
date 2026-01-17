@@ -1,20 +1,24 @@
 """Retry logic and error handling with Tenacity."""
-from typing import Callable, Any
+
+from typing import Any, Callable
+
+import httpx
+from anthropic import APIConnectionError, APIError, RateLimitError
+from openai import APIError as OpenAIAPIError
+from openai import RateLimitError as OpenAIRateLimitError
 from tenacity import (
+    after_log,
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
-    after_log,
 )
-import httpx
-from anthropic import RateLimitError, APIError, APIConnectionError
-from openai import RateLimitError as OpenAIRateLimitError, APIError as OpenAIAPIError
+
 from src.utils.logger import log
 
-
 # === API Call Retry Decorators ===
+
 
 def retry_on_api_error(max_attempts: int = 3):
     """Retry decorator for general API errors with exponential backoff.
@@ -27,15 +31,17 @@ def retry_on_api_error(max_attempts: int = 3):
     return retry(
         stop=stop_after_attempt(max_attempts),
         wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((
-            APIError,
-            APIConnectionError,
-            OpenAIAPIError,
-            httpx.HTTPError,
-            httpx.TimeoutException,
-        )),
-        before_sleep=before_sleep_log(log, 'WARNING'),
-        after=after_log(log, 'INFO'),
+        retry=retry_if_exception_type(
+            (
+                APIError,
+                APIConnectionError,
+                OpenAIAPIError,
+                httpx.HTTPError,
+                httpx.TimeoutException,
+            )
+        ),
+        before_sleep=before_sleep_log(log, "WARNING"),
+        after=after_log(log, "INFO"),
         reraise=True,
     )
 
@@ -51,12 +57,14 @@ def retry_on_rate_limit(max_attempts: int = 5):
     return retry(
         stop=stop_after_attempt(max_attempts),
         wait=wait_exponential(multiplier=2, min=4, max=60),
-        retry=retry_if_exception_type((
-            RateLimitError,
-            OpenAIRateLimitError,
-        )),
-        before_sleep=before_sleep_log(log, 'WARNING'),
-        after=after_log(log, 'INFO'),
+        retry=retry_if_exception_type(
+            (
+                RateLimitError,
+                OpenAIRateLimitError,
+            )
+        ),
+        before_sleep=before_sleep_log(log, "WARNING"),
+        after=after_log(log, "INFO"),
         reraise=True,
     )
 
@@ -72,26 +80,29 @@ def retry_on_network_error(max_attempts: int = 3):
     return retry(
         stop=stop_after_attempt(max_attempts),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((
-            httpx.ConnectError,
-            httpx.TimeoutException,
-            ConnectionError,
-            TimeoutError,
-        )),
-        before_sleep=before_sleep_log(log, 'WARNING'),
-        after=after_log(log, 'INFO'),
+        retry=retry_if_exception_type(
+            (
+                httpx.ConnectError,
+                httpx.TimeoutException,
+                ConnectionError,
+                TimeoutError,
+            )
+        ),
+        before_sleep=before_sleep_log(log, "WARNING"),
+        after=after_log(log, "INFO"),
         reraise=True,
     )
 
 
 # === Graceful Degradation Helpers ===
 
+
 async def with_fallback(
     primary_fn: Callable,
     fallback_fn: Callable,
     fallback_on: tuple = (Exception,),
     *args,
-    **kwargs
+    **kwargs,
 ) -> Any:
     """Execute primary function, fall back to fallback function on error.
 
@@ -106,13 +117,21 @@ async def with_fallback(
     """
     try:
         if callable(primary_fn):
-            return await primary_fn(*args, **kwargs) if asyncio.iscoroutinefunction(primary_fn) else primary_fn(*args, **kwargs)
+            return (
+                await primary_fn(*args, **kwargs)
+                if asyncio.iscoroutinefunction(primary_fn)
+                else primary_fn(*args, **kwargs)
+            )
         return primary_fn
     except fallback_on as e:
         log.warning(f"Primary function failed: {e}. Using fallback.")
         try:
             if callable(fallback_fn):
-                return await fallback_fn(*args, **kwargs) if asyncio.iscoroutinefunction(fallback_fn) else fallback_fn(*args, **kwargs)
+                return (
+                    await fallback_fn(*args, **kwargs)
+                    if asyncio.iscoroutinefunction(fallback_fn)
+                    else fallback_fn(*args, **kwargs)
+                )
             return fallback_fn
         except Exception as fallback_error:
             log.error(f"Fallback also failed: {fallback_error}")
@@ -141,6 +160,7 @@ async def with_default(fn: Callable, default: Any, *args, **kwargs) -> Any:
 
 # === Error Context Manager ===
 
+
 class ErrorContext:
     """Context manager for standardized error handling and logging."""
 
@@ -157,7 +177,10 @@ class ErrorContext:
         self.critical = critical
 
     async def __aenter__(self):
-        log.info(f"Starting: {self.operation}" + (f" (user: {self.user_id})" if self.user_id else ""))
+        log.info(
+            f"Starting: {self.operation}"
+            + (f" (user: {self.user_id})" if self.user_id else "")
+        )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

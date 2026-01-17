@@ -1,5 +1,7 @@
 """Incident reporting action handlers."""
-from typing import Dict, Any, List, Optional
+
+from typing import Any, Dict, List, Optional
+
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
@@ -31,32 +33,26 @@ async def submit_incident_report(
         if not image_urls or len(image_urls) == 0:
             return {
                 "success": False,
-                "message": "Au moins une image est requise pour signaler un incident."
+                "message": "Au moins une image est requise pour signaler un incident.",
             }
 
         # Validate that description is provided
         if not description or len(description.strip()) == 0:
             return {
                 "success": False,
-                "message": "Une description est requise pour signaler un incident."
+                "message": "Une description est requise pour signaler un incident.",
             }
 
         # Get project details to retrieve PlanRadar project ID
         project = await supabase_client.get_project(project_id, user_id=user_id)
 
         if not project:
-            return {
-                "success": False,
-                "message": "Projet non trouvé."
-            }
+            return {"success": False, "message": "Projet non trouvé."}
 
         planradar_project_id = project.get("planradar_project_id")
 
         if not planradar_project_id:
-            return {
-                "success": False,
-                "message": "Ce projet n'est pas lié à PlanRadar."
-            }
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
 
         # Submit incident to PlanRadar using PlanRadar project ID
         incident_id = await planradar_client.submit_incident_report(
@@ -70,7 +66,7 @@ async def submit_incident_report(
         if not incident_id:
             return {
                 "success": False,
-                "message": "Erreur lors de la soumission du rapport d'incident."
+                "message": "Erreur lors de la soumission du rapport d'incident.",
             }
 
         # Log action
@@ -83,13 +79,13 @@ async def submit_incident_report(
                 "image_count": len(image_urls),
                 "has_location": bool(location),
             },
-            result={"incident_id": incident_id}
+            result={"incident_id": incident_id},
         )
 
         return {
             "success": True,
             "message": "Rapport d'incident soumis avec succès.",
-            "data": {"incident_id": incident_id}
+            "data": {"incident_id": incident_id},
         }
 
     except Exception as e:
@@ -97,7 +93,7 @@ async def submit_incident_report(
         return {
             "success": False,
             "message": "Erreur lors de la soumission du rapport d'incident.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -123,7 +119,7 @@ async def update_incident_report(
         if not additional_text and not additional_images:
             return {
                 "success": False,
-                "message": "Veuillez fournir du texte ou des images supplémentaires."
+                "message": "Veuillez fournir du texte ou des images supplémentaires.",
             }
 
         # Update incident in PlanRadar
@@ -136,7 +132,7 @@ async def update_incident_report(
         if not success:
             return {
                 "success": False,
-                "message": "Erreur lors de la mise à jour du rapport d'incident."
+                "message": "Erreur lors de la mise à jour du rapport d'incident.",
             }
 
         # Log action
@@ -148,12 +144,12 @@ async def update_incident_report(
                 "has_text": bool(additional_text),
                 "image_count": len(additional_images) if additional_images else 0,
             },
-            result={"success": True}
+            result={"success": True},
         )
 
         return {
             "success": True,
-            "message": "Rapport d'incident mis à jour avec succès."
+            "message": "Rapport d'incident mis à jour avec succès.",
         }
 
     except Exception as e:
@@ -161,5 +157,5 @@ async def update_incident_report(
         return {
             "success": False,
             "message": "Erreur lors de la mise à jour du rapport d'incident.",
-            "error": str(e)
+            "error": str(e),
         }

@@ -1,7 +1,10 @@
 """Language detection service using LLM."""
+
 from typing import Optional, Tuple
+
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+
 from src.config import settings
 from src.utils.logger import log
 
@@ -16,7 +19,7 @@ class LanguageDetectionService:
                 model="gpt-4o-mini",
                 api_key=settings.openai_api_key,
                 temperature=0,
-                max_tokens=10
+                max_tokens=10,
             )
             log.info("Language detection service initialized with OpenAI")
         else:
@@ -24,7 +27,7 @@ class LanguageDetectionService:
                 model="claude-3-5-haiku-20241022",
                 api_key=settings.anthropic_api_key,
                 temperature=0,
-                max_tokens=10
+                max_tokens=10,
             )
             log.info("Language detection service initialized with Claude AI")
 
@@ -63,7 +66,9 @@ Language code:"""
             log.error(f"❌ Claude language detection error: {str(e)}")
             return None
 
-    async def detect_async(self, text: str, fallback_language: str = 'fr') -> Tuple[str, str]:
+    async def detect_async(
+        self, text: str, fallback_language: str = "fr"
+    ) -> Tuple[str, str]:
         """Detect language using Claude AI.
 
         Strategy:
@@ -79,8 +84,10 @@ Language code:"""
             Method can be: 'claude' or 'fallback'
         """
         if not text or len(text.strip()) < 2:
-            log.info(f"⏩ Text too short for detection ({len(text)} chars) → Using fallback: {fallback_language}")
-            return fallback_language, 'fallback'
+            log.info(
+                f"⏩ Text too short for detection ({len(text)} chars) → Using fallback: {fallback_language}"
+            )
+            return fallback_language, "fallback"
 
         text = text.strip()
         text_preview = text[:30] + "..." if len(text) > 30 else text
@@ -90,15 +97,15 @@ Language code:"""
         claude_lang = await self.detect_with_claude(text)
         if claude_lang:
             log.info(f"✅ Detection successful: {claude_lang} (method: claude)")
-            return claude_lang, 'claude'
+            return claude_lang, "claude"
 
         # Fallback to profile language
         log.warning(
             f"⚠️ Claude detection failed for '{text_preview}' → Using fallback: {fallback_language}"
         )
-        return fallback_language, 'fallback'
+        return fallback_language, "fallback"
 
-    def detect(self, text: str, fallback_language: str = 'fr') -> Tuple[str, str]:
+    def detect(self, text: str, fallback_language: str = "fr") -> Tuple[str, str]:
         """Deprecated: Use detect_async() instead.
 
         This method is deprecated because Claude AI detection requires async operations.

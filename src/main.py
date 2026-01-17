@@ -1,22 +1,24 @@
 """Main FastAPI application entry point for Lumiera WhatsApp Copilot."""
+
+import asyncio
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import os
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from src.config import settings
-from src.handlers.webhook import router as webhook_router
 from src.handlers.media import router as media_router
+from src.handlers.webhook import router as webhook_router
 from src.utils.logger import log
-import asyncio
-
 
 # Initialize Sentry if enabled
 if settings.enable_sentry and settings.sentry_dsn:
     import sentry_sdk
+
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
@@ -69,6 +71,7 @@ async def lifespan(app: FastAPI):
     if settings.enable_fsm:
         try:
             from src.fsm.handlers import session_recovery_manager
+
             log.info("Running FSM session recovery...")
             stats = await session_recovery_manager.recover_on_startup()
             log.info(f"✅ FSM session recovery complete: {stats}")

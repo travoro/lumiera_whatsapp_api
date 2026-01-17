@@ -8,19 +8,21 @@ Tests cover:
 - Message length validation
 - Empty message handling
 """
+
 import pytest
+
 from src.services.validation import (
-    validate_input,
+    MAX_MESSAGE_LENGTH,
+    MIN_MESSAGE_LENGTH,
     is_safe_for_sql,
     sanitize_filename,
-    MAX_MESSAGE_LENGTH,
-    MIN_MESSAGE_LENGTH
+    validate_input,
 )
-
 
 # ============================================================================
 # Prompt Injection Detection Tests
 # ============================================================================
+
 
 class TestPromptInjectionDetection:
     """Test detection of prompt injection attempts."""
@@ -75,6 +77,7 @@ class TestPromptInjectionDetection:
 # ============================================================================
 # XSS Pattern Detection Tests
 # ============================================================================
+
 
 class TestXSSDetection:
     """Test detection of XSS attack patterns."""
@@ -138,6 +141,7 @@ class TestXSSDetection:
 # SQL Injection Prevention Tests
 # ============================================================================
 
+
 class TestSQLInjectionPrevention:
     """Test SQL injection pattern detection."""
 
@@ -184,6 +188,7 @@ class TestSQLInjectionPrevention:
 # ============================================================================
 # Path Traversal Sanitization Tests
 # ============================================================================
+
 
 class TestPathTraversalSanitization:
     """Test filename sanitization against path traversal."""
@@ -243,6 +248,7 @@ class TestPathTraversalSanitization:
 # ============================================================================
 # Message Length Validation Tests
 # ============================================================================
+
 
 class TestMessageLengthValidation:
     """Test message length validation."""
@@ -305,6 +311,7 @@ class TestMessageLengthValidation:
 # Sanitization Tests
 # ============================================================================
 
+
 class TestMessageSanitization:
     """Test message sanitization."""
 
@@ -341,6 +348,7 @@ class TestMessageSanitization:
 # ============================================================================
 # Edge Cases and Integration Tests
 # ============================================================================
+
 
 class TestEdgeCases:
     """Test edge cases and special scenarios."""

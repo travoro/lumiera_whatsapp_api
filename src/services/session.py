@@ -1,6 +1,8 @@
 """Session management service for conversation tracking."""
-from typing import Optional, Dict, Any
+
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
 
@@ -21,7 +23,9 @@ class SessionManagementService:
         self.session_timeout_hours = 7  # New session after 7 hours
         log.info("Session management service initialized")
 
-    async def get_or_create_session(self, subcontractor_id: str) -> Optional[Dict[str, Any]]:
+    async def get_or_create_session(
+        self, subcontractor_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Get active session or create new one if needed.
 
         Uses PostgreSQL function for smart session detection:
@@ -37,7 +41,9 @@ class SessionManagementService:
         """
         try:
             # Call PostgreSQL function to get or create session
-            session_id = await supabase_client.get_or_create_session_rpc(subcontractor_id)
+            session_id = await supabase_client.get_or_create_session_rpc(
+                subcontractor_id
+            )
 
             if session_id:
                 # Get full session details
@@ -56,7 +62,9 @@ class SessionManagementService:
             # Fallback to manual creation
             return await self._create_session_manual(subcontractor_id)
 
-    async def _create_session_manual(self, subcontractor_id: str) -> Optional[Dict[str, Any]]:
+    async def _create_session_manual(
+        self, subcontractor_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Manually create a new session (fallback).
 
         Args:
@@ -70,16 +78,21 @@ class SessionManagementService:
             await self._end_active_sessions(subcontractor_id)
 
             # Create new session
-            session = await supabase_client.create_session(subcontractor_id, {
-                'subcontractor_id': subcontractor_id,
-                'started_at': datetime.utcnow().isoformat(),
-                'last_message_at': datetime.utcnow().isoformat(),
-                'status': 'active',
-                'message_count': 0
-            })
+            session = await supabase_client.create_session(
+                subcontractor_id,
+                {
+                    "subcontractor_id": subcontractor_id,
+                    "started_at": datetime.utcnow().isoformat(),
+                    "last_message_at": datetime.utcnow().isoformat(),
+                    "status": "active",
+                    "message_count": 0,
+                },
+            )
 
             if session:
-                log.info(f"Created new session {session['id']} for user {subcontractor_id}")
+                log.info(
+                    f"Created new session {session['id']} for user {subcontractor_id}"
+                )
                 return session
 
             return None
@@ -95,12 +108,15 @@ class SessionManagementService:
             subcontractor_id: The subcontractor's ID
         """
         try:
-            success = await supabase_client.end_sessions_for_user(subcontractor_id, {
-                'status': 'ended',
-                'ended_at': datetime.utcnow().isoformat(),
-                'ended_reason': 'timeout',
-                'updated_at': datetime.utcnow().isoformat()
-            })
+            success = await supabase_client.end_sessions_for_user(
+                subcontractor_id,
+                {
+                    "status": "ended",
+                    "ended_at": datetime.utcnow().isoformat(),
+                    "ended_reason": "timeout",
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+            )
 
             if success:
                 log.info(f"Ended active sessions for user {subcontractor_id}")
@@ -111,8 +127,8 @@ class SessionManagementService:
     async def end_session(
         self,
         session_id: str,
-        reason: str = 'user_request',
-        generate_summary: bool = True
+        reason: str = "user_request",
+        generate_summary: bool = True,
     ) -> bool:
         """End a session.
 
@@ -126,17 +142,17 @@ class SessionManagementService:
         """
         try:
             update_data = {
-                'status': 'ended',
-                'ended_at': datetime.utcnow().isoformat(),
-                'ended_reason': reason,
-                'updated_at': datetime.utcnow().isoformat()
+                "status": "ended",
+                "ended_at": datetime.utcnow().isoformat(),
+                "ended_reason": reason,
+                "updated_at": datetime.utcnow().isoformat(),
             }
 
             # Generate summary if requested
             if generate_summary:
                 summary = await self._generate_session_summary(session_id)
                 if summary:
-                    update_data['session_summary'] = summary
+                    update_data["session_summary"] = summary
 
             success = await supabase_client.update_session(session_id, update_data)
 
@@ -165,7 +181,9 @@ class SessionManagementService:
                 return summary
 
             # Fallback: Simple summary
-            messages = await supabase_client.get_messages_by_session(session_id, 'direction')
+            messages = await supabase_client.get_messages_by_session(
+                session_id, "direction"
+            )
 
             if messages:
                 count = len(messages)
@@ -187,10 +205,10 @@ class SessionManagementService:
             True if successful
         """
         try:
-            success = await supabase_client.update_session(session_id, {
-                'status': 'escalated',
-                'updated_at': datetime.utcnow().isoformat()
-            })
+            success = await supabase_client.update_session(
+                session_id,
+                {"status": "escalated", "updated_at": datetime.utcnow().isoformat()},
+            )
 
             if success:
                 log.info(f"Session {session_id} escalated to human")
@@ -215,26 +233,26 @@ class SessionManagementService:
 
             if not sessions:
                 return {
-                    'total_sessions': 0,
-                    'active_sessions': 0,
-                    'ended_sessions': 0,
-                    'escalated_sessions': 0,
-                    'total_messages': 0
+                    "total_sessions": 0,
+                    "active_sessions": 0,
+                    "ended_sessions": 0,
+                    "escalated_sessions": 0,
+                    "total_messages": 0,
                 }
 
             total = len(sessions)
-            active = len([s for s in sessions if s['status'] == 'active'])
-            ended = len([s for s in sessions if s['status'] == 'ended'])
-            escalated = len([s for s in sessions if s['status'] == 'escalated'])
-            total_messages = sum(s.get('message_count', 0) for s in sessions)
+            active = len([s for s in sessions if s["status"] == "active"])
+            ended = len([s for s in sessions if s["status"] == "ended"])
+            escalated = len([s for s in sessions if s["status"] == "escalated"])
+            total_messages = sum(s.get("message_count", 0) for s in sessions)
 
             return {
-                'total_sessions': total,
-                'active_sessions': active,
-                'ended_sessions': ended,
-                'escalated_sessions': escalated,
-                'total_messages': total_messages,
-                'avg_messages_per_session': total_messages / total if total > 0 else 0
+                "total_sessions": total,
+                "active_sessions": active,
+                "ended_sessions": ended,
+                "escalated_sessions": escalated,
+                "total_messages": total_messages,
+                "avg_messages_per_session": total_messages / total if total > 0 else 0,
             }
 
         except Exception as e:

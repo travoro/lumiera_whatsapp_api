@@ -1,11 +1,14 @@
 """Specialized LangChain tools for progress update agent."""
-from langchain.tools import tool
+
 from typing import Optional
-from src.services.progress_update.state import progress_update_state
-from src.services.project_context import project_context_service
+
+from langchain.tools import tool
+
+from src.actions.tasks import list_tasks
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
-from src.actions.tasks import list_tasks
+from src.services.progress_update.state import progress_update_state
+from src.services.project_context import project_context_service
 from src.utils.logger import log
 
 
@@ -38,7 +41,9 @@ async def get_active_task_context_tool(user_id: str) -> str:
                 return "❌ No active project context. Please select a project first."
 
             # Get project details to find PlanRadar project ID
-            project = await supabase_client.get_project(active_project_id, user_id=user_id)
+            project = await supabase_client.get_project(
+                active_project_id, user_id=user_id
+            )
             if not project:
                 return "❌ Project not found. Please select a project first."
 
@@ -47,11 +52,14 @@ async def get_active_task_context_tool(user_id: str) -> str:
 
             # Now get task details from PlanRadar using the project ID
             from src.integrations.planradar import planradar_client
+
             task = await planradar_client.get_task(active_task_id, planradar_project_id)
             if task:
                 # get_task already returns the "data" object, not full response
                 attributes = task.get("attributes", {})
-                task_title = attributes.get("subject") or task.get("title", "Unknown Task")
+                task_title = attributes.get("subject") or task.get(
+                    "title", "Unknown Task"
+                )
 
                 return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
@@ -78,30 +86,37 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
 
         if active_project_id:
             # User has active project but no active task - LIST TASKS
-            project = await supabase_client.get_project(active_project_id, user_id=user_id)
+            project = await supabase_client.get_project(
+                active_project_id, user_id=user_id
+            )
             if project:
                 project_name = project.get("name", "Unknown Project")
                 planradar_project_id = project.get("planradar_project_id")
 
                 # Get tasks for this project
                 tasks_result = await list_tasks(
-                    user_id=user_id,
-                    project_id=active_project_id
+                    user_id=user_id, project_id=active_project_id
                 )
 
-                log.info(f"📋 list_tasks result: success={tasks_result.get('success')}, data_length={len(tasks_result.get('data', []))}")
+                log.info(
+                    f"📋 list_tasks result: success={tasks_result.get('success')}, data_length={len(tasks_result.get('data', []))}"
+                )
 
                 if tasks_result.get("success"):
-                    tasks = tasks_result.get("data", [])  # list_tasks returns "data", not "tasks"
+                    tasks = tasks_result.get(
+                        "data", []
+                    )  # list_tasks returns "data", not "tasks"
                     log.info(f"📊 Extracted tasks: {len(tasks)} tasks found")
 
                     if tasks:
                         # SPECIAL CASE: If only ONE task, ask for confirmation instead of showing list
                         if len(tasks) == 1:
-                            task_title = tasks[0].get('title', 'No title')
-                            task_id = tasks[0].get('id')
+                            task_title = tasks[0].get("title", "No title")
+                            task_id = tasks[0].get("id")
 
-                            log.info(f"📌 Only 1 task found - showing confirmation instead of list")
+                            log.info(
+                                f"📌 Only 1 task found - showing confirmation instead of list"
+                            )
                             return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
 Project: {project_name}
@@ -125,16 +140,20 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                         # MULTIPLE TASKS: Show list for selection
                         log.info(f"✅ Building task list for user display")
                         # Format task list - SIMPLE format for user display
-                        task_list_display = "\n".join([
-                            f"{idx}. {task.get('title', 'No title')}"
-                            for idx, task in enumerate(tasks[:10], 1)  # Limit to 10
-                        ])
+                        task_list_display = "\n".join(
+                            [
+                                f"{idx}. {task.get('title', 'No title')}"
+                                for idx, task in enumerate(tasks[:10], 1)  # Limit to 10
+                            ]
+                        )
 
                         # Also provide task IDs for agent to use when user selects
-                        task_id_mapping = "\n".join([
-                            f"Number {idx} = ID {task.get('id')}"
-                            for idx, task in enumerate(tasks[:10], 1)
-                        ])
+                        task_id_mapping = "\n".join(
+                            [
+                                f"Number {idx} = ID {task.get('id')}"
+                                for idx, task in enumerate(tasks[:10], 1)
+                            ]
+                        )
 
                         result_text = f"""✅ Active project: {project_name}
 
@@ -189,7 +208,10 @@ async def get_progress_update_context_tool(user_id: str) -> str:
 
         # Get task details from PlanRadar
         from src.integrations.planradar import planradar_client
-        task = await planradar_client.get_task(session["task_id"], session["project_id"])
+
+        task = await planradar_client.get_task(
+            session["task_id"], session["project_id"]
+        )
 
         task_title = "Unknown"
         if task:
@@ -203,15 +225,17 @@ async def get_progress_update_context_tool(user_id: str) -> str:
         output += f"Actions déjà effectuées :\n"
         output += f"- Photos ajoutées : {session['images_uploaded']}\n"
         output += f"- Commentaires ajoutés : {session['comments_added']}\n"
-        output += f"- Statut changé : {'Oui' if session['status_changed'] else 'Non'}\n\n"
+        output += (
+            f"- Statut changé : {'Oui' if session['status_changed'] else 'Non'}\n\n"
+        )
 
         # Suggest next actions
         remaining = []
-        if session['images_uploaded'] == 0:
+        if session["images_uploaded"] == 0:
             remaining.append("📸 Ajouter une photo")
-        if session['comments_added'] == 0:
+        if session["comments_added"] == 0:
             remaining.append("💬 Laisser un commentaire")
-        if not session['status_changed']:
+        if not session["status_changed"]:
             remaining.append("✅ Marquer comme terminé")
 
         if remaining:
@@ -227,10 +251,7 @@ async def get_progress_update_context_tool(user_id: str) -> str:
 
 
 @tool
-async def add_progress_image_tool(
-    user_id: str,
-    image_url: str
-) -> str:
+async def add_progress_image_tool(user_id: str, image_url: str) -> str:
     """Add an image to the task being updated.
 
     Args:
@@ -250,7 +271,7 @@ async def add_progress_image_tool(
         success = await planradar_client.update_incident_report(
             task_id=session["task_id"],
             project_id=session["project_id"],
-            additional_images=[image_url]
+            additional_images=[image_url],
         )
 
         if success:
@@ -267,10 +288,7 @@ async def add_progress_image_tool(
 
 
 @tool
-async def add_progress_comment_tool(
-    user_id: str,
-    comment_text: str
-) -> str:
+async def add_progress_comment_tool(user_id: str, comment_text: str) -> str:
     """Add a comment to the task being updated.
 
     Args:
@@ -289,7 +307,7 @@ async def add_progress_comment_tool(
         success = await planradar_client.add_task_comment(
             task_id=session["task_id"],
             project_id=session["project_id"],
-            comment_text=comment_text
+            comment_text=comment_text,
         )
 
         if success:
@@ -322,8 +340,7 @@ async def mark_task_complete_tool(user_id: str) -> str:
             return "❌ Aucune session active. Impossible de marquer la tâche comme terminée."
 
         success = await planradar_client.mark_task_complete(
-            task_id=session["task_id"],
-            project_id=session["project_id"]
+            task_id=session["task_id"], project_id=session["project_id"]
         )
 
         if success:
@@ -353,9 +370,7 @@ async def mark_task_complete_tool(user_id: str) -> str:
 
 @tool
 async def start_progress_update_session_tool(
-    user_id: str,
-    task_id: str,
-    project_id: str
+    user_id: str, task_id: str, project_id: str
 ) -> str:
     """Start a new progress update session for a specific task.
 
@@ -370,21 +385,22 @@ async def start_progress_update_session_tool(
     try:
         # Create session
         session_id = await progress_update_state.create_session(
-            user_id=user_id,
-            task_id=task_id,
-            project_id=project_id
+            user_id=user_id, task_id=task_id, project_id=project_id
         )
 
         if session_id:
             # Get task details from PlanRadar
             from src.integrations.planradar import planradar_client
+
             task = await planradar_client.get_task(task_id, project_id)
 
             task_title = "Unknown Task"
             if task:
                 # get_task already returns the "data" object, not full response
                 attributes = task.get("attributes", {})
-                task_title = attributes.get("subject") or task.get("title", "Unknown Task")
+                task_title = attributes.get("subject") or task.get(
+                    "title", "Unknown Task"
+                )
 
             return f"✅ Session de mise à jour démarrée pour : {task_title}\n\nQue souhaitez-vous faire ?\n1. 📸 Ajouter une photo\n2. 💬 Laisser un commentaire\n3. ✅ Marquer comme terminé"
         else:

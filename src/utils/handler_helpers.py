@@ -3,15 +3,16 @@
 IMPORTANT: All helpers ALWAYS return French text. Translation to user language
 happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 """
-from typing import Tuple, List, Dict, Any, Optional
+
+from typing import Any, Dict, List, Optional, Tuple
+
 from src.integrations.supabase import supabase_client
-from src.utils.whatsapp_formatter import get_translation
 from src.utils.logger import log
+from src.utils.whatsapp_formatter import get_translation
 
 
 async def get_projects_with_context(
-    user_id: str,
-    language: str
+    user_id: str, language: str
 ) -> Tuple[List[Dict[str, Any]], Optional[str], Optional[str]]:
     """Get user's projects.
 
@@ -56,7 +57,7 @@ def format_project_list(
     projects: List[Dict[str, Any]],
     language: str,
     max_items: int = 5,
-    header_key: str = "project_list"
+    header_key: str = "project_list",
 ) -> str:
     """Format a list of projects as numbered text.
 

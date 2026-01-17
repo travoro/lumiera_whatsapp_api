@@ -1,6 +1,9 @@
 """Task action handlers."""
-from typing import Dict, Any, Optional, List
+
+from typing import Any, Dict, List, Optional
+
 from langsmith import traceable
+
 from src.integrations.planradar import planradar_client
 from src.integrations.supabase import supabase_client
 from src.services.project_context import project_context_service
@@ -8,7 +11,9 @@ from src.utils.logger import log
 
 
 @traceable(name="list_tasks", tags=["actions", "tasks", "planradar"])
-async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Optional[str] = None) -> Dict[str, Any]:
+async def list_tasks(
+    user_id: str, project_id: Optional[str] = None, status: Optional[str] = None
+) -> Dict[str, Any]:
     """List tasks for a specific project.
 
     If project_id is not provided, uses the active project context from the user's profile.
@@ -23,18 +28,14 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
                     "success": False,
                     "message": "Sur quel projet travaillez-vous actuellement ? Veuillez sélectionner un projet.",
                     "requires_project_selection": True,
-                    "data": []
+                    "data": [],
                 }
 
         # Get project details to retrieve PlanRadar project ID
         project = await supabase_client.get_project(project_id, user_id=user_id)
 
         if not project:
-            return {
-                "success": False,
-                "message": "Projet non trouvé.",
-                "data": []
-            }
+            return {"success": False, "message": "Projet non trouvé.", "data": []}
 
         planradar_project_id = project.get("planradar_project_id")
 
@@ -42,7 +43,7 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             return {
                 "success": False,
                 "message": "Ce projet n'est pas lié à PlanRadar.",
-                "data": []
+                "data": [],
             }
 
         # Fetch tasks from PlanRadar using the PlanRadar project ID
@@ -55,7 +56,7 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
                     "success": False,
                     "message": "⏱️ L'API PlanRadar est temporairement surchargée. Veuillez réessayer dans quelques instants.",
                     "data": [],
-                    "rate_limited": True
+                    "rate_limited": True,
                 }
             else:
                 raise  # Re-raise other exceptions
@@ -66,8 +67,8 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             return {
                 "success": True,
                 "message": f"Le projet '{project_name}' n'a actuellement aucune tâche active. "
-                          f"Il n'y a pas encore de tâches assignées ou toutes les tâches ont été complétées.",
-                "data": []
+                f"Il n'y a pas encore de tâches assignées ou toutes les tâches ont été complétées.",
+                "data": [],
             }
 
         # Format tasks for display
@@ -85,7 +86,9 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             closed_at = attributes.get("closed-at")
 
             # DEBUG: Log full status info
-            log.info(f"   📊 Task {short_id_val}: status-id={status_id} (type: {type(status_id).__name__}), progress={progress}%, closed_at={closed_at}")
+            log.info(
+                f"   📊 Task {short_id_val}: status-id={status_id} (type: {type(status_id).__name__}), progress={progress}%, closed_at={closed_at}"
+            )
 
             # Skip tasks that are actually closed (closed-at is set)
             if closed_at is not None:
@@ -98,31 +101,42 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             # String status codes observed: "lm" (in-progress), "ma" (marked as complete/resolved)
             # Numeric status codes: 1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected
             resolved_status_ids = [
-                3, 5, 6,  # Numeric: Resolved, Closed, Rejected
-                "3", "5", "6",  # String equivalents
+                3,
+                5,
+                6,  # Numeric: Resolved, Closed, Rejected
+                "3",
+                "5",
+                "6",  # String equivalents
                 "ma",  # PlanRadar string code for resolved/marked as complete
             ]
             if status_id in resolved_status_ids:
-                log.info(f"   ⏭️  Skipping task {short_id_val} - status {status_id} (resolved/closed/rejected)")
+                log.info(
+                    f"   ⏭️  Skipping task {short_id_val} - status {status_id} (resolved/closed/rejected)"
+                )
                 continue
 
             # Additional safety check: Filter tasks with 100% progress that might be complete
             # but not yet marked with a closed status (edge case)
             if progress == 100 and status_id not in [1, 2, 4, "1", "2", "4", "lm"]:
-                log.info(f"   ⏭️  Skipping task {short_id_val} - 100% complete with status {status_id}")
+                log.info(
+                    f"   ⏭️  Skipping task {short_id_val} - 100% complete with status {status_id}"
+                )
                 continue
 
-            formatted_tasks.append({
-                "id": uuid_val,  # Use UUID as primary ID (latest API standard)
-                "short_id": short_id_val,  # Keep short ID for backward compatibility
-                "title": attributes.get("subject", "Sans titre"),
-                "status": status_id,
-                "priority": attributes.get("priority", "normal"),
-                "due_date": attributes.get("due-date"),
-                "progress": attributes.get("progress", 0),
-                "sequential_id": attributes.get("sequential-id"),
-                "project_id": attributes.get("project-id") or planradar_project_id,  # Store project_id for API calls
-            })
+            formatted_tasks.append(
+                {
+                    "id": uuid_val,  # Use UUID as primary ID (latest API standard)
+                    "short_id": short_id_val,  # Keep short ID for backward compatibility
+                    "title": attributes.get("subject", "Sans titre"),
+                    "status": status_id,
+                    "priority": attributes.get("priority", "normal"),
+                    "due_date": attributes.get("due-date"),
+                    "progress": attributes.get("progress", 0),
+                    "sequential_id": attributes.get("sequential-id"),
+                    "project_id": attributes.get("project-id")
+                    or planradar_project_id,  # Store project_id for API calls
+                }
+            )
 
         # Check if filtering removed all tasks
         if not formatted_tasks:
@@ -130,16 +144,14 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             return {
                 "success": True,
                 "message": f"Le projet '{project_name}' n'a actuellement aucune tâche active. "
-                          f"Toutes les tâches ont été complétées ou fermées. 🎉",
-                "data": []
+                f"Toutes les tâches ont été complétées ou fermées. 🎉",
+                "data": [],
             }
 
         # Update active project context (set or touch activity)
         project_name = project.get("nom")
         await project_context_service.set_active_project(
-            user_id=user_id,
-            project_id=project_id,
-            project_name=project_name
+            user_id=user_id, project_id=project_id, project_name=project_name
         )
 
         # Log action
@@ -147,14 +159,16 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
             user_id=user_id,
             action_name="list_tasks",
             parameters={"project_id": project_id, "status": status},
-            result={"count": len(formatted_tasks)}
+            result={"count": len(formatted_tasks)},
         )
 
-        log.info(f"📊 Returning {len(formatted_tasks)} active tasks (filtered out resolved/closed)")
+        log.info(
+            f"📊 Returning {len(formatted_tasks)} active tasks (filtered out resolved/closed)"
+        )
         return {
             "success": True,
             "message": f"{len(formatted_tasks)} tâche(s) active(s) trouvée(s).",
-            "data": formatted_tasks
+            "data": formatted_tasks,
         }
 
     except Exception as e:
@@ -162,14 +176,18 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
         return {
             "success": False,
             "message": "Erreur lors de la récupération des tâches.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
 @traceable(name="get_task_description", tags=["actions", "tasks", "planradar"])
-async def get_task_description(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_task_description(
+    user_id: str, task_id: str, project_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Get detailed description of a task."""
-    log.info(f"📝 get_task_description action: user_id={user_id[:8]}..., task_id={task_id}, project_id={project_id[:8] if project_id else 'None'}...")
+    log.info(
+        f"📝 get_task_description action: user_id={user_id[:8]}..., task_id={task_id}, project_id={project_id[:8] if project_id else 'None'}..."
+    )
     try:
         # Get project_id from active context if not provided
         if not project_id:
@@ -179,7 +197,7 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
                 log.warning(f"   ⚠️ No active project found")
                 return {
                     "success": False,
-                    "message": "Contexte du projet non trouvé. Veuillez d'abord sélectionner un projet."
+                    "message": "Contexte du projet non trouvé. Veuillez d'abord sélectionner un projet.",
                 }
             log.info(f"   ✅ Active project: {project_id[:8]}...")
 
@@ -188,18 +206,12 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
         project = await supabase_client.get_project(project_id, user_id=user_id)
         if not project:
             log.warning(f"   ⚠️ Project not found in DB")
-            return {
-                "success": False,
-                "message": "Projet non trouvé."
-            }
+            return {"success": False, "message": "Projet non trouvé."}
 
         planradar_project_id = project.get("planradar_project_id")
         if not planradar_project_id:
             log.warning(f"   ⚠️ Project not linked to PlanRadar")
-            return {
-                "success": False,
-                "message": "Ce projet n'est pas lié à PlanRadar."
-            }
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
         log.info(f"   ✅ PlanRadar project ID: {planradar_project_id[:8]}...")
 
         # Get full task details to include title
@@ -207,10 +219,7 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
         task = await planradar_client.get_task(task_id, planradar_project_id)
 
         if not task:
-            return {
-                "success": False,
-                "message": "Tâche non trouvée."
-            }
+            return {"success": False, "message": "Tâche non trouvée."}
 
         # Handle PlanRadar's JSON:API format - title and description are in attributes
         attributes = task.get("attributes", {})
@@ -227,9 +236,15 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
             if typed_values and isinstance(typed_values, dict):
                 # Look for the first non-empty text value (likely description)
                 for field_id, field_value in typed_values.items():
-                    if field_value and isinstance(field_value, str) and len(field_value) > 10:
+                    if (
+                        field_value
+                        and isinstance(field_value, str)
+                        and len(field_value) > 10
+                    ):
                         description = field_value
-                        log.info(f"   📝 Found description in typed-values field: {field_id}")
+                        log.info(
+                            f"   📝 Found description in typed-values field: {field_id}"
+                        )
                         break
 
         # Log action
@@ -237,16 +252,13 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
             user_id=user_id,
             action_name="get_task_description",
             parameters={"task_id": task_id},
-            result={"has_description": bool(description)}
+            result={"has_description": bool(description)},
         )
 
         return {
             "success": True,
             "message": "Description de la tâche récupérée.",
-            "data": {
-                "description": description,
-                "title": title
-            }
+            "data": {"description": description, "title": title},
         }
 
     except Exception as e:
@@ -254,11 +266,13 @@ async def get_task_description(user_id: str, task_id: str, project_id: Optional[
         return {
             "success": False,
             "message": "Erreur lors de la récupération de la description.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
-async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_task_plans(
+    user_id: str, task_id: str, project_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Get plans/blueprints for a task."""
     try:
         # Get project_id from active context if not provided
@@ -282,13 +296,13 @@ async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] =
             user_id=user_id,
             action_name="get_task_plans",
             parameters={"task_id": task_id},
-            result={"count": len(plans)}
+            result={"count": len(plans)},
         )
 
         return {
             "success": True,
             "message": f"{len(plans)} plan(s) trouvé(s).",
-            "data": plans
+            "data": plans,
         }
 
     except Exception as e:
@@ -296,12 +310,14 @@ async def get_task_plans(user_id: str, task_id: str, project_id: Optional[str] =
         return {
             "success": False,
             "message": "Erreur lors de la récupération des plans.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
 @traceable(name="get_task_images", tags=["actions", "tasks", "planradar"])
-async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_task_images(
+    user_id: str, task_id: str, project_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Get all attachments (images, documents, etc.) attached to a task.
 
     Args:
@@ -312,7 +328,9 @@ async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] 
     Returns:
         Dict with success status and list of all attachments (images, PDFs, documents, etc.)
     """
-    log.info(f"📎 get_task_images action: user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}...")
+    log.info(
+        f"📎 get_task_images action: user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8] if project_id else 'None'}..."
+    )
     try:
         # Get project_id from active context if not provided
         if not project_id:
@@ -337,20 +355,22 @@ async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] 
 
         log.info(f"   🌐 Calling PlanRadar API for task attachments")
         # task_id is now UUID, pass it directly to get_task_images (now returns all attachments)
-        attachments = await planradar_client.get_task_images(task_id, planradar_project_id, task_uuid=task_id)
+        attachments = await planradar_client.get_task_images(
+            task_id, planradar_project_id, task_uuid=task_id
+        )
 
         # Log action
         await supabase_client.save_action_log(
             user_id=user_id,
             action_name="get_task_images",
             parameters={"task_id": task_id},
-            result={"count": len(attachments)}
+            result={"count": len(attachments)},
         )
 
         return {
             "success": True,
             "message": f"{len(attachments)} pièce(s) jointe(s) trouvée(s).",
-            "data": attachments
+            "data": attachments,
         }
 
     except Exception as e:
@@ -358,11 +378,13 @@ async def get_task_images(user_id: str, task_id: str, project_id: Optional[str] 
         return {
             "success": False,
             "message": "Erreur lors de la récupération des images.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
-async def add_task_comment(user_id: str, task_id: str, comment_text: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+async def add_task_comment(
+    user_id: str, task_id: str, comment_text: str, project_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Add a comment to a task."""
     try:
         # Get project_id from active context if not provided
@@ -379,12 +401,14 @@ async def add_task_comment(user_id: str, task_id: str, comment_text: str, projec
         if not planradar_project_id:
             return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
 
-        success = await planradar_client.add_task_comment(task_id, planradar_project_id, comment_text)
+        success = await planradar_client.add_task_comment(
+            task_id, planradar_project_id, comment_text
+        )
 
         if not success:
             return {
                 "success": False,
-                "message": "Erreur lors de l'ajout du commentaire."
+                "message": "Erreur lors de l'ajout du commentaire.",
             }
 
         # Log action
@@ -392,24 +416,23 @@ async def add_task_comment(user_id: str, task_id: str, comment_text: str, projec
             user_id=user_id,
             action_name="add_task_comment",
             parameters={"task_id": task_id, "comment_length": len(comment_text)},
-            result={"success": True}
+            result={"success": True},
         )
 
-        return {
-            "success": True,
-            "message": "Commentaire ajouté avec succès."
-        }
+        return {"success": True, "message": "Commentaire ajouté avec succès."}
 
     except Exception as e:
         log.error(f"Error in add_task_comment: {e}")
         return {
             "success": False,
             "message": "Erreur lors de l'ajout du commentaire.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
-async def get_task_comments(user_id: str, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_task_comments(
+    user_id: str, task_id: str, project_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Get all comments for a task."""
     try:
         # Get project_id from active context if not provided
@@ -426,20 +449,22 @@ async def get_task_comments(user_id: str, task_id: str, project_id: Optional[str
         if not planradar_project_id:
             return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
 
-        comments = await planradar_client.get_task_comments(task_id, planradar_project_id)
+        comments = await planradar_client.get_task_comments(
+            task_id, planradar_project_id
+        )
 
         # Log action
         await supabase_client.save_action_log(
             user_id=user_id,
             action_name="get_task_comments",
             parameters={"task_id": task_id},
-            result={"count": len(comments)}
+            result={"count": len(comments)},
         )
 
         return {
             "success": True,
             "message": f"{len(comments)} commentaire(s) trouvé(s).",
-            "data": comments
+            "data": comments,
         }
 
     except Exception as e:
@@ -447,7 +472,7 @@ async def get_task_comments(user_id: str, task_id: str, project_id: Optional[str
         return {
             "success": False,
             "message": "Erreur lors de la récupération des commentaires.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -476,33 +501,24 @@ async def update_task_progress(
         # Get user to find active project context
         user = supabase_client.get_user(user_id)
         if not user:
-            return {
-                "success": False,
-                "message": "Utilisateur non trouvé."
-            }
+            return {"success": False, "message": "Utilisateur non trouvé."}
 
         # Get active project ID
         project_id = user.get("active_project_id")
         if not project_id:
             return {
                 "success": False,
-                "message": "Aucun projet actif. Veuillez sélectionner un projet d'abord."
+                "message": "Aucun projet actif. Veuillez sélectionner un projet d'abord.",
             }
 
         # Get project to find planradar_project_id
         project = await supabase_client.get_project(project_id, user_id=user_id)
         if not project:
-            return {
-                "success": False,
-                "message": "Projet non trouvé."
-            }
+            return {"success": False, "message": "Projet non trouvé."}
 
         planradar_project_id = project.get("planradar_project_id")
         if not planradar_project_id:
-            return {
-                "success": False,
-                "message": "Ce projet n'est pas lié à PlanRadar."
-            }
+            return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
 
         # Update via PlanRadar with correct parameters
         success = await planradar_client.update_task_progress(
@@ -517,7 +533,7 @@ async def update_task_progress(
         if not success:
             return {
                 "success": False,
-                "message": "Erreur lors de la mise à jour de la progression."
+                "message": "Erreur lors de la mise à jour de la progression.",
             }
 
         # Log action
@@ -531,7 +547,7 @@ async def update_task_progress(
                 "has_note": bool(progress_note),
                 "image_count": len(image_urls) if image_urls else 0,
             },
-            result={"success": True}
+            result={"success": True},
         )
 
         # Status name mapping for user-friendly message
@@ -541,7 +557,7 @@ async def update_task_progress(
             3: "Résolu",
             4: "Feedback",
             5: "Fermé",
-            6: "Rejeté"
+            6: "Rejeté",
         }
         status_name = status_names.get(status_id, "Inconnu")
 
@@ -549,17 +565,14 @@ async def update_task_progress(
         if progress is not None:
             message += f" ({progress}%)"
 
-        return {
-            "success": True,
-            "message": message
-        }
+        return {"success": True, "message": message}
 
     except Exception as e:
         log.error(f"Error in update_task_progress: {e}")
         return {
             "success": False,
             "message": "Erreur lors de la mise à jour de la progression.",
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -571,7 +584,7 @@ async def mark_task_complete(user_id: str, task_id: str) -> Dict[str, Any]:
         if not success:
             return {
                 "success": False,
-                "message": "Erreur lors du marquage de la tâche comme terminée."
+                "message": "Erreur lors du marquage de la tâche comme terminée.",
             }
 
         # Log action
@@ -579,18 +592,15 @@ async def mark_task_complete(user_id: str, task_id: str) -> Dict[str, Any]:
             user_id=user_id,
             action_name="mark_task_complete",
             parameters={"task_id": task_id},
-            result={"success": True}
+            result={"success": True},
         )
 
-        return {
-            "success": True,
-            "message": "Tâche marquée comme terminée avec succès."
-        }
+        return {"success": True, "message": "Tâche marquée comme terminée avec succès."}
 
     except Exception as e:
         log.error(f"Error in mark_task_complete: {e}")
         return {
             "success": False,
             "message": "Erreur lors du marquage de la tâche.",
-            "error": str(e)
+            "error": str(e),
         }

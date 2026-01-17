@@ -3,15 +3,19 @@
 This module provides structured logging capabilities specifically designed for
 tracking FSM (Finite State Machine) operations, state transitions, and related events.
 """
+
 import json
 import uuid
-from typing import Any, Dict, Optional
-from datetime import datetime
 from contextvars import ContextVar
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 from loguru import logger
 
 # Context variable for correlation ID (thread-safe)
-correlation_id_var: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
+correlation_id_var: ContextVar[Optional[str]] = ContextVar(
+    "correlation_id", default=None
+)
 
 
 class StructuredLogger:
@@ -26,10 +30,7 @@ class StructuredLogger:
         self.component = component
 
     def _format_structured_log(
-        self,
-        level: str,
-        message: str,
-        **kwargs: Any
+        self, level: str, message: str, **kwargs: Any
     ) -> Dict[str, Any]:
         """Format log entry as structured JSON.
 
@@ -106,7 +107,7 @@ class StructuredLogger:
         trigger: str,
         success: bool = True,
         error: Optional[str] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """Log FSM state transition with structured data.
 
@@ -127,7 +128,7 @@ class StructuredLogger:
             trigger=trigger,
             success=success,
             error=error,
-            **kwargs
+            **kwargs,
         )
 
 

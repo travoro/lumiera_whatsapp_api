@@ -1,6 +1,8 @@
 """Project context service for managing active project state."""
-from typing import Optional, Dict, Any
+
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
 
@@ -62,10 +64,7 @@ class ProjectContextService:
             return None
 
     async def set_active_project(
-        self,
-        user_id: str,
-        project_id: str,
-        project_name: Optional[str] = None
+        self, user_id: str, project_id: str, project_name: Optional[str] = None
     ) -> bool:
         """Set or update the active project for a subcontractor.
 
@@ -80,17 +79,22 @@ class ProjectContextService:
             True if successful, False otherwise
         """
         try:
-            response = self.client.client.table("subcontractors").update({
-                "active_project_id": project_id,
-                "active_project_last_activity": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", user_id).execute()
+            response = (
+                self.client.client.table("subcontractors")
+                .update(
+                    {
+                        "active_project_id": project_id,
+                        "active_project_last_activity": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 project_display = project_name if project_name else project_id
-                log.info(
-                    f"🎯 Set active project for user {user_id}: {project_display}"
-                )
+                log.info(f"🎯 Set active project for user {user_id}: {project_display}")
                 return True
             else:
                 log.warning(f"Failed to set active project for user {user_id}")
@@ -118,10 +122,17 @@ class ProjectContextService:
             if not user or not user.get("active_project_id"):
                 return False
 
-            response = self.client.client.table("subcontractors").update({
-                "active_project_last_activity": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", user_id).execute()
+            response = (
+                self.client.client.table("subcontractors")
+                .update(
+                    {
+                        "active_project_last_activity": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 log.debug(f"Updated active project activity for user {user_id}")
@@ -147,11 +158,18 @@ class ProjectContextService:
             True if successful, False otherwise
         """
         try:
-            response = self.client.client.table("subcontractors").update({
-                "active_project_id": None,
-                "active_project_last_activity": None,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", user_id).execute()
+            response = (
+                self.client.client.table("subcontractors")
+                .update(
+                    {
+                        "active_project_id": None,
+                        "active_project_last_activity": None,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 log.info(f"🧹 Cleared active project context for user {user_id}")
@@ -162,7 +180,9 @@ class ProjectContextService:
             log.error(f"Error clearing active project for user {user_id}: {e}")
             return False
 
-    async def get_active_project_with_details(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_active_project_with_details(
+        self, user_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Get active project with full details (name, status, etc.).
 
         Args:
@@ -177,9 +197,12 @@ class ProjectContextService:
                 return None
 
             # Get project details from Supabase
-            response = self.client.client.table("projects").select("*").eq(
-                "id", project_id
-            ).execute()
+            response = (
+                self.client.client.table("projects")
+                .select("*")
+                .eq("id", project_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 return response.data[0]
@@ -229,10 +252,7 @@ class ProjectContextService:
             return None
 
     async def set_active_task(
-        self,
-        user_id: str,
-        task_id: str,
-        task_title: Optional[str] = None
+        self, user_id: str, task_id: str, task_title: Optional[str] = None
     ) -> bool:
         """Set or update the active task for a subcontractor.
 
@@ -247,17 +267,22 @@ class ProjectContextService:
             True if successful, False otherwise
         """
         try:
-            response = self.client.client.table("subcontractors").update({
-                "active_task_id": task_id,
-                "active_task_last_activity": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", user_id).execute()
+            response = (
+                self.client.client.table("subcontractors")
+                .update(
+                    {
+                        "active_task_id": task_id,
+                        "active_task_last_activity": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 task_display = task_title if task_title else task_id
-                log.info(
-                    f"🎯 Set active task for user {user_id}: {task_display}"
-                )
+                log.info(f"🎯 Set active task for user {user_id}: {task_display}")
                 return True
             else:
                 log.warning(f"Failed to set active task for user {user_id}")
@@ -277,11 +302,18 @@ class ProjectContextService:
             True if successful, False otherwise
         """
         try:
-            response = self.client.client.table("subcontractors").update({
-                "active_task_id": None,
-                "active_task_last_activity": None,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", user_id).execute()
+            response = (
+                self.client.client.table("subcontractors")
+                .update(
+                    {
+                        "active_task_id": None,
+                        "active_task_last_activity": None,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("id", user_id)
+                .execute()
+            )
 
             if response.data and len(response.data) > 0:
                 log.info(f"🧹 Cleared active task context for user {user_id}")
@@ -308,12 +340,16 @@ class ProjectContextService:
         try:
             # Parse timestamp
             if isinstance(last_activity, str):
-                last_activity_dt = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                last_activity_dt = datetime.fromisoformat(
+                    last_activity.replace("Z", "+00:00")
+                )
             else:
                 last_activity_dt = last_activity
 
             # Check if more than expiration_hours have passed
-            time_since_activity = datetime.utcnow() - last_activity_dt.replace(tzinfo=None)
+            time_since_activity = datetime.utcnow() - last_activity_dt.replace(
+                tzinfo=None
+            )
             return time_since_activity > timedelta(hours=expiration_hours)
 
         except Exception as e:
@@ -330,21 +366,29 @@ class ProjectContextService:
         """
         try:
             # Get all subcontractors with active projects
-            response = self.client.client.table("subcontractors").select(
-                "id, active_project_id, active_project_last_activity"
-            ).not_.is_("active_project_id", "null").execute()
+            response = (
+                self.client.client.table("subcontractors")
+                .select("id, active_project_id, active_project_last_activity")
+                .not_.is_("active_project_id", "null")
+                .execute()
+            )
 
             if not response.data:
                 return 0
 
             cleared_count = 0
             for user in response.data:
-                if self._is_expired(user.get("active_project_last_activity"), self.PROJECT_EXPIRATION_HOURS):
+                if self._is_expired(
+                    user.get("active_project_last_activity"),
+                    self.PROJECT_EXPIRATION_HOURS,
+                ):
                     await self.clear_active_project(user["id"])
                     cleared_count += 1
 
             if cleared_count > 0:
-                log.info(f"🧹 Cleaned up {cleared_count} expired active project contexts")
+                log.info(
+                    f"🧹 Cleaned up {cleared_count} expired active project contexts"
+                )
 
             return cleared_count
 

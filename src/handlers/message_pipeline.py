@@ -2,17 +2,19 @@
 
 Breaks down message processing into discrete, testable stages.
 """
-from typing import Dict, Any, Optional
+
 from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
+
+from src.agent.agent import lumiera_agent
+from src.exceptions import *
 from src.integrations.supabase import supabase_client
-from src.services.translation import translation_service
-from src.services.transcription import transcription_service
-from src.services.session import session_service
 from src.services.intent import intent_classifier
 from src.services.intent_router import intent_router
-from src.agent.agent import lumiera_agent
+from src.services.session import session_service
+from src.services.transcription import transcription_service
+from src.services.translation import translation_service
 from src.utils.logger import log
-from src.exceptions import *
 from src.utils.result import Result
 
 
@@ -34,14 +36,20 @@ class MessageContext:
     user_language: Optional[str] = None
     session_id: Optional[str] = None
     message_in_french: Optional[str] = None
-    last_bot_message: Optional[str] = None  # Last message sent by bot (for menu context)
-    recent_messages: list = field(default_factory=list)  # Last 3 messages for intent context
+    last_bot_message: Optional[str] = (
+        None  # Last message sent by bot (for menu context)
+    )
+    recent_messages: list = field(
+        default_factory=list
+    )  # Last 3 messages for intent context
     intent: Optional[str] = None
     confidence: Optional[float] = None
     response_text: Optional[str] = None
     escalation: bool = False
     tools_called: list = field(default_factory=list)
-    tool_outputs: list = field(default_factory=list)  # Structured tool outputs (for short-term memory)
+    tool_outputs: list = field(
+        default_factory=list
+    )  # Structured tool outputs (for short-term memory)
 
     # FSM session context (for context preservation)
     active_session_id: Optional[str] = None
@@ -61,7 +69,7 @@ class MessageContext:
             "session_id": self.session_id,
             "intent": self.intent,
             "confidence": self.confidence,
-            "escalation": self.escalation
+            "escalation": self.escalation,
         }
 
 
@@ -87,7 +95,7 @@ class MessagePipeline:
             "romanian": "ro",
             "arabic": "ar",
             "german": "de",
-            "italian": "it"
+            "italian": "it",
         }
 
         # If it's a full name, convert to ISO code
@@ -108,7 +116,7 @@ class MessagePipeline:
         message_sid: Optional[str] = None,
         media_url: Optional[str] = None,
         media_type: Optional[str] = None,
-        interactive_data: Optional[Dict[str, Any]] = None
+        interactive_data: Optional[Dict[str, Any]] = None,
     ) -> Result[Dict[str, Any]]:
         """Process message through pipeline stages.
 
@@ -129,7 +137,7 @@ class MessagePipeline:
             message_sid=message_sid,
             media_url=media_url,
             media_type=media_type,
-            interactive_data=interactive_data
+            interactive_data=interactive_data,
         )
 
         try:
@@ -149,7 +157,7 @@ class MessagePipeline:
                 return result
 
             # Stage 4: Process media (audio transcription)
-            if ctx.media_url and ctx.media_type and 'audio' in ctx.media_type:
+            if ctx.media_url and ctx.media_type and "audio" in ctx.media_type:
                 result = await self._process_audio(ctx)
                 if not result.success:
                     return result
@@ -190,19 +198,19 @@ class MessagePipeline:
                 "session_id": ctx.session_id,
                 "intent": ctx.intent,
                 "confidence": ctx.confidence,
-                "detected_language": ctx.user_language  # Include detected language!
+                "detected_language": ctx.user_language,  # Include detected language!
             }
 
             # Include response_type and list_type if present (from specialized agents)
-            if hasattr(ctx, 'response_type') and ctx.response_type:
+            if hasattr(ctx, "response_type") and ctx.response_type:
                 response_data["response_type"] = ctx.response_type
                 log.info(f"📦 Pipeline forwarding response_type: {ctx.response_type}")
-            if hasattr(ctx, 'list_type') and ctx.list_type:
+            if hasattr(ctx, "list_type") and ctx.list_type:
                 response_data["list_type"] = ctx.list_type
                 log.info(f"📦 Pipeline forwarding list_type: {ctx.list_type}")
 
             # Include attachments if present (for task images/files)
-            if hasattr(ctx, 'attachments') and ctx.attachments:
+            if hasattr(ctx, "attachments") and ctx.attachments:
                 response_data["attachments"] = ctx.attachments
                 log.info(f"📦 Pipeline forwarding {len(ctx.attachments)} attachments")
 
@@ -222,10 +230,10 @@ class MessagePipeline:
             if not user:
                 raise UserNotFoundException(user_id=ctx.from_number)
 
-            ctx.user_id = user['id']
-            ctx.user_name = user.get('contact_prenom') or user.get('contact_name', '')
+            ctx.user_id = user["id"]
+            ctx.user_name = user.get("contact_prenom") or user.get("contact_name", "")
             # Normalize language code (handle both "fr" and "french" formats)
-            raw_language = user.get('language', 'fr')
+            raw_language = user.get("language", "fr")
             ctx.user_language = self._normalize_language_code(raw_language)
 
             log.info(f"✅ User authenticated: {ctx.user_id} ({ctx.user_name})")
@@ -239,35 +247,40 @@ class MessagePipeline:
         try:
             session = await session_service.get_or_create_session(ctx.user_id)
             if session:
-                ctx.session_id = session['id']
+                ctx.session_id = session["id"]
                 log.info(f"✅ Session: {ctx.session_id}")
 
                 # Load conversation context for intent classification
                 try:
                     messages = await supabase_client.get_messages_by_session(
-                        ctx.session_id,
-                        fields='content,direction,created_at'
+                        ctx.session_id, fields="content,direction,created_at"
                     )
 
                     # Sort messages by created_at (oldest to newest)
                     sorted_messages = sorted(
-                        messages,
-                        key=lambda x: x.get('created_at', '')
+                        messages, key=lambda x: x.get("created_at", "")
                     )
 
                     # Get last 3 messages for intent context
                     if sorted_messages:
                         ctx.recent_messages = sorted_messages[-3:]
-                        log.info(f"📜 Loaded {len(ctx.recent_messages)} recent messages for intent context")
+                        log.info(
+                            f"📜 Loaded {len(ctx.recent_messages)} recent messages for intent context"
+                        )
 
                     # Find the last outbound message (from bot to user) for menu context
                     outbound_messages = [
-                        msg for msg in sorted_messages
-                        if msg.get('direction') == 'outbound'
+                        msg
+                        for msg in sorted_messages
+                        if msg.get("direction") == "outbound"
                     ]
                     if outbound_messages:
-                        ctx.last_bot_message = outbound_messages[-1].get('content')
-                        log.info(f"📜 Last bot message: '{ctx.last_bot_message[:50]}...' " if ctx.last_bot_message and len(ctx.last_bot_message) > 50 else f"📜 Last bot message: '{ctx.last_bot_message}'")
+                        ctx.last_bot_message = outbound_messages[-1].get("content")
+                        log.info(
+                            f"📜 Last bot message: '{ctx.last_bot_message[:50]}...' "
+                            if ctx.last_bot_message and len(ctx.last_bot_message) > 50
+                            else f"📜 Last bot message: '{ctx.last_bot_message}'"
+                        )
 
                 except Exception as e:
                     # Don't fail the pipeline if we can't load messages
@@ -291,19 +304,28 @@ class MessagePipeline:
             # Try to detect language from message content using robust hybrid detection
             if ctx.message_body and len(ctx.message_body.strip()) > 2:
                 try:
-                    from src.services.language_detection import language_detection_service
+                    from src.services.language_detection import (
+                        language_detection_service,
+                    )
 
                     # Log detection attempt with message preview
-                    message_preview = ctx.message_body[:50] + "..." if len(ctx.message_body) > 50 else ctx.message_body
-                    log.info(f"🔍 Detecting language for message: '{message_preview}' (profile: {profile_language})")
+                    message_preview = (
+                        ctx.message_body[:50] + "..."
+                        if len(ctx.message_body) > 50
+                        else ctx.message_body
+                    )
+                    log.info(
+                        f"🔍 Detecting language for message: '{message_preview}' (profile: {profile_language})"
+                    )
 
-                    detected_language, detection_method = await language_detection_service.detect_async(
-                        ctx.message_body,
-                        fallback_language=profile_language
+                    detected_language, detection_method = (
+                        await language_detection_service.detect_async(
+                            ctx.message_body, fallback_language=profile_language
+                        )
                     )
 
                     # Check if detection succeeded (not fallback)
-                    if detection_method != 'fallback':
+                    if detection_method != "fallback":
                         if detected_language != profile_language:
                             from src.config import settings
 
@@ -313,14 +335,24 @@ class MessagePipeline:
 
                             # Check greeting exception policy
                             message_lower = ctx.message_body.strip().lower()
-                            is_greeting_exception = message_lower in settings.language_greeting_exceptions_list
+                            is_greeting_exception = (
+                                message_lower
+                                in settings.language_greeting_exceptions_list
+                            )
 
                             if is_greeting_exception:
-                                update_blocked_reason = f"greeting exception ('{message_lower}')"
-                            elif len(ctx.message_body.strip()) < settings.language_update_min_message_length:
+                                update_blocked_reason = (
+                                    f"greeting exception ('{message_lower}')"
+                                )
+                            elif (
+                                len(ctx.message_body.strip())
+                                < settings.language_update_min_message_length
+                            ):
                                 update_blocked_reason = f"message too short ({len(ctx.message_body.strip())} chars < {settings.language_update_min_message_length})"
                             elif not settings.auto_update_user_language:
-                                update_blocked_reason = "auto-update disabled in settings"
+                                update_blocked_reason = (
+                                    "auto-update disabled in settings"
+                                )
                             else:
                                 should_update_profile = True
 
@@ -332,9 +364,10 @@ class MessagePipeline:
                                 )
 
                                 # Update user profile language permanently
-                                update_success = await supabase_client.update_user_language(
-                                    ctx.user_id,
-                                    detected_language
+                                update_success = (
+                                    await supabase_client.update_user_language(
+                                        ctx.user_id, detected_language
+                                    )
                                 )
 
                                 if update_success:
@@ -374,7 +407,9 @@ class MessagePipeline:
                     )
                     ctx.user_language = profile_language
             else:
-                log.info(f"⏩ Message too short for detection → Using profile language: {profile_language}")
+                log.info(
+                    f"⏩ Message too short for detection → Using profile language: {profile_language}"
+                )
 
             return Result.ok(None)
 
@@ -392,18 +427,20 @@ class MessagePipeline:
         5. Updates ctx.media_url to point to stored file
         """
         try:
-            if not (ctx.media_url and ctx.media_type and 'audio' in ctx.media_type):
+            if not (ctx.media_url and ctx.media_type and "audio" in ctx.media_type):
                 return Result.ok(None)  # Skip if not audio
 
             log.info(f"🎤 Processing audio message (transcribe + store)")
 
             # Download, store, and transcribe audio
-            transcription, storage_url, whisper_detected_lang = await transcription_service.transcribe_and_store_audio(
-                audio_url=ctx.media_url,
-                user_id=ctx.user_id,
-                message_sid=ctx.message_sid or "unknown",
-                target_language=ctx.user_language,
-                content_type=ctx.media_type
+            transcription, storage_url, whisper_detected_lang = (
+                await transcription_service.transcribe_and_store_audio(
+                    audio_url=ctx.media_url,
+                    user_id=ctx.user_id,
+                    message_sid=ctx.message_sid or "unknown",
+                    target_language=ctx.user_language,
+                    content_type=ctx.media_type,
+                )
             )
 
             if not transcription:
@@ -412,8 +449,12 @@ class MessagePipeline:
             # Update context with transcription
             ctx.message_body = transcription
             log.info(f"✅ Audio transcribed: {transcription[:50]}...")
-            log.info(f"🔍 TRACE: Language from transcription service: {whisper_detected_lang}")
-            log.info(f"🔍 TRACE: Current context language (profile): {ctx.user_language}")
+            log.info(
+                f"🔍 TRACE: Language from transcription service: {whisper_detected_lang}"
+            )
+            log.info(
+                f"🔍 TRACE: Current context language (profile): {ctx.user_language}"
+            )
 
             # Use detected language from transcribed text (already ISO 639-1 code)
             if whisper_detected_lang:
@@ -425,8 +466,7 @@ class MessagePipeline:
 
                     # Update user profile language permanently
                     update_success = await supabase_client.update_user_language(
-                        ctx.user_id,
-                        whisper_detected_lang
+                        ctx.user_id, whisper_detected_lang
                     )
 
                     if update_success:
@@ -441,13 +481,23 @@ class MessagePipeline:
 
                     # Use detected language for this message
                     ctx.user_language = whisper_detected_lang
-                    log.info(f"🔍 TRACE: Context language UPDATED to: {ctx.user_language}")
+                    log.info(
+                        f"🔍 TRACE: Context language UPDATED to: {ctx.user_language}"
+                    )
                 else:
-                    log.info(f"✅ Detected language: {whisper_detected_lang} (matches profile)")
-                    log.info(f"🔍 TRACE: Context language UNCHANGED: {ctx.user_language}")
+                    log.info(
+                        f"✅ Detected language: {whisper_detected_lang} (matches profile)"
+                    )
+                    log.info(
+                        f"🔍 TRACE: Context language UNCHANGED: {ctx.user_language}"
+                    )
             else:
-                log.info("⚠️ No confident language detection from audio, keeping profile language")
-                log.info(f"🔍 TRACE: Context language UNCHANGED (no detection): {ctx.user_language}")
+                log.info(
+                    "⚠️ No confident language detection from audio, keeping profile language"
+                )
+                log.info(
+                    f"🔍 TRACE: Context language UNCHANGED (no detection): {ctx.user_language}"
+                )
 
             # Update media URL to point to stored file (not Twilio URL)
             if storage_url:
@@ -466,8 +516,7 @@ class MessagePipeline:
         try:
             if ctx.user_language != "fr":
                 ctx.message_in_french = await translation_service.translate_to_french(
-                    ctx.message_body,
-                    ctx.user_language
+                    ctx.message_body, ctx.user_language
                 )
                 log.info(f"✅ Translated to French: {ctx.message_in_french[:50]}...")
             else:
@@ -482,36 +531,41 @@ class MessagePipeline:
         """Stage 5.5: Check if user has active progress update session (for context preservation)."""
         try:
             # Query for active progress update session
-            result = supabase_client.client.table('progress_update_sessions')\
-                .select('*')\
-                .eq('subcontractor_id', ctx.user_id)\
-                .gt('expires_at', 'now()')\
-                .order('last_activity', desc=True)\
-                .limit(1)\
+            result = (
+                supabase_client.client.table("progress_update_sessions")
+                .select("*")
+                .eq("subcontractor_id", ctx.user_id)
+                .gt("expires_at", "now()")
+                .order("last_activity", desc=True)
+                .limit(1)
                 .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 session = result.data[0]
 
                 # Extract FSM context
-                ctx.active_session_id = session['id']
-                ctx.fsm_state = session.get('fsm_state', 'idle')
-                ctx.fsm_current_step = session.get('current_step')
-                ctx.fsm_task_id = session.get('task_id')
+                ctx.active_session_id = session["id"]
+                ctx.fsm_state = session.get("fsm_state", "idle")
+                ctx.fsm_current_step = session.get("current_step")
+                ctx.fsm_task_id = session.get("task_id")
 
                 # Check if bot is expecting a response (from session_metadata)
-                metadata = session.get('session_metadata', {})
+                metadata = session.get("session_metadata", {})
                 if isinstance(metadata, dict):
-                    ctx.expecting_response = metadata.get('expecting_response', False)
-                    ctx.last_bot_options = metadata.get('available_actions', [])
+                    ctx.expecting_response = metadata.get("expecting_response", False)
+                    ctx.last_bot_options = metadata.get("available_actions", [])
 
                 # Calculate session age to determine if we should continue
                 from datetime import datetime, timezone
-                last_activity_str = session.get('last_activity')
+
+                last_activity_str = session.get("last_activity")
                 if last_activity_str:
                     try:
                         # Parse last_activity timestamp
-                        last_activity = datetime.fromisoformat(last_activity_str.replace('Z', '+00:00'))
+                        last_activity = datetime.fromisoformat(
+                            last_activity_str.replace("Z", "+00:00")
+                        )
 
                         # Ensure both datetimes are timezone-aware for accurate comparison
                         if last_activity.tzinfo is None:
@@ -522,21 +576,31 @@ class MessagePipeline:
                         now = datetime.now(timezone.utc)
                         age_seconds = (now - last_activity).total_seconds()
 
-                        log.info(f"🔄 Active session found: {ctx.active_session_id[:8]}...")
-                        log.info(f"   State: {ctx.fsm_state} | Step: {ctx.fsm_current_step}")
+                        log.info(
+                            f"🔄 Active session found: {ctx.active_session_id[:8]}..."
+                        )
+                        log.info(
+                            f"   State: {ctx.fsm_state} | Step: {ctx.fsm_current_step}"
+                        )
                         log.info(f"   Expecting response: {ctx.expecting_response}")
                         log.info(f"   Age: {age_seconds:.0f}s")
 
                         # If expecting response and recent activity (< 5 minutes = 300s)
                         if ctx.expecting_response and age_seconds < 300:
                             ctx.should_continue_session = True
-                            log.info(f"   ✅ Should continue session (recent activity, expecting response)")
+                            log.info(
+                                f"   ✅ Should continue session (recent activity, expecting response)"
+                            )
                         else:
-                            log.info(f"   💤 Session exists but not expecting response or too old")
+                            log.info(
+                                f"   💤 Session exists but not expecting response or too old"
+                            )
                     except Exception as e:
                         log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
                 else:
-                    log.info(f"🔄 Active session found: {ctx.active_session_id[:8]}... (no last_activity)")
+                    log.info(
+                        f"🔄 Active session found: {ctx.active_session_id[:8]}... (no last_activity)"
+                    )
             else:
                 log.info(f"💤 No active progress update session for user")
 
@@ -557,15 +621,17 @@ class MessagePipeline:
 
             if has_media and ctx.media_type:
                 # Extract simple media type (image, video, audio)
-                if 'image' in ctx.media_type.lower():
-                    media_type_simple = 'image'
-                elif 'video' in ctx.media_type.lower():
-                    media_type_simple = 'video'
-                elif 'audio' in ctx.media_type.lower():
-                    media_type_simple = 'audio'
+                if "image" in ctx.media_type.lower():
+                    media_type_simple = "image"
+                elif "video" in ctx.media_type.lower():
+                    media_type_simple = "video"
+                elif "audio" in ctx.media_type.lower():
+                    media_type_simple = "audio"
 
             if has_media:
-                log.info(f"📎 Message has media: {media_type_simple} (url: {ctx.media_url[:50]}...)")
+                log.info(
+                    f"📎 Message has media: {media_type_simple} (url: {ctx.media_url[:50]}...)"
+                )
 
             intent_result = await intent_classifier.classify(
                 ctx.message_in_french,
@@ -580,10 +646,10 @@ class MessagePipeline:
                 # Media context (critical for photo/video messages)
                 has_media=has_media,
                 media_type=media_type_simple,
-                num_media=num_media
+                num_media=num_media,
             )
-            ctx.intent = intent_result['intent']
-            ctx.confidence = intent_result.get('confidence', 0.0)
+            ctx.intent = intent_result["intent"]
+            ctx.confidence = intent_result.get("confidence", 0.0)
 
             log.info(f"✅ Intent: {ctx.intent} (confidence: {ctx.confidence:.2%})")
             return Result.ok(None)
@@ -597,7 +663,10 @@ class MessagePipeline:
             from src.config import settings
 
             # Try fast path for high-confidence intents
-            if settings.enable_fast_path_handlers and ctx.confidence >= settings.intent_confidence_threshold:
+            if (
+                settings.enable_fast_path_handlers
+                and ctx.confidence >= settings.intent_confidence_threshold
+            ):
                 log.info(f"🚀 HIGH CONFIDENCE - Attempting fast path")
 
                 # Load last bot message's tool_outputs for resolving numeric selections
@@ -605,24 +674,31 @@ class MessagePipeline:
                 last_bot_message = None
                 try:
                     messages = await supabase_client.get_messages_by_session(
-                        ctx.session_id,
-                        fields='content,direction,metadata'
+                        ctx.session_id, fields="content,direction,metadata"
                     )
                     log.debug(f"📨 Loaded {len(messages)} messages from session")
 
                     # Find the most recent outbound message (only check last 5 messages)
                     recent_messages = messages[-5:] if len(messages) > 5 else messages
                     for msg in reversed(recent_messages):
-                        if msg and msg.get('direction') == 'outbound':
-                            last_bot_message = msg.get('content', '')
-                            metadata = msg.get('metadata', {})
-                            last_tool_outputs = metadata.get('tool_outputs', []) if metadata else []
+                        if msg and msg.get("direction") == "outbound":
+                            last_bot_message = msg.get("content", "")
+                            metadata = msg.get("metadata", {})
+                            last_tool_outputs = (
+                                metadata.get("tool_outputs", []) if metadata else []
+                            )
 
                             if last_tool_outputs:
-                                log.info(f"📦 Loaded {len(last_tool_outputs)} tool outputs from last bot message")
-                                log.debug(f"📋 Tool outputs: {[t.get('tool') for t in last_tool_outputs]}")
+                                log.info(
+                                    f"📦 Loaded {len(last_tool_outputs)} tool outputs from last bot message"
+                                )
+                                log.debug(
+                                    f"📋 Tool outputs: {[t.get('tool') for t in last_tool_outputs]}"
+                                )
                             else:
-                                log.debug(f"📭 Last bot message has no tool_outputs in metadata")
+                                log.debug(
+                                    f"📭 Last bot message has no tool_outputs in metadata"
+                                )
                             break
                 except Exception as e:
                     log.warning(f"⚠️ Could not load last message tool_outputs: {e}")
@@ -639,14 +715,16 @@ class MessagePipeline:
                     message_text=ctx.message_in_french,  # Pass message for project name extraction
                     session_id=ctx.session_id,  # Pass session for context queries
                     last_tool_outputs=last_tool_outputs,  # For resolving numeric selections
-                    last_bot_message=last_bot_message  # For menu context
+                    last_bot_message=last_bot_message,  # For menu context
                 )
 
                 if result:
                     ctx.response_text = result.get("message")
                     ctx.escalation = result.get("escalation", False)
                     ctx.tools_called = result.get("tools_called", [])
-                    ctx.tool_outputs = result.get("tool_outputs", [])  # Capture tool outputs from fast path
+                    ctx.tool_outputs = result.get(
+                        "tool_outputs", []
+                    )  # Capture tool outputs from fast path
 
                     # Capture response metadata from specialized handlers
                     if "response_type" in result:
@@ -656,12 +734,18 @@ class MessagePipeline:
                     if "attachments" in result:
                         ctx.attachments = result.get("attachments")
                         if ctx.attachments:
-                            log.info(f"📦 Captured {len(ctx.attachments)} attachments from fast path")
+                            log.info(
+                                f"📦 Captured {len(ctx.attachments)} attachments from fast path"
+                            )
 
-                    log.info(f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)")
+                    log.info(
+                        f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)"
+                    )
                     return Result.ok(None)
                 else:
-                    log.warning(f"❌ Fast path returned None - checking for specialized routing")
+                    log.warning(
+                        f"❌ Fast path returned None - checking for specialized routing"
+                    )
 
                     # Check for specialized routing in message.py before falling back to Opus
                     from src.handlers.message import handle_direct_action
@@ -673,54 +757,71 @@ class MessagePipeline:
                         language=ctx.user_language,
                         message_body=ctx.message_in_french,
                         media_url=ctx.media_url,
-                        media_type=ctx.media_type
+                        media_type=ctx.media_type,
                     )
 
                     if specialized_result:
-                        log.info(f"✅ Specialized routing succeeded for intent: {ctx.intent}")
+                        log.info(
+                            f"✅ Specialized routing succeeded for intent: {ctx.intent}"
+                        )
                         ctx.response_text = specialized_result.get("message")
                         ctx.escalation = specialized_result.get("escalation", False)
                         ctx.tools_called = specialized_result.get("tools_called", [])
                         ctx.tool_outputs = specialized_result.get("tool_outputs", [])
                         ctx.agent_used = specialized_result.get("agent_used")
-                        ctx.response_type = specialized_result.get("response_type")  # For formatting decisions
-                        ctx.list_type = specialized_result.get("list_type")  # For interactive lists
+                        ctx.response_type = specialized_result.get(
+                            "response_type"
+                        )  # For formatting decisions
+                        ctx.list_type = specialized_result.get(
+                            "list_type"
+                        )  # For interactive lists
                         if "attachments" in specialized_result:
                             ctx.attachments = specialized_result.get("attachments")
                             if ctx.attachments:
-                                log.info(f"📦 Captured {len(ctx.attachments)} attachments from specialized handler")
+                                log.info(
+                                    f"📦 Captured {len(ctx.attachments)} attachments from specialized handler"
+                                )
                         return Result.ok(None)
                     else:
-                        log.warning(f"❌ No specialized routing found - parameters unclear")
-                        log.info(f"🤖 Falling back to full AI agent to resolve ambiguity")
+                        log.warning(
+                            f"❌ No specialized routing found - parameters unclear"
+                        )
+                        log.info(
+                            f"🤖 Falling back to full AI agent to resolve ambiguity"
+                        )
                         log.info(f"   Intent: {ctx.intent}")
                         log.info(f"   Message: '{ctx.message_in_french}'")
-                        log.info(f"   AI will use conversation history to understand user intent")
+                        log.info(
+                            f"   AI will use conversation history to understand user intent"
+                        )
 
             # Fallback to full agent
             log.info(f"⚙️ Using full agent (Opus)")
 
             # LAYER 1: Build AUTHORITATIVE explicit state
             from src.services.agent_state import agent_state_builder
+
             agent_state = await agent_state_builder.build_state(
                 user_id=ctx.user_id,
                 language=ctx.user_language,
-                session_id=ctx.session_id
+                session_id=ctx.session_id,
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(f"📍 Injecting explicit state: project={agent_state.active_project_id}, task={agent_state.active_task_id}")
+                log.info(
+                    f"📍 Injecting explicit state: project={agent_state.active_project_id}, task={agent_state.active_task_id}"
+                )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history = []
             try:
-                from langchain_core.messages import HumanMessage, AIMessage
                 import json
+
+                from langchain_core.messages import AIMessage, HumanMessage
 
                 # Load messages WITH metadata
                 messages = await supabase_client.get_messages_by_session(
-                    ctx.session_id,
-                    fields='content,direction,metadata,created_at'
+                    ctx.session_id, fields="content,direction,metadata,created_at"
                 )
 
                 # Convert to LangChain message format (last 10 messages for context)
@@ -733,8 +834,10 @@ class MessagePipeline:
                     if not msg or not isinstance(msg, dict):
                         continue
                     # Handle case where metadata is explicitly None in database
-                    metadata = msg.get('metadata') or {}
-                    if msg.get('direction') == 'outbound' and metadata.get('tool_outputs'):
+                    metadata = msg.get("metadata") or {}
+                    if msg.get("direction") == "outbound" and metadata.get(
+                        "tool_outputs"
+                    ):
                         recent_tool_turns += 1
                         if recent_tool_turns >= 3:  # MAX 3 turns with tool outputs
                             break
@@ -748,66 +851,95 @@ class MessagePipeline:
 
                         # Validate message structure (must be a dict)
                         if not isinstance(msg, dict):
-                            log.warning(f"⚠️ Invalid message type at index {idx}: {type(msg)}")
+                            log.warning(
+                                f"⚠️ Invalid message type at index {idx}: {type(msg)}"
+                            )
                             continue
 
                         # Validate required fields
-                        direction = msg.get('direction')
+                        direction = msg.get("direction")
                         if not direction:
-                            log.warning(f"⚠️ Message missing 'direction' field at index {idx}")
+                            log.warning(
+                                f"⚠️ Message missing 'direction' field at index {idx}"
+                            )
                             continue
 
-                        if direction == 'inbound':
-                            chat_history.append(HumanMessage(content=msg.get('content', '')))
+                        if direction == "inbound":
+                            chat_history.append(
+                                HumanMessage(content=msg.get("content", ""))
+                            )
 
-                        elif direction == 'outbound':
-                            content = msg.get('content', '')
+                        elif direction == "outbound":
+                            content = msg.get("content", "")
 
                             # Check if this message has tool outputs AND is within last 3 tool-using turns
-                            metadata = msg.get('metadata', {})
+                            metadata = msg.get("metadata", {})
                             if metadata is None:
                                 metadata = {}
 
-                            tool_outputs = metadata.get('tool_outputs', []) if isinstance(metadata, dict) else []
+                            tool_outputs = (
+                                metadata.get("tool_outputs", [])
+                                if isinstance(metadata, dict)
+                                else []
+                            )
 
                             # Only append tool outputs if from recent turns (prevent token bloat!)
-                            is_recent_enough = (len(messages_for_history) - idx) <= (recent_tool_turns if recent_tool_turns <= 3 else 3)
+                            is_recent_enough = (len(messages_for_history) - idx) <= (
+                                recent_tool_turns if recent_tool_turns <= 3 else 3
+                            )
 
                             if tool_outputs and is_recent_enough:
                                 # Append structured data for agent reference (compact format)
                                 tool_context = "\n[Données précédentes:"
                                 for tool_output in tool_outputs:
                                     if not isinstance(tool_output, dict):
-                                        log.debug(f"⚠️ Skipping non-dict tool_output: {type(tool_output)}")
+                                        log.debug(
+                                            f"⚠️ Skipping non-dict tool_output: {type(tool_output)}"
+                                        )
                                         continue
 
-                                    tool_name = tool_output.get('tool', 'unknown')
-                                    output_data = tool_output.get('output')
+                                    tool_name = tool_output.get("tool", "unknown")
+                                    output_data = tool_output.get("output")
 
                                     # Only include essential structured data (not full details)
-                                    if tool_name == 'list_projects_tool' and isinstance(output_data, list):
+                                    if (
+                                        tool_name == "list_projects_tool"
+                                        and isinstance(output_data, list)
+                                    ):
                                         # Extract just IDs and names
                                         projects_compact = [
                                             {"id": p.get("id"), "nom": p.get("nom")}
-                                            for p in output_data if isinstance(p, dict)
+                                            for p in output_data
+                                            if isinstance(p, dict)
                                         ]
                                         if projects_compact:
                                             tool_context += f"\nProjets: {json.dumps(projects_compact, ensure_ascii=False)}"
 
-                                    elif tool_name == 'list_tasks_tool' and isinstance(output_data, list):
+                                    elif tool_name == "list_tasks_tool" and isinstance(
+                                        output_data, list
+                                    ):
                                         # Extract just IDs and titles
                                         tasks_compact = [
                                             {"id": t.get("id"), "title": t.get("title")}
-                                            for t in output_data if isinstance(t, dict)
+                                            for t in output_data
+                                            if isinstance(t, dict)
                                         ]
                                         if tasks_compact:
                                             tool_context += f"\nTâches: {json.dumps(tasks_compact, ensure_ascii=False)}"
 
-                                    elif tool_name == 'list_documents_tool' and isinstance(output_data, list):
+                                    elif (
+                                        tool_name == "list_documents_tool"
+                                        and isinstance(output_data, list)
+                                    ):
                                         # Extract just IDs and names
                                         docs_compact = [
-                                            {"id": d.get("id"), "name": d.get("name"), "type": d.get("type")}
-                                            for d in output_data if isinstance(d, dict)
+                                            {
+                                                "id": d.get("id"),
+                                                "name": d.get("name"),
+                                                "type": d.get("type"),
+                                            }
+                                            for d in output_data
+                                            if isinstance(d, dict)
                                         ]
                                         if docs_compact:
                                             tool_context += f"\nDocuments: {json.dumps(docs_compact, ensure_ascii=False)}"
@@ -819,24 +951,34 @@ class MessagePipeline:
 
                     except Exception as msg_error:
                         # Log error but continue processing other messages (graceful degradation)
-                        log.warning(f"⚠️ Error processing message at index {idx}: {msg_error}")
+                        log.warning(
+                            f"⚠️ Error processing message at index {idx}: {msg_error}"
+                        )
                         log.debug(f"   Problematic message: {msg}")
                         continue
 
                 log.info(f"📜 Loaded {len(chat_history)} messages for agent context")
-                log.debug(f"   Chat history has {len([m for m in chat_history if isinstance(m, HumanMessage)])} user messages")
-                log.debug(f"   Chat history has {len([m for m in chat_history if isinstance(m, AIMessage)])} AI messages")
+                log.debug(
+                    f"   Chat history has {len([m for m in chat_history if isinstance(m, HumanMessage)])} user messages"
+                )
+                log.debug(
+                    f"   Chat history has {len([m for m in chat_history if isinstance(m, AIMessage)])} AI messages"
+                )
             except Exception as e:
                 log.warning(f"Could not load chat history for agent: {e}")
                 log.exception(e)  # Full stack trace for debugging
                 log.debug(f"   Session ID: {ctx.session_id}")
-                log.debug(f"   Messages loaded: {len(messages) if 'messages' in locals() else 'N/A'}")
+                log.debug(
+                    f"   Messages loaded: {len(messages) if 'messages' in locals() else 'N/A'}"
+                )
                 chat_history = []
 
             log.info(f"🤖 Invoking full AI agent with conversation context")
             log.debug(f"   User message: '{ctx.message_in_french}'")
             log.debug(f"   Chat history: {len(chat_history)} messages")
-            log.debug(f"   Explicit state: {state_context if state_context else 'None'}")
+            log.debug(
+                f"   Explicit state: {state_context if state_context else 'None'}"
+            )
 
             agent_result = await lumiera_agent.process_message(
                 user_id=ctx.user_id,
@@ -845,7 +987,7 @@ class MessagePipeline:
                 language=ctx.user_language,
                 message_text=ctx.message_in_french,
                 chat_history=chat_history,
-                state_context=state_context  # NEW: Inject explicit state
+                state_context=state_context,  # NEW: Inject explicit state
             )
 
             ctx.response_text = agent_result.get("message")
@@ -853,10 +995,14 @@ class MessagePipeline:
             ctx.tools_called = agent_result.get("tools_called", [])
 
             log.info(f"✅ AI agent completed")
-            log.debug(f"   Response length: {len(ctx.response_text) if ctx.response_text else 0} chars")
+            log.debug(
+                f"   Response length: {len(ctx.response_text) if ctx.response_text else 0} chars"
+            )
             log.debug(f"   Tools called: {ctx.tools_called}")
             log.debug(f"   Escalation: {ctx.escalation}")
-            ctx.tool_outputs = agent_result.get("tool_outputs", [])  # NEW: Store for persistence
+            ctx.tool_outputs = agent_result.get(
+                "tool_outputs", []
+            )  # NEW: Store for persistence
 
             log.info(f"✅ Agent processed message")
             return Result.ok(None)
@@ -873,9 +1019,10 @@ class MessagePipeline:
 
                 # Only check if response is substantial enough
                 if len(ctx.response_text.strip()) > 10:
-                    detected_lang, method = await language_detection_service.detect_async(
-                        ctx.response_text,
-                        fallback_language="fr"
+                    detected_lang, method = (
+                        await language_detection_service.detect_async(
+                            ctx.response_text, fallback_language="fr"
+                        )
                     )
 
                     if detected_lang != "fr":
@@ -887,25 +1034,33 @@ class MessagePipeline:
                         ctx.response_text = await translation_service.translate(
                             ctx.response_text,
                             source_language=detected_lang,
-                            target_language=ctx.user_language
+                            target_language=ctx.user_language,
                         )
-                        log.info(f"✅ Response translated from {detected_lang} to {ctx.user_language}")
+                        log.info(
+                            f"✅ Response translated from {detected_lang} to {ctx.user_language}"
+                        )
                     else:
                         # Agent correctly responded in French
                         if ctx.user_language != "fr":
-                            ctx.response_text = await translation_service.translate_from_french(
-                                ctx.response_text,
-                                ctx.user_language
+                            ctx.response_text = (
+                                await translation_service.translate_from_french(
+                                    ctx.response_text, ctx.user_language
+                                )
                             )
-                            log.info(f"✅ Response translated from French to {ctx.user_language}")
+                            log.info(
+                                f"✅ Response translated from French to {ctx.user_language}"
+                            )
                         else:
-                            log.debug(f"ℹ️ No translation needed - user language is French")
+                            log.debug(
+                                f"ℹ️ No translation needed - user language is French"
+                            )
                 else:
                     # Short response, assume French and translate
                     if ctx.user_language != "fr":
-                        ctx.response_text = await translation_service.translate_from_french(
-                            ctx.response_text,
-                            ctx.user_language
+                        ctx.response_text = (
+                            await translation_service.translate_from_french(
+                                ctx.response_text, ctx.user_language
+                            )
                         )
                         log.info(f"✅ Response translated to {ctx.user_language}")
                     else:
@@ -927,8 +1082,10 @@ class MessagePipeline:
                 direction="inbound",
                 message_sid=ctx.message_sid,
                 media_url=ctx.media_url,
-                message_type="audio" if ctx.media_type and 'audio' in ctx.media_type else "text",
-                session_id=ctx.session_id
+                message_type=(
+                    "audio" if ctx.media_type and "audio" in ctx.media_type else "text"
+                ),
+                session_id=ctx.session_id,
             )
 
             # Build metadata for outbound message
@@ -942,7 +1099,9 @@ class MessagePipeline:
             # Add tool outputs metadata if any (for short-term memory)
             if ctx.tool_outputs:
                 outbound_metadata["tool_outputs"] = ctx.tool_outputs
-                log.debug(f"💾 Storing {len(ctx.tool_outputs)} tool outputs in message metadata")
+                log.debug(
+                    f"💾 Storing {len(ctx.tool_outputs)} tool outputs in message metadata"
+                )
 
             # Save outbound message with metadata
             await supabase_client.save_message(
@@ -952,7 +1111,7 @@ class MessagePipeline:
                 direction="outbound",
                 session_id=ctx.session_id,
                 is_escalation=ctx.escalation,
-                metadata=outbound_metadata if outbound_metadata else None
+                metadata=outbound_metadata if outbound_metadata else None,
             )
 
             log.info(f"✅ Messages persisted")

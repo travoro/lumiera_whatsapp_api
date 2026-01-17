@@ -3,18 +3,21 @@
 These tests simulate real user interactions to verify the system
 handles common scenarios correctly, including edge cases and chaos.
 """
-import pytest
+
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
-from src.fsm.core import FSMEngine, StateManager
-from src.fsm.routing import IntentRouter
-from src.fsm.handlers import ClarificationManager
-from src.fsm.models import SessionState, FSMContext
 
+import pytest
+
+from src.fsm.core import FSMEngine, StateManager
+from src.fsm.handlers import ClarificationManager
+from src.fsm.models import FSMContext, SessionState
+from src.fsm.routing import IntentRouter
 
 # ============================================================================
 # Test Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def mock_state_manager():
@@ -55,6 +58,7 @@ def clarification_manager():
 # Scenario Tests - Happy Path
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
     """Scenario 1: User completes full progress update (photo + comment + complete)."""
@@ -65,13 +69,11 @@ async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
         user_id=user_id,
         current_state=SessionState.IDLE,
         session_id="session_123",
-        task_id="task_456"
+        task_id="task_456",
     )
 
     result = await fsm_engine.transition(
-        context=context,
-        to_state=SessionState.TASK_SELECTION,
-        trigger="start_update"
+        context=context, to_state=SessionState.TASK_SELECTION, trigger="start_update"
     )
     assert result.success is True
     assert result.to_state == SessionState.TASK_SELECTION
@@ -79,9 +81,7 @@ async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
     # Step 1.5: User selects task (TASK_SELECTION -> AWAITING_ACTION)
     context = result.context
     result = await fsm_engine.transition(
-        context=context,
-        to_state=SessionState.AWAITING_ACTION,
-        trigger="task_selected"
+        context=context, to_state=SessionState.AWAITING_ACTION, trigger="task_selected"
     )
     assert result.success is True
     assert result.to_state == SessionState.AWAITING_ACTION
@@ -91,7 +91,7 @@ async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
     result = await fsm_engine.transition(
         context=context,
         to_state=SessionState.COLLECTING_DATA,
-        trigger="start_collection"
+        trigger="start_collection",
     )
     assert result.success is True
     assert result.to_state == SessionState.COLLECTING_DATA
@@ -99,9 +99,7 @@ async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
     # Step 3: User adds comment (self-loop)
     context = result.context
     result = await fsm_engine.transition(
-        context=context,
-        to_state=SessionState.COLLECTING_DATA,
-        trigger="add_data"
+        context=context, to_state=SessionState.COLLECTING_DATA, trigger="add_data"
     )
     assert result.success is True
     assert result.to_state == SessionState.COLLECTING_DATA
@@ -111,7 +109,7 @@ async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
     result = await fsm_engine.transition(
         context=context,
         to_state=SessionState.CONFIRMATION_PENDING,
-        trigger="request_confirmation"
+        trigger="request_confirmation",
     )
     assert result.success is True
     assert result.to_state == SessionState.CONFIRMATION_PENDING
@@ -122,7 +120,7 @@ async def test_scenario_happy_path_full_update(fsm_engine, intent_router):
         context=context,
         to_state=SessionState.COMPLETED,
         trigger="confirm",
-        closure_reason="completed_successfully"
+        closure_reason="completed_successfully",
     )
     assert result.success is True
     assert result.to_state == SessionState.COMPLETED
@@ -135,29 +133,40 @@ async def test_scenario_minimal_update(fsm_engine):
         user_id="user_123",
         current_state=SessionState.IDLE,
         session_id="session_123",
-        task_id="task_456"
+        task_id="task_456",
     )
 
     # IDLE -> TASK_SELECTION -> AWAITING_ACTION -> COLLECTING -> CONFIRMATION -> COMPLETE
-    result = await fsm_engine.transition(context, SessionState.TASK_SELECTION, "start_update")
+    result = await fsm_engine.transition(
+        context, SessionState.TASK_SELECTION, "start_update"
+    )
     assert result.success
 
-    result = await fsm_engine.transition(result.context, SessionState.AWAITING_ACTION, "task_selected")
+    result = await fsm_engine.transition(
+        result.context, SessionState.AWAITING_ACTION, "task_selected"
+    )
     assert result.success
 
-    result = await fsm_engine.transition(result.context, SessionState.COLLECTING_DATA, "start_collection")
+    result = await fsm_engine.transition(
+        result.context, SessionState.COLLECTING_DATA, "start_collection"
+    )
     assert result.success
 
-    result = await fsm_engine.transition(result.context, SessionState.CONFIRMATION_PENDING, "request_confirmation")
+    result = await fsm_engine.transition(
+        result.context, SessionState.CONFIRMATION_PENDING, "request_confirmation"
+    )
     assert result.success
 
-    result = await fsm_engine.transition(result.context, SessionState.COMPLETED, "confirm")
+    result = await fsm_engine.transition(
+        result.context, SessionState.COMPLETED, "confirm"
+    )
     assert result.success
 
 
 # ============================================================================
 # Scenario Tests - Ambiguous Intent (Clarification Needed)
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_scenario_ambiguous_problem_keyword(intent_router):
@@ -167,19 +176,25 @@ async def test_scenario_ambiguous_problem_keyword(intent_router):
         user_id="user_123",
         current_state=SessionState.COLLECTING_DATA,
         session_id="session_123",
-        task_id="task_456"
+        task_id="task_456",
     )
 
     # Simulate two possible intents: add_comment vs create_incident
     intents = [
-        {"intent": "add_comment", "confidence": 0.75, "parameters": {"text": "problem with wall"}},
-        {"intent": "create_incident", "confidence": 0.72, "parameters": {"description": "problem with wall"}}
+        {
+            "intent": "add_comment",
+            "confidence": 0.75,
+            "parameters": {"text": "problem with wall"},
+        },
+        {
+            "intent": "create_incident",
+            "confidence": 0.72,
+            "parameters": {"description": "problem with wall"},
+        },
     ]
 
     winner, needs_clarification = intent_router.route_multiple_intents(
-        intents=intents,
-        context=context,
-        confidence_threshold=0.70
+        intents=intents, context=context, confidence_threshold=0.70
     )
 
     # System automatically resolves by penalizing conflicting intent
@@ -198,7 +213,7 @@ async def test_scenario_switch_task_mid_update(intent_router):
         user_id="user_123",
         current_state=SessionState.COLLECTING_DATA,
         session_id="session_123",
-        task_id="task_5"
+        task_id="task_5",
     )
 
     # User says "update task 12" (wants to switch)
@@ -206,7 +221,7 @@ async def test_scenario_switch_task_mid_update(intent_router):
         intent="progress_update",
         confidence=0.85,
         context=context,
-        parameters={"task_id": "task_12"}
+        parameters={"task_id": "task_12"},
     )
 
     # Should detect conflict and request clarification
@@ -217,6 +232,7 @@ async def test_scenario_switch_task_mid_update(intent_router):
 # Scenario Tests - Abandonment & Timeout
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_scenario_explicit_cancellation(fsm_engine):
     """Scenario 5: User explicitly cancels update."""
@@ -224,14 +240,14 @@ async def test_scenario_explicit_cancellation(fsm_engine):
         user_id="user_123",
         current_state=SessionState.COLLECTING_DATA,
         session_id="session_123",
-        task_id="task_456"
+        task_id="task_456",
     )
 
     result = await fsm_engine.transition(
         context=context,
         to_state=SessionState.ABANDONED,
         trigger="cancel",
-        closure_reason="user_cancelled"
+        closure_reason="user_cancelled",
     )
 
     assert result.success is True
@@ -245,14 +261,14 @@ async def test_scenario_timeout_abandonment(fsm_engine):
         user_id="user_123",
         current_state=SessionState.AWAITING_ACTION,
         session_id="session_123",
-        task_id="task_456"
+        task_id="task_456",
     )
 
     result = await fsm_engine.transition(
         context=context,
         to_state=SessionState.ABANDONED,
         trigger="timeout",
-        closure_reason="session_timeout"
+        closure_reason="session_timeout",
     )
 
     assert result.success is True
@@ -273,6 +289,7 @@ async def test_scenario_clarification_timeout(clarification_manager):
 # Scenario Tests - Idempotency
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_scenario_duplicate_message(mock_state_manager):
     """Scenario 8: User clicks 'complete' twice - idempotency prevents duplicate."""
@@ -285,9 +302,7 @@ async def test_scenario_duplicate_message(mock_state_manager):
 
     # Process and record
     await mock_state_manager.record_idempotency(
-        user_id=user_id,
-        message_id=message_id,
-        result={"status": "completed"}
+        user_id=user_id, message_id=message_id, result={"status": "completed"}
     )
 
     # Second request - should return cached result
@@ -304,14 +319,14 @@ async def test_scenario_concurrent_messages(mock_state_manager, fsm_engine):
         user_id="user_123",
         current_state=SessionState.COLLECTING_DATA,
         session_id="session_123",
-        task_id="task_456"
+        task_id="task_456",
     )
 
     # Simulate concurrent transitions (both trying to complete)
     result1 = await fsm_engine.transition(
         context=context,
         to_state=SessionState.CONFIRMATION_PENDING,
-        trigger="request_confirmation"
+        trigger="request_confirmation",
     )
 
     # Second transition should fail (context already in new state)
@@ -323,24 +338,24 @@ async def test_scenario_concurrent_messages(mock_state_manager, fsm_engine):
 # Scenario Tests - Priority-Based Routing
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_scenario_critical_command_overrides(intent_router):
     """Scenario 10: 'Cancel' command (P0) overrides other intents."""
     context = FSMContext(
         user_id="user_123",
         current_state=SessionState.COLLECTING_DATA,
-        session_id="session_123"
+        session_id="session_123",
     )
 
     # Multiple intents detected, but 'cancel' has P0 priority
     intents = [
         {"intent": "add_comment", "confidence": 0.85, "parameters": {}},
-        {"intent": "cancel", "confidence": 0.90, "parameters": {}}
+        {"intent": "cancel", "confidence": 0.90, "parameters": {}},
     ]
 
     winner, needs_clarification = intent_router.route_multiple_intents(
-        intents=intents,
-        context=context
+        intents=intents, context=context
     )
 
     assert needs_clarification is False
@@ -355,19 +370,17 @@ async def test_scenario_low_confidence_requests_clarification(intent_router):
     context = FSMContext(
         user_id="user_123",
         current_state=SessionState.AWAITING_ACTION,
-        session_id="session_123"
+        session_id="session_123",
     )
 
     # Low confidence intents
     intents = [
         {"intent": "add_comment", "confidence": 0.55, "parameters": {}},
-        {"intent": "upload_photo", "confidence": 0.60, "parameters": {}}
+        {"intent": "upload_photo", "confidence": 0.60, "parameters": {}},
     ]
 
     winner, needs_clarification = intent_router.route_multiple_intents(
-        intents=intents,
-        context=context,
-        confidence_threshold=0.70
+        intents=intents, context=context, confidence_threshold=0.70
     )
 
     assert needs_clarification is True
@@ -377,6 +390,7 @@ async def test_scenario_low_confidence_requests_clarification(intent_router):
 # ============================================================================
 # Scenario Tests - Session Recovery
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_scenario_server_restart_recovery(mock_state_manager):
@@ -388,7 +402,7 @@ async def test_scenario_server_restart_recovery(mock_state_manager):
         old_session = {
             "id": "session_123",
             "subcontractor_id": "user_456",
-            "last_activity": (datetime.utcnow() - timedelta(minutes=40)).isoformat()
+            "last_activity": (datetime.utcnow() - timedelta(minutes=40)).isoformat(),
         }
 
         mock_db.client.table.return_value.select.return_value.lt.return_value.not_.return_value.in_.return_value.execute.return_value.data = [
@@ -406,20 +420,17 @@ async def test_scenario_server_restart_recovery(mock_state_manager):
 # Scenario Tests - Invalid Transitions
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_scenario_invalid_transition_blocked(fsm_engine):
     """Scenario 13: Invalid transition is blocked by FSM."""
     context = FSMContext(
-        user_id="user_123",
-        current_state=SessionState.IDLE,
-        session_id="session_123"
+        user_id="user_123", current_state=SessionState.IDLE, session_id="session_123"
     )
 
     # Try to go directly from IDLE to COMPLETED (invalid)
     result = await fsm_engine.transition(
-        context=context,
-        to_state=SessionState.COMPLETED,
-        trigger="complete"
+        context=context, to_state=SessionState.COMPLETED, trigger="complete"
     )
 
     assert result.success is False
@@ -431,18 +442,20 @@ async def test_scenario_invalid_transition_blocked(fsm_engine):
 async def test_scenario_force_abandon_from_any_state(fsm_engine):
     """Scenario 14: Force abandon works from any state (global transition)."""
     # Test from multiple states
-    for state in [SessionState.AWAITING_ACTION, SessionState.COLLECTING_DATA, SessionState.CONFIRMATION_PENDING]:
+    for state in [
+        SessionState.AWAITING_ACTION,
+        SessionState.COLLECTING_DATA,
+        SessionState.CONFIRMATION_PENDING,
+    ]:
         context = FSMContext(
-            user_id="user_123",
-            current_state=state,
-            session_id="session_123"
+            user_id="user_123", current_state=state, session_id="session_123"
         )
 
         result = await fsm_engine.transition(
             context=context,
             to_state=SessionState.ABANDONED,
             trigger="force_abandon",
-            closure_reason="admin_action"
+            closure_reason="admin_action",
         )
 
         assert result.success is True

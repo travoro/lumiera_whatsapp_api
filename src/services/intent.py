@@ -1,9 +1,12 @@
 """Intent classification service for hybrid approach."""
-from typing import Optional, Dict, Any
-import re
+
 import json
+import re
+from typing import Any, Dict, Optional
+
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+
 from src.config import settings
 from src.utils.logger import log
 
@@ -11,97 +14,240 @@ INTENTS = {
     "greeting": {
         "keywords": [
             # English
-            "hello", "hi", "hey",
+            "hello",
+            "hi",
+            "hey",
             # French
-            "bonjour", "salut",
+            "bonjour",
+            "salut",
             # Spanish
-            "hola", "buenos dias",
+            "hola",
+            "buenos dias",
             # Portuguese
             "bom dia",
             # Arabic (transliterated and common phrases)
-            "allahu akbar", "salam", "as-salamu alaykum", "assalamu alaikum",
-            "marhaba", "ahlan", "sabah al-khayr", "sabah al khair",
-            "masa al-khayr", "masa al khair"
+            "allahu akbar",
+            "salam",
+            "as-salamu alaykum",
+            "assalamu alaikum",
+            "marhaba",
+            "ahlan",
+            "sabah al-khayr",
+            "sabah al khair",
+            "masa al-khayr",
+            "masa al khair",
         ],
-        "requires_tools": False
+        "requires_tools": False,
     },
     "list_projects": {
-        "keywords": ["projects", "chantiers", "list", "show", "projets", "voir", "mostrar"],
+        "keywords": [
+            "projects",
+            "chantiers",
+            "list",
+            "show",
+            "projets",
+            "voir",
+            "mostrar",
+        ],
         "tools": ["list_projects_tool"],
-        "requires_confirmation": False
+        "requires_confirmation": False,
     },
     "list_tasks": {
         "keywords": ["tasks", "tâches", "todo", "tareas", "tarefas"],
         "tools": ["list_tasks_tool"],
-        "requires_confirmation": False
+        "requires_confirmation": False,
     },
     "view_documents": {
         "keywords": [
             # English
-            "documents", "plans", "plan", "files", "blueprints", "drawings",
+            "documents",
+            "plans",
+            "plan",
+            "files",
+            "blueprints",
+            "drawings",
             # French
-            "documents", "plan", "plans", "fichiers", "schémas", "dessins", "voir plan", "voir les plans",
+            "documents",
+            "plan",
+            "plans",
+            "fichiers",
+            "schémas",
+            "dessins",
+            "voir plan",
+            "voir les plans",
             # Spanish
-            "documentos", "planos", "archivos", "ver plan",
+            "documentos",
+            "planos",
+            "archivos",
+            "ver plan",
             # Portuguese
-            "documentos", "planos", "arquivos", "ver plano"
+            "documentos",
+            "planos",
+            "arquivos",
+            "ver plano",
         ],
         "tools": ["get_documents_tool"],
-        "requires_confirmation": False
+        "requires_confirmation": False,
     },
     "escalate": {  # EASY ESCALATION - NO CONFIRMATION
         "keywords": [
             # English
-            "human", "person", "admin", "team", "contact", "speak", "talk", "help", "stuck",
+            "human",
+            "person",
+            "admin",
+            "team",
+            "contact",
+            "speak",
+            "talk",
+            "help",
+            "stuck",
             # French
-            "humain", "personne", "administrateur", "équipe", "equipe", "contacter", "parler", "aide", "bloqué",
+            "humain",
+            "personne",
+            "administrateur",
+            "équipe",
+            "equipe",
+            "contacter",
+            "parler",
+            "aide",
+            "bloqué",
             # Spanish
-            "humano", "persona", "administrador", "equipo", "contactar", "hablar", "ayuda", "atascado",
+            "humano",
+            "persona",
+            "administrador",
+            "equipo",
+            "contactar",
+            "hablar",
+            "ayuda",
+            "atascado",
             # Portuguese
-            "humano", "pessoa", "administrador", "equipe", "equipa", "contatar", "falar", "ajuda", "preso",
+            "humano",
+            "pessoa",
+            "administrador",
+            "equipe",
+            "equipa",
+            "contatar",
+            "falar",
+            "ajuda",
+            "preso",
             # German
-            "mensch", "person", "administrator", "team", "kontakt", "sprechen", "hilfe", "fest",
+            "mensch",
+            "person",
+            "administrator",
+            "team",
+            "kontakt",
+            "sprechen",
+            "hilfe",
+            "fest",
             # Italian
-            "umano", "persona", "amministratore", "squadra", "contattare", "parlare", "aiuto", "bloccato",
+            "umano",
+            "persona",
+            "amministratore",
+            "squadra",
+            "contattare",
+            "parlare",
+            "aiuto",
+            "bloccato",
             # Romanian
-            "om", "persoană", "administrator", "echipă", "echipa", "contacta", "vorbi", "ajutor", "blocat",
+            "om",
+            "persoană",
+            "administrator",
+            "echipă",
+            "echipa",
+            "contacta",
+            "vorbi",
+            "ajutor",
+            "blocat",
             # Polish
-            "człowiek", "osoba", "administrator", "zespół", "kontakt", "rozmawiać", "pomoc", "utknął",
+            "człowiek",
+            "osoba",
+            "administrator",
+            "zespół",
+            "kontakt",
+            "rozmawiać",
+            "pomoc",
+            "utknął",
             # Arabic (transliterated)
-            "insan", "shakhṣ", "mudīr", "farīq", "ittiṣāl", "takallum", "musāʿada"
+            "insan",
+            "shakhṣ",
+            "mudīr",
+            "farīq",
+            "ittiṣāl",
+            "takallum",
+            "musāʿada",
         ],
         "tools": ["escalate_to_human_tool"],
-        "requires_confirmation": False  # No confirmation needed!
+        "requires_confirmation": False,  # No confirmation needed!
     },
     "report_incident": {
-        "keywords": ["incident", "problem", "issue", "problema", "signaler", "reportar"],
+        "keywords": [
+            "incident",
+            "problem",
+            "issue",
+            "problema",
+            "signaler",
+            "reportar",
+        ],
         "tools": ["report_incident_tool"],
-        "requires_confirmation": False
+        "requires_confirmation": False,
     },
     "update_progress": {
-        "keywords": ["update", "progress", "progression", "mettre à jour", "actualizar", "atualizar", "avancement", "progreso", "progresso"],
+        "keywords": [
+            "update",
+            "progress",
+            "progression",
+            "mettre à jour",
+            "actualizar",
+            "atualizar",
+            "avancement",
+            "progreso",
+            "progresso",
+        ],
         "tools": ["update_task_progress_tool"],
-        "requires_confirmation": False
+        "requires_confirmation": False,
     },
     "task_details": {
         "keywords": [
             # English
-            "details", "detail", "info", "information", "describe", "show", "view", "see",
+            "details",
+            "detail",
+            "info",
+            "information",
+            "describe",
+            "show",
+            "view",
+            "see",
             # French
-            "détails", "détail", "description", "voir", "montrer", "afficher", "infos", "informations",
+            "détails",
+            "détail",
+            "description",
+            "voir",
+            "montrer",
+            "afficher",
+            "infos",
+            "informations",
             # Spanish
-            "detalles", "detalle", "descripción", "información", "ver", "mostrar",
+            "detalles",
+            "detalle",
+            "descripción",
+            "información",
+            "ver",
+            "mostrar",
             # Portuguese
-            "detalhes", "descrição", "informação", "ver", "mostrar"
+            "detalhes",
+            "descrição",
+            "informação",
+            "ver",
+            "mostrar",
         ],
         "tools": ["get_task_description_tool", "get_task_images_tool"],
-        "requires_confirmation": False
+        "requires_confirmation": False,
     },
     "general": {
         "keywords": [],
         "tools": "all",  # All tools available
-        "requires_confirmation": False
-    }
+        "requires_confirmation": False,
+    },
 }
 
 
@@ -115,7 +261,7 @@ class IntentClassifier:
                 model="gpt-4o-mini",  # Fast and cheap for classification
                 api_key=settings.openai_api_key,
                 temperature=0.1,
-                max_tokens=100
+                max_tokens=100,
             )
             log.info("Intent classifier initialized with OpenAI (gpt-4o-mini)")
         else:
@@ -123,7 +269,7 @@ class IntentClassifier:
                 model="claude-3-5-haiku-20241022",
                 api_key=settings.anthropic_api_key,
                 temperature=0.1,
-                max_tokens=100
+                max_tokens=100,
             )
             log.info("Intent classifier initialized with Claude Haiku")
         # Keep backward compatibility
@@ -142,7 +288,7 @@ class IntentClassifier:
             return False
         # Match patterns like "1.", "2)", "1 -", "1:", etc.
         # Look for at least 1 numbered item (supporting 1-10 for dynamic menus)
-        pattern = r'(?:^|\n)\s*[1-9][\.\)\:\-]\s+|(?:^|\n)\s*10[\.\)\:\-]\s+'
+        pattern = r"(?:^|\n)\s*[1-9][\.\)\:\-]\s+|(?:^|\n)\s*10[\.\)\:\-]\s+"
         matches = re.findall(pattern, text, re.MULTILINE)
         return len(matches) >= 1
 
@@ -160,7 +306,7 @@ class IntentClassifier:
         # Media context (critical for photo/video messages)
         has_media: bool = False,
         media_type: str = None,
-        num_media: int = 0
+        num_media: int = 0,
     ) -> Dict[str, Any]:
         """Classify intent quickly with Claude Haiku and confidence score.
 
@@ -184,15 +330,23 @@ class IntentClassifier:
                 for keyword in keywords:
                     if keyword in message_lower:
                         # Exact match = high confidence
-                        if message_lower == keyword or message_lower.startswith(keyword + " ") or message_lower.endswith(" " + keyword):
+                        if (
+                            message_lower == keyword
+                            or message_lower.startswith(keyword + " ")
+                            or message_lower.endswith(" " + keyword)
+                        ):
                             confidence = 0.98
-                            log.info(f"🎯 Exact keyword match: '{keyword}' → {intent_name} (confidence: {confidence})")
+                            log.info(
+                                f"🎯 Exact keyword match: '{keyword}' → {intent_name} (confidence: {confidence})"
+                            )
                             intent = intent_name
                             break
                         # Partial match = medium-high confidence
                         elif len(message_lower.split()) <= 3:
                             confidence = 0.90
-                            log.info(f"🎯 Strong keyword match: '{keyword}' → {intent_name} (confidence: {confidence})")
+                            log.info(
+                                f"🎯 Strong keyword match: '{keyword}' → {intent_name} (confidence: {confidence})"
+                            )
                             intent = intent_name
                             break
                 if confidence >= 0.90:
@@ -205,16 +359,20 @@ class IntentClassifier:
                 if conversation_history and len(conversation_history) > 0:
                     context_section = "\n\nHistorique récent de conversation :\n"
                     for msg in conversation_history:
-                        direction = msg.get('direction', '')
-                        content = msg.get('content', '')[:200]  # Limit to 200 chars
-                        if direction == 'inbound':
+                        direction = msg.get("direction", "")
+                        content = msg.get("content", "")[:200]  # Limit to 200 chars
+                        if direction == "inbound":
                             context_section += f"User: {content}\n"
-                        elif direction == 'outbound':
+                        elif direction == "outbound":
                             context_section += f"Bot: {content}\n"
                     context_section += "\n"
 
                 # Check if last bot message was a numbered menu
-                is_menu_response = message.strip().isdigit() and last_bot_message and self._contains_numbered_list(last_bot_message)
+                is_menu_response = (
+                    message.strip().isdigit()
+                    and last_bot_message
+                    and self._contains_numbered_list(last_bot_message)
+                )
                 menu_hint = ""
                 if is_menu_response:
                     menu_hint = f"\n⚠️ IMPORTANT : L'utilisateur répond à un menu numéroté avec '{message}'. Analyse l'historique pour comprendre ce que ce numéro représente.\n"
@@ -226,7 +384,7 @@ class IntentClassifier:
                     media_types = {
                         "image": "photo/image",
                         "video": "vidéo",
-                        "audio": "message vocal/audio"
+                        "audio": "message vocal/audio",
                     }
                     media_display = media_types.get(media_type, "média")
                     media_hint = f"""
@@ -312,7 +470,9 @@ Retourne UNIQUEMENT un JSON valide sans texte supplémentaire. Format :
 
 Exemple : {{"intent": "greeting", "confidence": 95}}"""
 
-                response = await self.haiku.ainvoke([{"role": "user", "content": prompt}])
+                response = await self.haiku.ainvoke(
+                    [{"role": "user", "content": prompt}]
+                )
                 response_text = response.content.strip()
 
                 # Log raw response for debugging
@@ -322,21 +482,25 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                 try:
                     # Try to extract JSON if there's extra text (sometimes LLMs add explanation)
                     # Find first { and last } to extract JSON object
-                    start_idx = response_text.find('{')
-                    end_idx = response_text.rfind('}')
+                    start_idx = response_text.find("{")
+                    end_idx = response_text.rfind("}")
 
                     if start_idx != -1 and end_idx != -1:
-                        json_str = response_text[start_idx:end_idx + 1]
+                        json_str = response_text[start_idx : end_idx + 1]
                         parsed = json.loads(json_str)
-                        intent = parsed.get('intent', 'general').lower()
-                        confidence = float(parsed.get('confidence', 75)) / 100.0
-                        log.info(f"✅ JSON parsed successfully: intent={intent}, confidence={confidence}")
+                        intent = parsed.get("intent", "general").lower()
+                        confidence = float(parsed.get("confidence", 75)) / 100.0
+                        log.info(
+                            f"✅ JSON parsed successfully: intent={intent}, confidence={confidence}"
+                        )
                     else:
                         raise ValueError("No JSON object found in response")
 
                 except Exception as e:
                     log.warning(f"⚠️ JSON parsing failed: {e}")
-                    log.warning(f"📝 Raw response (first 200 chars): {response_text[:200]}")
+                    log.warning(
+                        f"📝 Raw response (first 200 chars): {response_text[:200]}"
+                    )
                     # Fallback to old format if JSON parsing fails
                     response_lower = response_text.lower()
                     if ":" in response_lower:
@@ -344,8 +508,12 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                         intent = parts[0].strip()
                         try:
                             # Extract just the number (handles "95" or "95%" or "95 explanation")
-                            conf_text = parts[1].strip().split()[0] if parts[1].strip() else "75"
-                            conf_text = conf_text.replace('%', '')
+                            conf_text = (
+                                parts[1].strip().split()[0]
+                                if parts[1].strip()
+                                else "75"
+                            )
+                            conf_text = conf_text.replace("%", "")
                             confidence = float(conf_text) / 100.0
                         except:
                             confidence = 0.75
@@ -354,11 +522,15 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                         confidence = 0.75
 
                 log_prefix = "🔢" if is_menu_response else "🤖"
-                log.info(f"{log_prefix} Haiku classification: {intent} (confidence: {confidence})")
+                log.info(
+                    f"{log_prefix} Haiku classification: {intent} (confidence: {confidence})"
+                )
 
             # Validate intent
             if intent not in INTENTS:
-                log.warning(f"Unknown intent '{intent}' returned, defaulting to 'general'")
+                log.warning(
+                    f"Unknown intent '{intent}' returned, defaulting to 'general'"
+                )
                 intent = "general"
                 confidence = 0.5  # Low confidence for fallback
 
@@ -370,21 +542,28 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                 "confidence": confidence,
                 "requires_tools": intent_metadata.get("requires_tools", True),
                 "tools": intent_metadata.get("tools", []),
-                "requires_confirmation": intent_metadata.get("requires_confirmation", False)
+                "requires_confirmation": intent_metadata.get(
+                    "requires_confirmation", False
+                ),
             }
 
-            log.info(f"Classified intent: {intent} for message: '{message[:50]}...' (user: {user_id})")
+            log.info(
+                f"Classified intent: {intent} for message: '{message[:50]}...' (user: {user_id})"
+            )
 
             # Save classification for analytics (async, don't wait)
             try:
                 from src.integrations.supabase import supabase_client
+
                 if user_id:
-                    await supabase_client.log_intent_classification({
-                        'subcontractor_id': user_id,
-                        'message_text': message[:500],  # Limit length
-                        'classified_intent': intent,
-                        'confidence': confidence  # Use actual confidence score
-                    })
+                    await supabase_client.log_intent_classification(
+                        {
+                            "subcontractor_id": user_id,
+                            "message_text": message[:500],  # Limit length
+                            "classified_intent": intent,
+                            "confidence": confidence,  # Use actual confidence score
+                        }
+                    )
             except Exception as e:
                 log.warning(f"Failed to save intent classification: {e}")
 
@@ -397,7 +576,7 @@ Exemple : {{"intent": "greeting", "confidence": 95}}"""
                 "intent": "general",
                 "requires_tools": True,
                 "tools": "all",
-                "requires_confirmation": False
+                "requires_confirmation": False,
             }
 
     def get_intent_info(self, intent: str) -> Dict[str, Any]:

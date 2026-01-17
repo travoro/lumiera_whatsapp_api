@@ -10,23 +10,25 @@ This test suite covers:
 
 Tests simulate actual Twilio webhooks without external dependencies.
 """
-import pytest
+
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from src.handlers.message import process_inbound_message
-from src.fsm.core import StateManager, FSMEngine
-from src.fsm.routing import IntentRouter
+import pytest
+
+from src.fsm.core import FSMEngine, StateManager
 from src.fsm.handlers import clarification_manager, session_recovery_manager
-from src.fsm.models import SessionState, FSMContext
+from src.fsm.models import FSMContext, SessionState
+from src.fsm.routing import IntentRouter
+from src.handlers.message import process_inbound_message
 from src.services.intent_router import intent_router
-
 
 # ============================================================================
 # Test Fixtures - Mocked Services
 # ============================================================================
+
 
 @pytest.fixture
 def mock_twilio():
@@ -50,7 +52,7 @@ def mock_supabase():
             "name": "Test User",
             "language": "fr",
             "active_project_id": "project_123",
-            "active_task_id": "task_456"
+            "active_task_id": "task_456",
         }
 
         # Mock user lookup - make it return the user data
@@ -91,20 +93,30 @@ def mock_planradar():
     """Mock PlanRadar API."""
     with patch("src.integrations.planradar.PlanRadarClient") as mock:
         # Mock task list
-        mock.return_value.get_tasks = AsyncMock(return_value=[
-            {"id": "task_1", "title": "Install electrical wiring", "status": "open"},
-            {"id": "task_2", "title": "Fix water leak", "status": "open"},
-            {"id": "task_3", "title": "Paint walls", "status": "in_progress"}
-        ])
+        mock.return_value.get_tasks = AsyncMock(
+            return_value=[
+                {
+                    "id": "task_1",
+                    "title": "Install electrical wiring",
+                    "status": "open",
+                },
+                {"id": "task_2", "title": "Fix water leak", "status": "open"},
+                {"id": "task_3", "title": "Paint walls", "status": "in_progress"},
+            ]
+        )
         # Mock task update
         mock.return_value.update_task = AsyncMock(return_value=True)
         # Mock photo upload
-        mock.return_value.upload_photo = AsyncMock(return_value={"photo_id": "photo_123"})
+        mock.return_value.upload_photo = AsyncMock(
+            return_value={"photo_id": "photo_123"}
+        )
         yield mock
 
 
 @pytest.fixture
-async def setup_test_environment(mock_twilio, mock_supabase, mock_anthropic, mock_planradar):
+async def setup_test_environment(
+    mock_twilio, mock_supabase, mock_anthropic, mock_planradar
+):
     """Setup complete test environment with all mocks."""
     # Enable FSM for tests
     with patch("src.config.settings.enable_fsm", True):
@@ -112,13 +124,14 @@ async def setup_test_environment(mock_twilio, mock_supabase, mock_anthropic, moc
             "twilio": mock_twilio,
             "supabase": mock_supabase,
             "anthropic": mock_anthropic,
-            "planradar": mock_planradar
+            "planradar": mock_planradar,
         }
 
 
 # ============================================================================
 # Helper Functions for Test Simulation
 # ============================================================================
+
 
 class ConversationSimulator:
     """Simulates a WhatsApp conversation for testing."""
@@ -138,7 +151,7 @@ class ConversationSimulator:
         media_url: Optional[str] = None,
         media_type: Optional[str] = None,
         button_payload: Optional[str] = None,
-        button_text: Optional[str] = None
+        button_text: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Simulate sending a message from user."""
         self.message_counter += 1
@@ -152,7 +165,7 @@ class ConversationSimulator:
             "media_content_type": media_type,
             "button_payload": button_payload,
             "button_text": button_text,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.utcnow(),
         }
 
         self.message_history.append(message_data)
@@ -165,18 +178,18 @@ class ConversationSimulator:
             media_url=media_url,
             media_content_type=media_type,
             button_payload=button_payload,
-            button_text=button_text
+            button_text=button_text,
         )
 
         # Capture bot response from mock
-        if self.mock_twilio and hasattr(self.mock_twilio, 'send_message'):
+        if self.mock_twilio and hasattr(self.mock_twilio, "send_message"):
             calls = self.mock_twilio.send_message.call_args_list
             if calls:
                 last_call = calls[-1]
                 if len(last_call.args) >= 2:
                     self.bot_responses.append(last_call.args[1])  # message body
-                elif 'body' in last_call.kwargs:
-                    self.bot_responses.append(last_call.kwargs['body'])
+                elif "body" in last_call.kwargs:
+                    self.bot_responses.append(last_call.kwargs["body"])
 
         return message_data
 
@@ -200,16 +213,19 @@ class ConversationSimulator:
 # Integration Test Suite - Audit Scenarios
 # ============================================================================
 
+
 class TestAuditScenario01_NormalCompletion:
     """Scenario 1.1: Normal task update completion (happy path)."""
 
     @pytest.mark.asyncio
-    async def test_normal_task_update_flow(self, setup_test_environment, mock_twilio, mock_supabase):
+    async def test_normal_task_update_flow(
+        self, setup_test_environment, mock_twilio, mock_supabase
+    ):
         """Test complete normal flow: select task -> photo -> comment -> complete."""
         sim = ConversationSimulator(
             user_phone="+1234567890",
             mock_twilio=mock_twilio,
-            mock_supabase=mock_supabase
+            mock_supabase=mock_supabase,
         )
 
         # Step 1: User initiates update
@@ -222,7 +238,7 @@ class TestAuditScenario01_NormalCompletion:
         await sim.send_message(
             "Progress photo",
             media_url="https://example.com/photo.jpg",
-            media_type="image/jpeg"
+            media_type="image/jpeg",
         )
 
         # Step 4: User adds comment
@@ -258,9 +274,7 @@ class TestAuditScenario02_PartialUpdate:
 
             # User sends photo after expiry
             await sim.send_message(
-                "",
-                media_url="https://example.com/photo.jpg",
-                media_type="image/jpeg"
+                "", media_url="https://example.com/photo.jpg", media_type="image/jpeg"
             )
 
         # System should either:
@@ -287,7 +301,7 @@ class TestAuditScenario03_MultiplePhotos:
             await sim.send_message(
                 "",  # Empty text
                 media_url=f"https://example.com/photo{i}.jpg",
-                media_type="image/jpeg"
+                media_type="image/jpeg",
             )
 
         # All photos should be added to same task
@@ -307,14 +321,14 @@ class TestAuditScenario04_UserGosSilent:
         await sim.send_message("Update task")
         await sim.send_message("", button_payload="task_3", button_text="Paint walls")
         await sim.send_message(
-            "",
-            media_url="https://example.com/photo.jpg",
-            media_type="image/jpeg"
+            "", media_url="https://example.com/photo.jpg", media_type="image/jpeg"
         )
 
         # User goes silent for 30 minutes, then asks something unrelated
         with patch("datetime.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = datetime.utcnow() + timedelta(minutes=30)
+            mock_datetime.utcnow.return_value = datetime.utcnow() + timedelta(
+                minutes=30
+            )
 
             # User asks about different project
             await sim.send_message("Show me all projects")
@@ -338,9 +352,7 @@ class TestAuditScenario05_SwitchTask:
         await sim.send_message("Update task 5")
         await sim.send_message("", button_payload="task_5", button_text="Task 5")
         await sim.send_message(
-            "",
-            media_url="https://example.com/photo.jpg",
-            media_type="image/jpeg"
+            "", media_url="https://example.com/photo.jpg", media_type="image/jpeg"
         )
 
         # User mentions different task
@@ -506,6 +518,7 @@ class TestAuditScenario12_MultipleActiveActions:
 # FSM Integration Tests
 # ============================================================================
 
+
 class TestFSMIntegration:
     """Test FSM integration with message pipeline."""
 
@@ -522,9 +535,7 @@ class TestFSMIntegration:
 
         # AWAITING_ACTION -> COLLECTING_DATA
         await sim.send_message(
-            "",
-            media_url="https://example.com/photo.jpg",
-            media_type="image/jpeg"
+            "", media_url="https://example.com/photo.jpg", media_type="image/jpeg"
         )
 
         # COLLECTING_DATA -> CONFIRMATION_PENDING
@@ -574,6 +585,7 @@ class TestFSMIntegration:
 # Multi-Turn Conversation Tests
 # ============================================================================
 
+
 class TestMultiTurnConversations:
     """Test complex multi-turn conversations."""
 
@@ -588,9 +600,7 @@ class TestMultiTurnConversations:
 
         # Add photo
         await sim.send_message(
-            "",
-            media_url="https://example.com/photo1.jpg",
-            media_type="image/jpeg"
+            "", media_url="https://example.com/photo1.jpg", media_type="image/jpeg"
         )
 
         # User asks question (interruption)
@@ -601,9 +611,7 @@ class TestMultiTurnConversations:
 
         # User adds another photo
         await sim.send_message(
-            "",
-            media_url="https://example.com/photo2.jpg",
-            media_type="image/jpeg"
+            "", media_url="https://example.com/photo2.jpg", media_type="image/jpeg"
         )
 
         # User completes
@@ -625,7 +633,9 @@ class TestMultiTurnConversations:
         await sim.send_message("Task number three")
 
         # User sends voice comment (transcribed)
-        await sim.send_message("The painting work is almost finished we just need one more day")
+        await sim.send_message(
+            "The painting work is almost finished we just need one more day"
+        )
 
         # Verify voice messages handled as text
         assert len(sim.message_history) == 3
@@ -634,6 +644,7 @@ class TestMultiTurnConversations:
 # ============================================================================
 # Error Handling and Edge Cases
 # ============================================================================
+
 
 class TestErrorHandling:
     """Test error handling and edge cases."""
@@ -659,11 +670,14 @@ class TestErrorHandling:
         await sim.send_message("", button_payload="task_3", button_text="Paint walls")
 
         # Mock media download failure
-        with patch("src.integrations.twilio.twilio_client.download_and_upload_media", return_value=None):
+        with patch(
+            "src.integrations.twilio.twilio_client.download_and_upload_media",
+            return_value=None,
+        ):
             await sim.send_message(
                 "",
                 media_url="https://example.com/broken_photo.jpg",
-                media_type="image/jpeg"
+                media_type="image/jpeg",
             )
 
         # System should:
@@ -678,7 +692,10 @@ class TestErrorHandling:
         sim = ConversationSimulator()
 
         # Mock PlanRadar API failure
-        with patch("src.integrations.planradar.PlanRadarClient.get_tasks", side_effect=Exception("API Error")):
+        with patch(
+            "src.integrations.planradar.PlanRadarClient.get_tasks",
+            side_effect=Exception("API Error"),
+        ):
             await sim.send_message("Update task")
 
         # System should:
@@ -693,7 +710,10 @@ class TestErrorHandling:
         sim = ConversationSimulator()
 
         # Mock database failure
-        with patch("src.integrations.supabase.supabase_client.client.table", side_effect=Exception("DB Error")):
+        with patch(
+            "src.integrations.supabase.supabase_client.client.table",
+            side_effect=Exception("DB Error"),
+        ):
             await sim.send_message("Update task")
 
         # System should handle gracefully
@@ -703,6 +723,7 @@ class TestErrorHandling:
 # ============================================================================
 # State Persistence and Recovery Tests
 # ============================================================================
+
 
 class TestStatePersistence:
     """Test state persistence and recovery."""
@@ -715,11 +736,15 @@ class TestStatePersistence:
             old_session = {
                 "id": "session_old",
                 "subcontractor_id": "user_test_123",
-                "last_activity": (datetime.utcnow() - timedelta(minutes=40)).isoformat(),
-                "fsm_state": "collecting_data"
+                "last_activity": (
+                    datetime.utcnow() - timedelta(minutes=40)
+                ).isoformat(),
+                "fsm_state": "collecting_data",
             }
 
-            mock_db.client.table.return_value.select.return_value.lt.return_value.not_.return_value.in_.return_value.execute.return_value.data = [old_session]
+            mock_db.client.table.return_value.select.return_value.lt.return_value.not_.return_value.in_.return_value.execute.return_value.data = [
+                old_session
+            ]
 
             # Run recovery
             count = await session_recovery_manager.recover_orphaned_sessions()
@@ -735,11 +760,13 @@ class TestStatePersistence:
             "id": "clarification_old",
             "user_id": "user_test_123",
             "status": "pending",
-            "expires_at": (datetime.utcnow() - timedelta(minutes=10)).isoformat()
+            "expires_at": (datetime.utcnow() - timedelta(minutes=10)).isoformat(),
         }
 
         with patch("src.fsm.handlers.supabase_client") as mock_db:
-            mock_db.client.table.return_value.select.return_value.eq.return_value.lt.return_value.execute.return_value.data = [expired_clarification]
+            mock_db.client.table.return_value.select.return_value.eq.return_value.lt.return_value.execute.return_value.data = [
+                expired_clarification
+            ]
 
             # Run cleanup
             count = await clarification_manager.cleanup_expired_clarifications()
@@ -751,6 +778,7 @@ class TestStatePersistence:
 # ============================================================================
 # Performance and Load Tests
 # ============================================================================
+
 
 class TestPerformance:
     """Test system performance under load."""

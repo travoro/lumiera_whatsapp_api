@@ -5,8 +5,10 @@ This module provides:
 - Session-aware confidence adjustment
 - Conflict resolution when multiple intents detected
 """
-from typing import List, Optional, Dict, Any, Tuple
-from src.fsm.models import IntentClassification, IntentPriority, FSMContext
+
+from typing import Any, Dict, List, Optional, Tuple
+
+from src.fsm.models import FSMContext, IntentClassification, IntentPriority
 from src.utils.structured_logger import get_structured_logger
 
 logger = get_structured_logger("fsm.routing")
@@ -22,7 +24,6 @@ INTENT_PRIORITY_MAP: Dict[str, IntentPriority] = {
     "stop": IntentPriority.P0_CRITICAL,
     "help": IntentPriority.P0_CRITICAL,
     "abandon": IntentPriority.P0_CRITICAL,
-
     # P1: Explicit action requests
     "progress_update": IntentPriority.P1_EXPLICIT,
     "upload_photo": IntentPriority.P1_EXPLICIT,
@@ -30,18 +31,15 @@ INTENT_PRIORITY_MAP: Dict[str, IntentPriority] = {
     "complete_task": IntentPriority.P1_EXPLICIT,
     "create_incident": IntentPriority.P1_EXPLICIT,
     "switch_task": IntentPriority.P1_EXPLICIT,
-
     # P2: Implicit/contextual actions
     "continue_update": IntentPriority.P2_IMPLICIT,
     "add_more_data": IntentPriority.P2_IMPLICIT,
     "confirm": IntentPriority.P2_IMPLICIT,
-
     # P3: General queries
     "list_tasks": IntentPriority.P3_GENERAL,
     "task_status": IntentPriority.P3_GENERAL,
     "greeting": IntentPriority.P3_GENERAL,
     "question": IntentPriority.P3_GENERAL,
-
     # P4: Fallback
     "unknown": IntentPriority.P4_FALLBACK,
     "unclear": IntentPriority.P4_FALLBACK,
@@ -51,6 +49,7 @@ INTENT_PRIORITY_MAP: Dict[str, IntentPriority] = {
 # ============================================================================
 # Intent Hierarchy
 # ============================================================================
+
 
 class IntentHierarchy:
     """Manages intent priority hierarchy for conflict resolution."""
@@ -74,7 +73,7 @@ class IntentHierarchy:
         self,
         intent: str,
         confidence: float,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> IntentClassification:
         """Assign priority to an intent classification.
 
@@ -93,13 +92,11 @@ class IntentHierarchy:
             confidence=confidence,
             priority=priority,
             parameters=parameters or {},
-            conflicts_with_session=False  # Will be set by ConfidenceAdjuster
+            conflicts_with_session=False,  # Will be set by ConfidenceAdjuster
         )
 
     def compare_priorities(
-        self,
-        intent1: IntentClassification,
-        intent2: IntentClassification
+        self, intent1: IntentClassification, intent2: IntentClassification
     ) -> int:
         """Compare priorities of two intents.
 
@@ -124,14 +121,15 @@ class IntentHierarchy:
         if idx1 < idx2:
             return -1  # intent1 higher priority
         elif idx1 > idx2:
-            return 1   # intent2 higher priority
+            return 1  # intent2 higher priority
         else:
-            return 0   # equal priority
+            return 0  # equal priority
 
 
 # ============================================================================
 # Confidence Adjuster
 # ============================================================================
+
 
 class ConfidenceAdjuster:
     """Adjusts confidence scores based on session context."""
@@ -143,9 +141,7 @@ class ConfidenceAdjuster:
         pass
 
     def detect_conflict(
-        self,
-        intent: IntentClassification,
-        context: Optional[FSMContext]
+        self, intent: IntentClassification, context: Optional[FSMContext]
     ) -> bool:
         """Detect if intent conflicts with active session.
 
@@ -160,7 +156,11 @@ class ConfidenceAdjuster:
             return False
 
         # No session active (IDLE state) - no conflict
-        current_state = context.current_state if isinstance(context.current_state, str) else context.current_state.value
+        current_state = (
+            context.current_state
+            if isinstance(context.current_state, str)
+            else context.current_state.value
+        )
         if current_state == "idle":
             return False
 
@@ -184,9 +184,7 @@ class ConfidenceAdjuster:
         return False
 
     def adjust_confidence(
-        self,
-        intent: IntentClassification,
-        context: Optional[FSMContext]
+        self, intent: IntentClassification, context: Optional[FSMContext]
     ) -> IntentClassification:
         """Adjust confidence score based on session context.
 
@@ -207,7 +205,7 @@ class ConfidenceAdjuster:
                 f"Conflict detected: {intent.intent}",
                 original_confidence=intent.confidence,
                 adjusted_confidence=adjusted_confidence,
-                user_id=context.user_id if context else None
+                user_id=context.user_id if context else None,
             )
 
             # Update intent with adjusted confidence
@@ -221,13 +219,12 @@ class ConfidenceAdjuster:
 # Conflict Resolver
 # ============================================================================
 
+
 class ConflictResolver:
     """Resolves conflicts between multiple intent classifications."""
 
     def __init__(
-        self,
-        hierarchy: IntentHierarchy,
-        confidence_adjuster: ConfidenceAdjuster
+        self, hierarchy: IntentHierarchy, confidence_adjuster: ConfidenceAdjuster
     ):
         """Initialize conflict resolver.
 
@@ -242,7 +239,7 @@ class ConflictResolver:
         self,
         intents: List[IntentClassification],
         context: Optional[FSMContext],
-        confidence_threshold: float = 0.70
+        confidence_threshold: float = 0.70,
     ) -> Tuple[Optional[IntentClassification], bool]:
         """Resolve conflicts between multiple intents.
 
@@ -273,14 +270,15 @@ class ConflictResolver:
 
         # Step 2: Filter by confidence threshold
         valid_intents = [
-            intent for intent in adjusted_intents
+            intent
+            for intent in adjusted_intents
             if intent.confidence >= confidence_threshold
         ]
 
         if not valid_intents:
             logger.info(
                 f"All intents below threshold ({confidence_threshold})",
-                user_id=context.user_id if context else None
+                user_id=context.user_id if context else None,
             )
             return None, True  # Need clarification
 
@@ -289,8 +287,8 @@ class ConflictResolver:
             valid_intents,
             key=lambda i: (
                 list(IntentPriority).index(i.priority),  # Lower index = higher priority
-                -i.confidence  # Higher confidence first (negative for descending)
-            )
+                -i.confidence,  # Higher confidence first (negative for descending)
+            ),
         )
 
         winner = sorted_intents[0]
@@ -300,7 +298,7 @@ class ConflictResolver:
             logger.info(
                 f"Winner has conflict, requesting clarification: {winner.intent}",
                 confidence=winner.confidence,
-                user_id=context.user_id if context else None
+                user_id=context.user_id if context else None,
             )
             return None, True  # Need clarification
 
@@ -315,7 +313,7 @@ class ConflictResolver:
                 logger.info(
                     f"Ambiguous: {winner.intent} vs {second.intent}",
                     gap=confidence_gap,
-                    user_id=context.user_id if context else None
+                    user_id=context.user_id if context else None,
                 )
                 return None, True  # Need clarification
 
@@ -323,7 +321,7 @@ class ConflictResolver:
             f"Resolved intent: {winner.intent}",
             confidence=winner.confidence,
             priority=winner.priority,
-            user_id=context.user_id if context else None
+            user_id=context.user_id if context else None,
         )
 
         return winner, False
@@ -333,6 +331,7 @@ class ConflictResolver:
 # IntentRouter - Main Interface
 # ============================================================================
 
+
 class IntentRouter:
     """Main interface for intent routing with conflict resolution."""
 
@@ -341,8 +340,7 @@ class IntentRouter:
         self.hierarchy = IntentHierarchy()
         self.confidence_adjuster = ConfidenceAdjuster()
         self.conflict_resolver = ConflictResolver(
-            self.hierarchy,
-            self.confidence_adjuster
+            self.hierarchy, self.confidence_adjuster
         )
 
     def route_intent(
@@ -351,7 +349,7 @@ class IntentRouter:
         confidence: float,
         context: Optional[FSMContext],
         parameters: Optional[Dict[str, Any]] = None,
-        confidence_threshold: float = 0.70
+        confidence_threshold: float = 0.70,
     ) -> Tuple[Optional[IntentClassification], bool]:
         """Route a single intent with session awareness.
 
@@ -367,23 +365,21 @@ class IntentRouter:
         """
         # Assign priority
         intent_classification = self.hierarchy.assign_priority(
-            intent=intent,
-            confidence=confidence,
-            parameters=parameters
+            intent=intent, confidence=confidence, parameters=parameters
         )
 
         # Resolve (single intent still goes through conflict resolution)
         return self.conflict_resolver.resolve(
             intents=[intent_classification],
             context=context,
-            confidence_threshold=confidence_threshold
+            confidence_threshold=confidence_threshold,
         )
 
     def route_multiple_intents(
         self,
         intents: List[Dict[str, Any]],
         context: Optional[FSMContext],
-        confidence_threshold: float = 0.70
+        confidence_threshold: float = 0.70,
     ) -> Tuple[Optional[IntentClassification], bool]:
         """Route multiple intents with conflict resolution.
 
@@ -400,7 +396,7 @@ class IntentRouter:
             self.hierarchy.assign_priority(
                 intent=item["intent"],
                 confidence=item["confidence"],
-                parameters=item.get("parameters")
+                parameters=item.get("parameters"),
             )
             for item in intents
         ]
@@ -409,5 +405,5 @@ class IntentRouter:
         return self.conflict_resolver.resolve(
             intents=intent_classifications,
             context=context,
-            confidence_threshold=confidence_threshold
+            confidence_threshold=confidence_threshold,
         )

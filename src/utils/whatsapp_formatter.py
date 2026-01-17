@@ -1,10 +1,10 @@
 """WhatsApp message formatter with interactive message support."""
-from typing import Dict, List, Optional, Any
-import re
+
+from typing import Any, Dict, List, Optional
+
 from src.integrations.twilio import twilio_client
 from src.services.dynamic_templates import dynamic_template_service
 from src.utils.logger import log
-
 
 # Robust translation dictionary for WhatsApp interactive messages
 TRANSLATIONS = {
@@ -16,13 +16,35 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Vous avez {count} chantiers actifs :\n\n",
         "projects_found_singular": "Voici votre chantier actif :",
         "projects_found_plural": "Voici vos chantiers actifs :",
-        "escalation_success": "✅ Votre demande a été transmise à notre équipe. Quelqu'un vous contactera sous peu.",
-        "report_incident": "Je vais vous aider à signaler un incident. 🚨\n\nPour créer un rapport d'incident, j'ai besoin de :\n1. 📸 Au moins une photo du problème\n2. 📝 Une description écrite ou audio de ce qui s'est passé\n3. 🏗️ Le chantier concerné, si ce n'est pas le chantier {chantier_nom}\n\nVous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas.",
+        "escalation_success": (
+            "✅ Votre demande a été transmise à notre équipe. "
+            "Quelqu'un vous contactera sous peu."
+        ),
+        "report_incident": (
+            "Je vais vous aider à signaler un incident. 🚨\n\n"
+            "Pour créer un rapport d'incident, j'ai besoin de :\n"
+            "1. 📸 Au moins une photo du problème\n"
+            "2. 📝 Une description écrite ou audio de ce qui s'est passé\n"
+            "3. 🏗️ Le chantier concerné, si ce n'est pas le chantier {chantier_nom}\n\n"
+            "Vous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas."
+        ),
         "menu_items": [
             {"title": "🏗️ Voir mes chantiers", "id": "view_sites_fr", "description": ""},
-            {"title": "✅ Consulter mes taches", "id": "view_tasks_fr", "description": ""},
-            {"title": "📄 Acceder aux documents", "id": "view_documents_fr", "description": ""},
-            {"title": "🚨 Signaler un incident", "id": "report_incident_fr", "description": ""},
+            {
+                "title": "✅ Consulter mes taches",
+                "id": "view_tasks_fr",
+                "description": "",
+            },
+            {
+                "title": "📄 Acceder aux documents",
+                "id": "view_documents_fr",
+                "description": "",
+            },
+            {
+                "title": "🚨 Signaler un incident",
+                "id": "report_incident_fr",
+                "description": "",
+            },
             {"title": "📊 Progression", "id": "update_progress_fr", "description": ""},
             {"title": "💬 Contacter equipe", "id": "talk_team_fr", "description": ""},
         ],
@@ -58,14 +80,36 @@ TRANSLATIONS = {
         "projects_list_header_plural": "You have {count} active projects:\n\n",
         "projects_found_singular": "Here is your active site:",
         "projects_found_plural": "Here are your active sites:",
-        "escalation_success": "✅ Your request has been forwarded to the admin team. A team member will contact you shortly.",
-        "report_incident": "I'll help you report an incident. 🚨\n\nTo create an incident report, I need:\n1. 📸 At least one photo of the problem\n2. 📝 A written or audio description of what happened\n3. 🏗️ The concerned site, if it's not the site {chantier_nom}\n\nYou can send me the elements one by one, I'll guide you step by step.",
+        "escalation_success": (
+            "✅ Your request has been forwarded to the admin team. "
+            "A team member will contact you shortly."
+        ),
+        "report_incident": (
+            "I'll help you report an incident. 🚨\n\n"
+            "To create an incident report, I need:\n"
+            "1. 📸 At least one photo of the problem\n"
+            "2. 📝 A written or audio description of what happened\n"
+            "3. 🏗️ The concerned site, if it's not the site {chantier_nom}\n\n"
+            "You can send me the elements one by one, I'll guide you step by step."
+        ),
         "menu_items": [
             {"title": "🏗️ View my sites", "id": "view_sites_en", "description": ""},
             {"title": "✅ Check my tasks", "id": "view_tasks_en", "description": ""},
-            {"title": "📄 Access documents", "id": "view_documents_en", "description": ""},
-            {"title": "🚨 Report incident", "id": "report_incident_en", "description": ""},
-            {"title": "📊 Update progress", "id": "update_progress_en", "description": ""},
+            {
+                "title": "📄 Access documents",
+                "id": "view_documents_en",
+                "description": "",
+            },
+            {
+                "title": "🚨 Report incident",
+                "id": "report_incident_en",
+                "description": "",
+            },
+            {
+                "title": "📊 Update progress",
+                "id": "update_progress_en",
+                "description": "",
+            },
             {"title": "💬 Talk to team", "id": "talk_team_en", "description": ""},
         ],
         "available_projects_header": "Available sites:\n",
@@ -99,14 +143,36 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Tienes {count} proyectos activos:\n\n",
         "projects_found_singular": "Aquí está tu obra activa:",
         "projects_found_plural": "Aquí están tus obras activas:",
-        "escalation_success": "✅ Tu solicitud ha sido enviada al equipo administrativo. Un miembro del equipo te contactará pronto.",
-        "report_incident": "Te ayudaré a reportar un incidente. 🚨\n\nPara crear un reporte de incidente, necesito:\n1. 📸 Al menos una foto del problema\n2. 📝 Una descripción escrita o de audio de lo que pasó\n3. 🏗️ La obra concernida, si no es la obra {chantier_nom}\n\nPuedes enviarme los elementos uno por uno, te guiaré paso a paso.",
+        "escalation_success": (
+            "✅ Tu solicitud ha sido enviada al equipo administrativo. "
+            "Un miembro del equipo te contactará pronto."
+        ),
+        "report_incident": (
+            "Te ayudaré a reportar un incidente. 🚨\n\n"
+            "Para crear un reporte de incidente, necesito:\n"
+            "1. 📸 Al menos una foto del problema\n"
+            "2. 📝 Una descripción escrita o de audio de lo que pasó\n"
+            "3. 🏗️ La obra concernida, si no es la obra {chantier_nom}\n\n"
+            "Puedes enviarme los elementos uno por uno, te guiaré paso a paso."
+        ),
         "menu_items": [
             {"title": "🏗️ Ver mis obras", "id": "view_sites_es", "description": ""},
             {"title": "✅ Ver mis tareas", "id": "view_tasks_es", "description": ""},
-            {"title": "📄 Acceder documentos", "id": "view_documents_es", "description": ""},
-            {"title": "🚨 Reportar incidente", "id": "report_incident_es", "description": ""},
-            {"title": "📊 Actualizar progreso", "id": "update_progress_es", "description": ""},
+            {
+                "title": "📄 Acceder documentos",
+                "id": "view_documents_es",
+                "description": "",
+            },
+            {
+                "title": "🚨 Reportar incidente",
+                "id": "report_incident_es",
+                "description": "",
+            },
+            {
+                "title": "📊 Actualizar progreso",
+                "id": "update_progress_es",
+                "description": "",
+            },
             {"title": "💬 Hablar con equipo", "id": "talk_team_es", "description": ""},
         ],
         "available_projects_header": "Obras disponibles:\n",
@@ -139,14 +205,40 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Você tem {count} projetos ativos:\n\n",
         "projects_found_singular": "Aqui está sua obra ativa:",
         "projects_found_plural": "Aqui estão suas obras ativas:",
-        "escalation_success": "✅ Sua solicitação foi encaminhada para a equipe administrativa. Um membro da equipe entrará em contato em breve.",
-        "report_incident": "Vou ajudá-lo a relatar um incidente. 🚨\n\nPara criar um relatório de incidente, preciso de:\n1. 📸 Pelo menos uma foto do problema\n2. 📝 Uma descrição escrita ou em áudio do que aconteceu\n3. 🏗️ A obra em questão, se não for a obra {chantier_nom}\n\nVocê pode me enviar os elementos um por um, vou guiá-lo passo a passo.",
+        "escalation_success": (
+            "✅ Sua solicitação foi encaminhada para a equipe administrativa. "
+            "Um membro da equipe entrará em contato em breve."
+        ),
+        "report_incident": (
+            "Vou ajudá-lo a relatar um incidente. 🚨\n\n"
+            "Para criar um relatório de incidente, preciso de:\n"
+            "1. 📸 Pelo menos uma foto do problema\n"
+            "2. 📝 Uma descrição escrita ou em áudio do que aconteceu\n"
+            "3. 🏗️ A obra em questão, se não for a obra {chantier_nom}\n\n"
+            "Você pode me enviar os elementos um por um, vou guiá-lo passo a passo."
+        ),
         "menu_items": [
             {"title": "🏗️ Ver minhas obras", "id": "view_sites_pt", "description": ""},
-            {"title": "✅ Ver minhas tarefas", "id": "view_tasks_pt", "description": ""},
-            {"title": "📄 Acessar documentos", "id": "view_documents_pt", "description": ""},
-            {"title": "🚨 Relatar incidente", "id": "report_incident_pt", "description": ""},
-            {"title": "📊 Atualizar progresso", "id": "update_progress_pt", "description": ""},
+            {
+                "title": "✅ Ver minhas tarefas",
+                "id": "view_tasks_pt",
+                "description": "",
+            },
+            {
+                "title": "📄 Acessar documentos",
+                "id": "view_documents_pt",
+                "description": "",
+            },
+            {
+                "title": "🚨 Relatar incidente",
+                "id": "report_incident_pt",
+                "description": "",
+            },
+            {
+                "title": "📊 Atualizar progresso",
+                "id": "update_progress_pt",
+                "description": "",
+            },
             {"title": "💬 Falar com equipe", "id": "talk_team_pt", "description": ""},
         ],
         "available_projects_header": "Obras disponíveis:\n",
@@ -177,13 +269,27 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Sie haben {count} aktive Projekte:\n\n",
         "projects_found_singular": "Hier ist Ihre aktive Baustelle:",
         "projects_found_plural": "Hier sind Ihre aktiven Baustellen:",
-        "escalation_success": "✅ Ihre Anfrage wurde an das Admin-Team weitergeleitet. Ein Teammitglied wird sich in Kürze bei Ihnen melden.",
-        "report_incident": "Ich helfe Ihnen, einen Vorfall zu melden. 🚨\n\nUm einen Vorfallbericht zu erstellen, benötige ich:\n1. 📸 Mindestens ein Foto des Problems\n2. 📝 Eine schriftliche oder Audio-Beschreibung dessen, was passiert ist\n3. 🏗️ Die betroffene Baustelle, falls es sich nicht um die Baustelle {chantier_nom} handelt\n\nSie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt.",
+        "escalation_success": (
+            "✅ Ihre Anfrage wurde an das Admin-Team weitergeleitet. "
+            "Ein Teammitglied wird sich in Kürze bei Ihnen melden."
+        ),
+        "report_incident": (
+            "Ich helfe Ihnen, einen Vorfall zu melden. 🚨\n\n"
+            "Um einen Vorfallbericht zu erstellen, benötige ich:\n"
+            "1. 📸 Mindestens ein Foto des Problems\n"
+            "2. 📝 Eine schriftliche oder Audio-Beschreibung dessen, was passiert ist\n"
+            "3. 🏗️ Die betroffene Baustelle, falls es sich nicht um die Baustelle {chantier_nom} handelt\n\n"
+            "Sie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt."
+        ),
         "menu_items": [
             {"title": "🏗️ Meine Baustellen", "id": "view_sites_de", "description": ""},
             {"title": "✅ Meine Aufgaben", "id": "view_tasks_de", "description": ""},
             {"title": "📄 Dokumente", "id": "view_documents_de", "description": ""},
-            {"title": "🚨 Vorfall melden", "id": "report_incident_de", "description": ""},
+            {
+                "title": "🚨 Vorfall melden",
+                "id": "report_incident_de",
+                "description": "",
+            },
             {"title": "📊 Fortschritt", "id": "update_progress_de", "description": ""},
             {"title": "💬 Team kontaktieren", "id": "talk_team_de", "description": ""},
         ],
@@ -203,7 +309,10 @@ TRANSLATIONS = {
         "update_progress_project_context": "Für die Baustelle **{project_name}**, ",
         "update_progress_tasks_header": "laufende Aufgaben:\n",
         "update_progress_no_tasks": "Keine laufenden Aufgaben für diese Baustelle.",
-        "update_progress_footer": "\n\nSagen Sie mir, welche Aufgabe Sie aktualisieren möchten und den neuen Prozentsatz.",
+        "update_progress_footer": (
+            "\n\nSagen Sie mir, welche Aufgabe Sie aktualisieren möchten "
+            "und den neuen Prozentsatz."
+        ),
         "report_incident_section_header": "3. 🏗️ Die betroffene Baustelle\n\n",
         "report_incident_closing": "\nSie können mir die Elemente einzeln senden, ich führe Sie Schritt für Schritt.",
     },
@@ -215,14 +324,36 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Hai {count} progetti attivi:\n\n",
         "projects_found_singular": "Ecco il tuo cantiere attivo:",
         "projects_found_plural": "Ecco i tuoi cantieri attivi:",
-        "escalation_success": "✅ La tua richiesta è stata inoltrata al team amministrativo. Un membro del team ti contatterà a breve.",
-        "report_incident": "Ti aiuterò a segnalare un incidente. 🚨\n\nPer creare un rapporto di incidente, ho bisogno di:\n1. 📸 Almeno una foto del problema\n2. 📝 Una descrizione scritta o audio di cosa è successo\n3. 🏗️ Il cantiere interessato, se non è il cantiere {chantier_nom}\n\nPuoi inviarmi gli elementi uno per uno, ti guiderò passo dopo passo.",
+        "escalation_success": (
+            "✅ La tua richiesta è stata inoltrata al team amministrativo. "
+            "Un membro del team ti contatterà a breve."
+        ),
+        "report_incident": (
+            "Ti aiuterò a segnalare un incidente. 🚨\n\n"
+            "Per creare un rapporto di incidente, ho bisogno di:\n"
+            "1. 📸 Almeno una foto del problema\n"
+            "2. 📝 Una descrizione scritta o audio di cosa è successo\n"
+            "3. 🏗️ Il cantiere interessato, se non è il cantiere {chantier_nom}\n\n"
+            "Puoi inviarmi gli elementi uno per uno, ti guiderò passo dopo passo."
+        ),
         "menu_items": [
             {"title": "🏗️ Vedi cantieri", "id": "view_sites_it", "description": ""},
             {"title": "✅ Vedi compiti", "id": "view_tasks_it", "description": ""},
-            {"title": "📄 Accedi documenti", "id": "view_documents_it", "description": ""},
-            {"title": "🚨 Segnala incidente", "id": "report_incident_it", "description": ""},
-            {"title": "📊 Aggiorna progresso", "id": "update_progress_it", "description": ""},
+            {
+                "title": "📄 Accedi documenti",
+                "id": "view_documents_it",
+                "description": "",
+            },
+            {
+                "title": "🚨 Segnala incidente",
+                "id": "report_incident_it",
+                "description": "",
+            },
+            {
+                "title": "📊 Aggiorna progresso",
+                "id": "update_progress_it",
+                "description": "",
+            },
             {"title": "💬 Parla con team", "id": "talk_team_it", "description": ""},
         ],
         "available_projects_header": "Cantieri disponibili:\n",
@@ -253,14 +384,36 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Ai {count} șantiere active:\n\n",
         "projects_found_singular": "Iată șantierul tău activ:",
         "projects_found_plural": "Iată șantierele tale active:",
-        "escalation_success": "✅ Cererea ta a fost trimisă echipei administrative. Un membru al echipei te va contacta în curând.",
-        "report_incident": "Te voi ajuta să raportezi un incident. 🚨\n\nPentru a crea un raport de incident, am nevoie de:\n1. 📸 Cel puțin o fotografie a problemei\n2. 📝 O descriere scrisă sau audio a ceea ce s-a întâmplat\n3. 🏗️ Șantierul în cauză, dacă nu este șantierul {chantier_nom}\n\nPoți să-mi trimiți elementele unul câte unul, te voi ghida pas cu pas.",
+        "escalation_success": (
+            "✅ Cererea ta a fost trimisă echipei administrative. "
+            "Un membru al echipei te va contacta în curând."
+        ),
+        "report_incident": (
+            "Te voi ajuta să raportezi un incident. 🚨\n\n"
+            "Pentru a crea un raport de incident, am nevoie de:\n"
+            "1. 📸 Cel puțin o fotografie a problemei\n"
+            "2. 📝 O descriere scrisă sau audio a ceea ce s-a întâmplat\n"
+            "3. 🏗️ Șantierul în cauză, dacă nu este șantierul {chantier_nom}\n\n"
+            "Poți să-mi trimiți elementele unul câte unul, te voi ghida pas cu pas."
+        ),
         "menu_items": [
             {"title": "🏗️ Vezi santierele", "id": "view_sites_ro", "description": ""},
             {"title": "✅ Vezi sarcinile", "id": "view_tasks_ro", "description": ""},
-            {"title": "📄 Acceseaza documente", "id": "view_documents_ro", "description": ""},
-            {"title": "🚨 Raporteaza incident", "id": "report_incident_ro", "description": ""},
-            {"title": "📊 Actualizeaza progres", "id": "update_progress_ro", "description": ""},
+            {
+                "title": "📄 Acceseaza documente",
+                "id": "view_documents_ro",
+                "description": "",
+            },
+            {
+                "title": "🚨 Raporteaza incident",
+                "id": "report_incident_ro",
+                "description": "",
+            },
+            {
+                "title": "📊 Actualizeaza progres",
+                "id": "update_progress_ro",
+                "description": "",
+            },
             {"title": "💬 Vorbeste cu echipa", "id": "talk_team_ro", "description": ""},
         ],
         "available_projects_header": "Șantiere disponibile:\n",
@@ -291,14 +444,40 @@ TRANSLATIONS = {
         "projects_list_header_plural": "Masz {count} aktywnych projektów:\n\n",
         "projects_found_singular": "Oto Twój aktywny plac budowy:",
         "projects_found_plural": "Oto Twoje aktywne place budowy:",
-        "escalation_success": "✅ Twoje zgłoszenie zostało przekazane do zespołu administracyjnego. Członek zespołu skontaktuje się z Tobą wkrótce.",
-        "report_incident": "Pomogę Ci zgłosić incydent. 🚨\n\nAby utworzyć raport o incydencie, potrzebuję:\n1. 📸 Co najmniej jednego zdjęcia problemu\n2. 📝 Pisemnego lub audio opisu tego, co się stało\n3. 🏗️ Placu budowy, którego to dotyczy, jeśli nie jest to plac budowy {chantier_nom}\n\nMożesz przesyłać mi elementy jeden po drugim, poprowadzę Cię krok po kroku.",
+        "escalation_success": (
+            "✅ Twoje zgłoszenie zostało przekazane do zespołu administracyjnego. "
+            "Członek zespołu skontaktuje się z Tobą wkrótce."
+        ),
+        "report_incident": (
+            "Pomogę Ci zgłosić incydent. 🚨\n\n"
+            "Aby utworzyć raport o incydencie, potrzebuję:\n"
+            "1. 📸 Co najmniej jednego zdjęcia problemu\n"
+            "2. 📝 Pisemnego lub audio opisu tego, co się stało\n"
+            "3. 🏗️ Placu budowy, którego to dotyczy, jeśli nie jest to plac budowy {chantier_nom}\n\n"
+            "Możesz przesyłać mi elementy jeden po drugim, poprowadzę Cię krok po kroku."
+        ),
         "menu_items": [
-            {"title": "🏗️ Zobacz place budowy", "id": "view_sites_pl", "description": ""},
+            {
+                "title": "🏗️ Zobacz place budowy",
+                "id": "view_sites_pl",
+                "description": "",
+            },
             {"title": "✅ Zobacz zadania", "id": "view_tasks_pl", "description": ""},
-            {"title": "📄 Dostep do dokumentow", "id": "view_documents_pl", "description": ""},
-            {"title": "🚨 Zglosz incydent", "id": "report_incident_pl", "description": ""},
-            {"title": "📊 Aktualizuj postep", "id": "update_progress_pl", "description": ""},
+            {
+                "title": "📄 Dostep do dokumentow",
+                "id": "view_documents_pl",
+                "description": "",
+            },
+            {
+                "title": "🚨 Zglosz incydent",
+                "id": "report_incident_pl",
+                "description": "",
+            },
+            {
+                "title": "📊 Aktualizuj postep",
+                "id": "update_progress_pl",
+                "description": "",
+            },
             {"title": "💬 Porozmawiaj", "id": "talk_team_pl", "description": ""},
         ],
         "available_projects_header": "Dostępne place budowy:\n",
@@ -330,12 +509,23 @@ TRANSLATIONS = {
         "projects_found_singular": "إليك موقع البناء النشط الخاص بك:",
         "projects_found_plural": "إليك مواقع البناء النشطة الخاصة بك:",
         "escalation_success": "✅ تم إرسال طلبك إلى الفريق الإداري. سيتصل بك أحد أعضاء الفريق قريبًا.",
-        "report_incident": "سأساعدك في الإبلاغ عن حادث. 🚨\n\nلإنشاء تقرير حادث، أحتاج إلى:\n1. 📸 صورة واحدة على الأقل للمشكلة\n2. 📝 وصف كتابي أو صوتي لما حدث\n3. 🏗️ موقع البناء المعني، إذا لم يكن موقع البناء {chantier_nom}\n\nيمكنك إرسال العناصر واحدة تلو الأخرى، سأرشدك خطوة بخطوة.",
+        "report_incident": (
+            "سأساعدك في الإبلاغ عن حادث. 🚨\n\n"
+            "لإنشاء تقرير حادث، أحتاج إلى:\n"
+            "1. 📸 صورة واحدة على الأقل للمشكلة\n"
+            "2. 📝 وصف كتابي أو صوتي لما حدث\n"
+            "3. 🏗️ موقع البناء المعني، إذا لم يكن موقع البناء {chantier_nom}\n\n"
+            "يمكنك إرسال العناصر واحدة تلو الأخرى، سأرشدك خطوة بخطوة."
+        ),
         "menu_items": [
             {"title": "🏗️ عرض مواقعي", "id": "view_sites_ar", "description": ""},
             {"title": "✅ عرض مهامي", "id": "view_tasks_ar", "description": ""},
             {"title": "📄 الوثائق", "id": "view_documents_ar", "description": ""},
-            {"title": "🚨 الإبلاغ عن حادث", "id": "report_incident_ar", "description": ""},
+            {
+                "title": "🚨 الإبلاغ عن حادث",
+                "id": "report_incident_ar",
+                "description": "",
+            },
             {"title": "📊 تحديث التقدم", "id": "update_progress_ar", "description": ""},
             {"title": "💬 التحدث مع الفريق", "id": "talk_team_ar", "description": ""},
         ],
@@ -376,14 +566,20 @@ def get_translation(language: str, key: str, default_language: str = "en") -> An
     if language in TRANSLATIONS and key in TRANSLATIONS[language]:
         return TRANSLATIONS[language][key]
     elif default_language in TRANSLATIONS and key in TRANSLATIONS[default_language]:
-        log.warning(f"Translation not found for {language}.{key}, using {default_language}")
+        log.warning(
+            f"Translation not found for {language}.{key}, using {default_language}"
+        )
         return TRANSLATIONS[default_language][key]
     else:
-        log.error(f"Translation not found for {language}.{key} and fallback {default_language}")
+        log.error(
+            f"Translation not found for {language}.{key} and fallback {default_language}"
+        )
         return None
 
 
-def get_plural_translation(language: str, base_key: str, count: int, default_language: str = "en") -> str:
+def get_plural_translation(
+    language: str, base_key: str, count: int, default_language: str = "en"
+) -> str:
     """Get singular or plural translation based on count.
 
     Args:
@@ -454,7 +650,9 @@ def send_whatsapp_message_smart(
 
         # Handle greeting with dynamic interactive list
         if is_greeting:
-            log.info(f"✅ Processing greeting with dynamic template (create-send-delete)")
+            log.info(
+                "✅ Processing greeting with dynamic template (create-send-delete)"
+            )
 
             # Get language-specific content using robust translation system
             greeting_template = get_translation(language, "greeting", "en")
@@ -465,7 +663,13 @@ def send_whatsapp_message_smart(
             if greeting_template:
                 # Use user's name or fallback to "there"
                 name = user_name.strip() if user_name else ""
-                greeting = greeting_template.format(name=name) if name else greeting_template.replace(" {name},", "").replace("{name},", "")
+                greeting = (
+                    greeting_template.format(name=name)
+                    if name
+                    else greeting_template.replace(" {name},", "").replace(
+                        "{name},", ""
+                    )
+                )
             else:
                 greeting = "Hello, how can I help you today?"
 
@@ -477,11 +681,15 @@ def send_whatsapp_message_smart(
             formatted_items = []
             if menu_items:
                 for menu_item in menu_items[:10]:  # Max 10 items for WhatsApp
-                    formatted_items.append({
-                        "item": safe_truncate(menu_item.get("title", ""), 24),
-                        "description": safe_truncate(menu_item.get("description", ""), 72),
-                        "id": menu_item.get("id", "")
-                    })
+                    formatted_items.append(
+                        {
+                            "item": safe_truncate(menu_item.get("title", ""), 24),
+                            "description": safe_truncate(
+                                menu_item.get("description", ""), 72
+                            ),
+                            "id": menu_item.get("id", ""),
+                        }
+                    )
 
             if not formatted_items:
                 # Fallback if no menu items
@@ -490,21 +698,27 @@ def send_whatsapp_message_smart(
                 return sid
 
             # Use dynamic template service (create → send → delete)
-            log.info(f"🚀 Sending dynamic list picker with {len(formatted_items)} items")
+            log.info(
+                f"🚀 Sending dynamic list picker with {len(formatted_items)} items"
+            )
 
             result = dynamic_template_service.send_list_picker(
                 to_number=to,
                 body_text=greeting,
-                button_text=safe_truncate(button_text, 20) if button_text else "Options",
+                button_text=(
+                    safe_truncate(button_text, 20) if button_text else "Options"
+                ),
                 items=formatted_items,
                 cleanup=True,  # Auto-delete after sending
-                language=language
+                language=language,
             )
 
-            if result['success']:
+            if result["success"]:
                 log.info(f"✅ Sent greeting via dynamic template to {to}")
-                log.info(f"📊 Performance: {result['total_ms']:.0f}ms (create → send → delete)")
-                return result['message_sid']
+                log.info(
+                    f"📊 Performance: {result['total_ms']:.0f}ms (create → send → delete)"
+                )
+                return result["message_sid"]
             else:
                 log.error(f"❌ Dynamic template send FAILED: {result.get('error')}")
                 # Fallback to regular text
@@ -514,7 +728,7 @@ def send_whatsapp_message_smart(
 
         elif msg_type == "list":
             # AI-generated response with interactive list - Use dynamic template
-            log.info(f"✅ Processing list response with dynamic template")
+            log.info("✅ Processing list response with dynamic template")
             log.debug(f"📋 Interactive data: {interactive_data}")
 
             # Extract data from interactive_data
@@ -526,18 +740,26 @@ def send_whatsapp_message_smart(
             formatted_items = []
             for section in sections:
                 for row in section.get("rows", []):
-                    formatted_items.append({
-                        "item": safe_truncate(row.get("title", ""), 24),
-                        "description": safe_truncate(row.get("description", ""), 72) if row.get("description") else "",
-                        "id": row.get("id", "")
-                    })
+                    formatted_items.append(
+                        {
+                            "item": safe_truncate(row.get("title", ""), 24),
+                            "description": (
+                                safe_truncate(row.get("description", ""), 72)
+                                if row.get("description")
+                                else ""
+                            ),
+                            "id": row.get("id", ""),
+                        }
+                    )
 
             if not formatted_items:
                 log.warning("⚠️ No list items found, falling back to text")
                 sid = twilio_client.send_message(to=to, body=text)
                 return sid
 
-            log.info(f"🚀 Sending dynamic list picker with {len(formatted_items)} items")
+            log.info(
+                f"🚀 Sending dynamic list picker with {len(formatted_items)} items"
+            )
 
             result = dynamic_template_service.send_list_picker(
                 to_number=to,
@@ -545,13 +767,15 @@ def send_whatsapp_message_smart(
                 button_text=safe_truncate(button_text, 20),
                 items=formatted_items,
                 cleanup=True,  # Auto-delete after sending
-                language=language
+                language=language,
             )
 
-            if result['success']:
+            if result["success"]:
                 log.info(f"✅ Sent list via dynamic template to {to}")
-                log.info(f"📊 Performance: {result['total_ms']:.0f}ms (create → send → delete)")
-                return result['message_sid']
+                log.info(
+                    f"📊 Performance: {result['total_ms']:.0f}ms (create → send → delete)"
+                )
+                return result["message_sid"]
             else:
                 log.error(f"❌ Dynamic template send FAILED: {result.get('error')}")
                 # Fallback to regular text
@@ -573,7 +797,7 @@ def format_menu_as_interactive_list(
     intro_text: str,
     options: List[Dict[str, str]],
     button_text: str = "Choose an option",
-    section_title: str = "Options"
+    section_title: str = "Options",
 ) -> Dict[str, Any]:
     """Format a menu into WhatsApp interactive list format.
 
@@ -600,12 +824,7 @@ def format_menu_as_interactive_list(
     return {
         "type": "list",
         "button_text": button_text,
-        "sections": [
-            {
-                "title": section_title[:24],  # Max 24 chars
-                "rows": rows
-            }
-        ]
+        "sections": [{"title": section_title[:24], "rows": rows}],  # Max 24 chars
     }
 
 
@@ -627,17 +846,15 @@ def format_menu_as_interactive_buttons(
         "buttons": [
             {
                 "id": btn.get("id", f"btn_{i}"),
-                "title": btn.get("title", "Option")[:20]  # Max 20 chars
+                "title": btn.get("title", "Option")[:20],  # Max 20 chars
             }
             for i, btn in enumerate(buttons[:3])  # Max 3 buttons
-        ]
+        ],
     }
 
 
 def format_text_with_numbered_list(
-    intro_text: str,
-    items: List[str],
-    emoji: str = "•"
+    intro_text: str, items: List[str], emoji: str = "•"
 ) -> str:
     """Format a text message with a numbered list.
 

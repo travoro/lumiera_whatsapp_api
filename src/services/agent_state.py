@@ -9,10 +9,12 @@ Key principles:
 3. This is separate from conversation history (which is for context only)
 4. State should be compact and structured (not bloated)
 """
-from typing import Optional, Dict, Any
+
 from dataclasses import dataclass
-from src.services.project_context import project_context_service
+from typing import Any, Dict, Optional
+
 from src.integrations.supabase import supabase_client
+from src.services.project_context import project_context_service
 from src.utils.logger import log
 
 
@@ -23,6 +25,7 @@ class AgentState:
     This is the authoritative state that the agent uses for decision-making.
     All IDs here are UUIDs that can be directly passed to tools.
     """
+
     user_id: str
     language: str
 
@@ -75,10 +78,7 @@ class AgentStateBuilder:
     """
 
     async def build_state(
-        self,
-        user_id: str,
-        language: str,
-        session_id: Optional[str] = None
+        self, user_id: str, language: str, session_id: Optional[str] = None
     ) -> AgentState:
         """Build the current agent state for a user.
 
@@ -94,11 +94,17 @@ class AgentStateBuilder:
         """
         try:
             # Load active project
-            active_project_id = await project_context_service.get_active_project(user_id)
+            active_project_id = await project_context_service.get_active_project(
+                user_id
+            )
             active_project_name = None
 
             if active_project_id:
-                project_details = await project_context_service.get_active_project_with_details(user_id)
+                project_details = (
+                    await project_context_service.get_active_project_with_details(
+                        user_id
+                    )
+                )
                 if project_details:
                     active_project_name = project_details.get("nom")
 
@@ -118,23 +124,16 @@ class AgentStateBuilder:
                 active_project_id=active_project_id,
                 active_project_name=active_project_name,
                 active_task_id=active_task_id,
-                active_task_title=active_task_title
+                active_task_title=active_task_title,
             )
 
         except Exception as e:
             log.error(f"Error building agent state for user {user_id}: {e}")
             # Return empty state on error
-            return AgentState(
-                user_id=user_id,
-                language=language,
-                session_id=session_id
-            )
+            return AgentState(user_id=user_id, language=language, session_id=session_id)
 
     async def update_state_from_tool_result(
-        self,
-        user_id: str,
-        tool_name: str,
-        tool_output: Any
+        self, user_id: str, tool_name: str, tool_output: Any
     ) -> None:
         """Update agent state based on tool execution results.
 
