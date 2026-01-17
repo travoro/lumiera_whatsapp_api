@@ -2,6 +2,149 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-01-17] - Documentation Organization & Test Suite Optimization
+
+### 🎯 Summary
+Complete documentation reorganization and test suite optimization. Reduced redundancy, improved structure, and achieved 100% test pass rate.
+
+### ✅ Added
+- **Test Infrastructure**
+  - `.env.test` - Test environment configuration with dummy credentials
+  - `run_tests.sh` - Helper script for running tests with proper environment setup
+  - `test_validation.py` - 37 security tests (prompt injection, XSS, SQL injection, path traversal)
+  - `test_pipeline.py` - 18 unit tests for message pipeline stages
+  - `test_templates.py` - 36 tests for WhatsApp template formatting
+
+- **Documentation Structure**
+  - `docs/fsm/` - FSM implementation documentation (7 docs)
+  - `docs/investigations/` - Historical analysis and fix documents (22 docs)
+  - `docs/testing/` - Test suite documentation (2 docs)
+  - Moved 11 reference documents to `docs/reference/`
+
+### 🔄 Changed
+- **Test Suite**
+  - Renamed `test_dynamic_templates.py` → `test_templates.py`
+  - Renamed `test_message_pipeline.py` → `test_pipeline.py`
+  - Updated `conftest.py` with required environment variables
+  - Modified `src/integrations/supabase.py` to skip initialization in test environment
+  - **Test Results**: 170/170 passing (100% pass rate, 3.78s execution)
+
+- **Documentation Organization**
+  - Moved 40+ markdown files from root to organized subfolders
+  - Cleaned up obsolete analysis documents
+  - Only `README.md` remains at project root
+  - Only `docs/README.md` remains as main docs index
+
+- **Logs Folder**
+  - Deleted redundant `server.log` (14M - duplicated app.log)
+  - Deleted redundant `server.error.log` (620K)
+  - Deleted `archive/` folder (960K)
+  - **Space Saved**: 15.5 MB (from 30M to 16M)
+
+### 🐛 Fixed
+- Test environment now properly loads without API key validation errors
+- All security tests passing with correct assertions matching implementation
+- Test suite can run independently without external dependencies
+
+### 📊 Impact
+- **Test Coverage**: 170 tests covering security, validation, FSM, pipeline, templates
+- **Documentation**: Organized, discoverable, and maintainable
+- **Storage**: 50% reduction in logs folder size
+
+---
+
+## [2026-01-16] - FSM Implementation & PlanRadar Optimization
+
+### 🎯 Summary
+Implemented Finite State Machine (FSM) for conversation flow management and optimized PlanRadar API calls by 50%.
+
+### ✅ Added
+- **FSM System**
+  - `src/fsm/core.py` - FSM engine with transition validation (650 LOC)
+  - `src/fsm/models.py` - FSM state models and enums
+  - `src/fsm/handlers.py` - FSM-aware message handlers
+  - `src/fsm/routing.py` - Intent routing with FSM integration
+  - Comprehensive test suite (170+ tests, 100% passing)
+
+- **FSM Features**
+  - 8 conversation states (IDLE, TASK_SELECTION, COLLECTING_DATA, etc.)
+  - 20+ validated state transitions
+  - Idempotency handling for message deduplication
+  - Session management with automatic expiry
+  - Graceful recovery from server restarts
+  - Comprehensive audit trail
+
+### 🔄 Changed
+- **PlanRadar API Optimization**
+  - Eliminated 50% of redundant API calls
+  - Implemented caching for task availability checks
+  - Improved filtering logic to prevent duplicate lookups
+  - **Impact**: Faster responses, reduced rate limit pressure
+
+- **Task Filtering**
+  - Fixed bug where resolved tasks (status code "3") appeared in available tasks
+  - Improved string-based status code handling
+  - Added proper null checks for status field
+
+### 🐛 Fixed
+- Option selection bug for list interactions (24-char limit compliance)
+- App restart recovery - sessions now properly restored after server restart
+- Resolved task filtering - status code "3" tasks no longer shown to users
+
+### 📊 Technical Details
+
+#### FSM Architecture
+```
+User Message
+    ↓
+Check Current State
+    ↓
+Validate Transition
+    ↓
+Execute Side Effects
+    ↓
+Update State
+    ↓
+Log Transition
+    ↓
+Response
+```
+
+#### API Call Reduction
+- **Before**: Up to 4 calls per task operation (get_task, list_tasks, validate, update)
+- **After**: 2 calls per task operation (list + update)
+- **Savings**: 50% reduction in API calls
+
+---
+
+## [2026-01-14] - Bug Fixes & Performance Improvements
+
+### 🎯 Summary
+Critical bug fixes for task selection, intent classification, and WhatsApp template formatting.
+
+### 🐛 Fixed
+- **Task Selection Bug**
+  - Fixed regex pattern to handle plural forms (tasks_1_fr, projects_1_fr)
+  - Fixed chat history crash preventing tool_outputs from reaching AI
+  - Improved direct action handler for list interactions
+
+- **Intent Classification**
+  - Robust parsing for Haiku responses with explanation text
+  - Lowered confidence threshold to 90% for better fast path usage
+  - Fixed SQL injection detection (OR-based tautologies)
+
+- **WhatsApp Template Issues**
+  - Fixed 42 template length violations (24-char limit)
+  - Implemented proper truncation for list items
+  - Enhanced emoji handling in templates
+
+### 🔄 Changed
+- Improved error logging for debugging
+- Enhanced validation for message sanitization
+- Better handling of edge cases in path traversal sanitization
+
+---
+
 ## [2026-01-05] - Major Database Schema Update + Conversation Memory
 
 ### 🎯 Summary

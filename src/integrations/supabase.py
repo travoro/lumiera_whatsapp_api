@@ -776,4 +776,9 @@ class SupabaseClient:
 
 
 # Global instance
-supabase_client = SupabaseClient()
+# Skip instantiation in test environment to avoid API key validation
+import os
+if os.getenv("ENVIRONMENT") == "test":
+    supabase_client = None  # Will be mocked by pytest fixtures
+else:
+    supabase_client = SupabaseClient()

@@ -301,6 +301,19 @@ def setup_test_environment(monkeypatch):
     # Disable external API calls by default
     monkeypatch.setenv("DISABLE_EXTERNAL_APIS", "true")
 
+    # Set required API keys and credentials (dummy values for tests)
+    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "test_twilio_sid")
+    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "test_twilio_token")
+    monkeypatch.setenv("TWILIO_WHATSAPP_NUMBER", "+1234567890")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test_anthropic_key")
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "test_anon_key")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test_service_role_key")
+    monkeypatch.setenv("PLANRADAR_API_KEY", "test_planradar_key")
+    monkeypatch.setenv("PLANRADAR_ACCOUNT_ID", "test_account_id")
+    monkeypatch.setenv("OPENAI_API_KEY", "test_openai_key")
+    monkeypatch.setenv("SECRET_KEY", "test_secret_key_12345678901234567890")
+
     yield
 
 
