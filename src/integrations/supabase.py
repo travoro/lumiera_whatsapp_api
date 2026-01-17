@@ -1,6 +1,5 @@
 """Supabase client for database operations."""
 
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
