@@ -87,7 +87,7 @@ jobs:
     - name: Run type checking
       run: |
         mypy src/ --ignore-missing-imports --no-strict-optional
-      continue-on-error: true  # Still have 47 errors to fix, but reduced from 66
+      # All type errors fixed! No longer using continue-on-error
 
     - name: Run tests with coverage
       env:
