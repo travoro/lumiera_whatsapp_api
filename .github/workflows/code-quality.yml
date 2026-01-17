@@ -1,0 +1,72 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for better analysis
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pylint radon
+
+    - name: Run Black formatter check
+      run: |
+        black --check src/ tests/ --diff
+
+    - name: Run isort import check
+      run: |
+        isort --check-only --profile black src/ tests/ --diff
+
+    - name: Run Flake8 linting
+      run: |
+        flake8 src/ tests/ --max-line-length=120 --extend-ignore=E203,W503 \
+          --statistics --count --show-source
+
+    - name: Run Pylint
+      run: |
+        pylint src/ --disable=C0111,C0103,R0903,W0212,C0301 --max-line-length=120 || true
+      continue-on-error: true
+
+    - name: Calculate code complexity
+      run: |
+        echo "## Code Complexity Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Cyclomatic Complexity" >> $GITHUB_STEP_SUMMARY
+        radon cc src/ -s -a >> $GITHUB_STEP_SUMMARY || true
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Maintainability Index" >> $GITHUB_STEP_SUMMARY
+        radon mi src/ -s >> $GITHUB_STEP_SUMMARY || true
+      continue-on-error: true
+
+    - name: Check for TODO/FIXME comments
+      run: |
+        echo "## TODO/FIXME Comments" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        grep -r "TODO\|FIXME" src/ || echo "No TODO/FIXME comments found" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      continue-on-error: true
+
+    - name: Count lines of code
+      run: |
+        echo "## Lines of Code" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        find src/ -name "*.py" -exec wc -l {} + | sort -rn >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      continue-on-error: true

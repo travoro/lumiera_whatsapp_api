@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.pytest_cache/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Documentation
+docs/
+README.md
+DEVELOPMENT.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Tests
+tests/
+htmlcov/
+.coverage
+coverage.xml
+
+# Scripts (use CMD in Dockerfile instead)
+*.sh
+
+# Migrations (if you want to exclude)
+migrations/

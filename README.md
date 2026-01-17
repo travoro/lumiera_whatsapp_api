@@ -1,5 +1,10 @@
 # Lumiera - WhatsApp Agentic Copilot for Construction Subcontractors
 
+![CI](https://github.com/travoro/lumiera_whatsapp_api/workflows/CI/badge.svg)
+![CD](https://github.com/travoro/lumiera_whatsapp_api/workflows/CD%20-%20Deploy/badge.svg)
+![Code Quality](https://github.com/travoro/lumiera_whatsapp_api/workflows/Code%20Quality/badge.svg)
+[![codecov](https://codecov.io/gh/travoro/lumiera_whatsapp_api/branch/main/graph/badge.svg)](https://codecov.io/gh/travoro/lumiera_whatsapp_api)
+
 A WhatsApp-first AI assistant built with Python, LangChain, and Claude Opus 4.5 for construction subcontractors (BTP).
 
 ## Overview

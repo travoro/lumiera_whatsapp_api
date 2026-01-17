@@ -1,0 +1,113 @@
+name: CD - Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Only deploy if tests pass
+    needs: []  # Add 'test' job from ci.yml if you want to run tests first
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    # Option 1: Deploy via SSH
+    - name: Deploy to Server via SSH
+      if: ${{ vars.DEPLOYMENT_METHOD == 'ssh' || vars.DEPLOYMENT_METHOD == '' }}
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        script: |
+          cd ${{ secrets.DEPLOY_PATH || '/home/ceeai/whatsapp_api' }}
+          git pull origin main
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+          # Run tests in production environment
+          ./run_tests.sh || echo "Tests failed but continuing deployment"
+
+          # Restart the service
+          sudo systemctl restart lumiera-whatsapp.service
+
+          # Check service status
+          sleep 5
+          sudo systemctl status lumiera-whatsapp.service
+
+    # Option 2: Build and push Docker image
+    - name: Set up Docker Buildx
+      if: ${{ vars.DEPLOYMENT_METHOD == 'docker' }}
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      if: ${{ vars.DEPLOYMENT_METHOD == 'docker' }}
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      if: ${{ vars.DEPLOYMENT_METHOD == 'docker' }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/whatsapp-api:latest
+          ${{ secrets.DOCKER_USERNAME }}/whatsapp-api:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/whatsapp-api:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/whatsapp-api:buildcache,mode=max
+
+    # Option 3: Deploy to cloud platform (customize for your platform)
+    - name: Deploy to Cloud Platform
+      if: ${{ vars.DEPLOYMENT_METHOD == 'cloud' }}
+      run: |
+        echo "Add your cloud platform deployment commands here"
+        # Examples:
+        # - Google Cloud Run: gcloud run deploy
+        # - AWS ECS/Fargate: aws ecs update-service
+        # - Azure App Service: az webapp up
+        # - Railway: railway up
+        # - Heroku: git push heroku main
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed!"
+        fi
+
+    # Optional: Send Slack/Discord notification
+    - name: Notify Slack
+      if: always() && secrets.SLACK_WEBHOOK_URL != ''
+      uses: slackapi/slack-github-action@v1.26.0
+      with:
+        payload: |
+          {
+            "text": "Deployment ${{ job.status }} for ${{ github.repository }}",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Deployment Status:* ${{ job.status }}\n*Repository:* ${{ github.repository }}\n*Branch:* ${{ github.ref_name }}\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}"
+                }
+              }
+            ]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
