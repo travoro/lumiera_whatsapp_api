@@ -1,7 +1,7 @@
 """Session management service for conversation tracking."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
@@ -22,11 +22,6 @@ class SessionManagementService:
         self.working_hours_end = 20  # 8 PM
         self.session_timeout_hours = 7  # New session after 7 hours
 
-        # Cache to prevent race conditions from multiple concurrent calls
-        # Format: {user_id: (session_dict, timestamp)}
-        self._session_cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
-        self._cache_ttl = 5.0  # Cache for 5 seconds to handle concurrent calls
-
         log.info("Session management service initialized")
 
     async def get_or_create_session(
@@ -46,18 +41,6 @@ class SessionManagementService:
             Session dict with id, started_at, etc.
         """
         try:
-            # Check cache first to prevent race conditions
-            import time
-
-            current_time = time.time()
-            if subcontractor_id in self._session_cache:
-                cached_session, cached_time = self._session_cache[subcontractor_id]
-                if current_time - cached_time < self._cache_ttl:
-                    log.debug(
-                        f"✅ Using cached session {cached_session['id']} for user {subcontractor_id}"
-                    )
-                    return cached_session
-
             # Call PostgreSQL function to get or create session
             session_id = await supabase_client.get_or_create_session_rpc(
                 subcontractor_id
@@ -69,24 +52,16 @@ class SessionManagementService:
 
                 if session:
                     log.info(f"Session {session_id} active for user {subcontractor_id}")
-                    # Cache the session
-                    self._session_cache[subcontractor_id] = (session, current_time)
                     return session
 
             # Fallback: Create session manually if function fails
             log.warning("PostgreSQL function failed, creating session manually")
-            session = await self._create_session_manual(subcontractor_id)
-            if session:
-                self._session_cache[subcontractor_id] = (session, current_time)
-            return session
+            return await self._create_session_manual(subcontractor_id)
 
         except Exception as e:
             log.error(f"Error getting/creating session: {e}")
             # Fallback to manual creation
-            session = await self._create_session_manual(subcontractor_id)
-            if session:
-                self._session_cache[subcontractor_id] = (session, current_time)
-            return session
+            return await self._create_session_manual(subcontractor_id)
 
     async def _create_session_manual(
         self, subcontractor_id: str
