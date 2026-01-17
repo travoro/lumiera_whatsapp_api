@@ -323,9 +323,9 @@ When working with Claude Code, here's what happens behind the scenes:
 
 ## 📚 Related Documentation
 
-- [CI-CD.md](CI-CD.md) - Complete CI/CD setup guide
+- [CI-CD.md](../deployment/CI-CD.md) - Complete CI/CD setup guide
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Development tools and environment
-- [CICD-SETUP-CHECKLIST.md](CICD-SETUP-CHECKLIST.md) - Setup checklist
+- [CICD-SETUP-CHECKLIST.md](../deployment/CICD-SETUP-CHECKLIST.md) - Setup checklist
 
 ---
 

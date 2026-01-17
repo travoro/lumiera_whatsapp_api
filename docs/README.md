@@ -8,6 +8,9 @@ Welcome to the Lumiera WhatsApp API documentation! This guide will help you unde
 Start here if you're new to the project:
 - **[Quick Start Guide](./getting-started/QUICKSTART.md)** - Get up and running in 10 minutes
 - **[Installation Guide](../README.md)** - Detailed installation and setup instructions
+- **[Development Workflow](./getting-started/WORKFLOW.md)** - "Ship it" workflow for rapid development
+- **[Development Tools](./getting-started/DEVELOPMENT.md)** - Auto-reload, auto-test, pre-commit hooks
+- **[Git Setup](./getting-started/GIT-SETUP.md)** - Git configuration guide
 
 ### Architecture
 Understand how the system works:
@@ -57,6 +60,13 @@ Security best practices and guidelines:
 - **[Best Practices](./security/BEST_PRACTICES.md)** - AI agent security framework
 - **[Input Validation](./security/INPUT_VALIDATION.md)** - Validation and sanitization
 
+### Deployment & CI/CD
+Automated testing and deployment:
+- **[CI/CD Pipeline Guide](./deployment/CI-CD.md)** - Complete CI/CD setup with GitHub Actions
+- **[CI/CD Setup Checklist](./deployment/CICD-SETUP-CHECKLIST.md)** - Quick start checklist
+- **GitHub Actions**: Automated testing, code quality, security scanning, deployment
+- **Docker Support**: Multi-stage builds, docker-compose for local development
+
 ### Development
 Guides for developers:
 - **[Test Suite Summary](./testing/TEST_SUITE_SUMMARY.md)** - 170 tests covering security, FSM, pipeline, templates
@@ -99,10 +109,11 @@ Historical bug fixes and performance improvements:
 4. Understand [Error Handling System](./architecture/ERROR_HANDLING.md)
 
 ### For Operations/DevOps
-1. Check [Deployment Guide](./development/DEPLOYMENT.md)
-2. Review [Database Schema](./database/SCHEMA.md)
-3. Study [Security Best Practices](./security/BEST_PRACTICES.md)
-4. Monitor [Changelog](./reference/CHANGELOG.md)
+1. Check [CI/CD Pipeline Guide](./deployment/CI-CD.md)
+2. Review [CI/CD Setup Checklist](./deployment/CICD-SETUP-CHECKLIST.md)
+3. Study [Database Schema](./database/SCHEMA.md)
+4. Review [Security Best Practices](./security/BEST_PRACTICES.md)
+5. Monitor [Changelog](./reference/CHANGELOG.md)
 
 ---
 

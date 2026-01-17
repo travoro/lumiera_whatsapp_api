@@ -71,4 +71,4 @@ gh workflow run dependency-update.yml
 
 ## Troubleshooting
 
-See [CI-CD.md](../CI-CD.md) for detailed setup instructions and troubleshooting.
+See [CI-CD.md](../../docs/deployment/CI-CD.md) for detailed setup instructions and troubleshooting.

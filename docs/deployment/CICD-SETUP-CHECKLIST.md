@@ -47,7 +47,7 @@ git config --global user.email "your.email@example.com"
 git config --list | grep user
 ```
 
-See [GIT-SETUP.md](GIT-SETUP.md) for detailed configuration.
+See [GIT-SETUP.md](../getting-started/GIT-SETUP.md) for detailed configuration.
 
 ### 1. Commit and Push CI/CD Files
 
@@ -323,8 +323,8 @@ docker push your-username/whatsapp-api:test
 ## 📚 Documentation
 
 - **Complete CI/CD Guide:** [CI-CD.md](CI-CD.md)
-- **Workflows Overview:** [.github/workflows/README.md](.github/workflows/README.md)
-- **Development Guide:** [DEVELOPMENT.md](DEVELOPMENT.md)
+- **Workflows Overview:** [.github/workflows/README.md](../../.github/workflows/README.md)
+- **Development Guide:** [DEVELOPMENT.md](../getting-started/DEVELOPMENT.md)
 - **GitHub Actions Docs:** https://docs.github.com/en/actions
 
 ## ✨ Next Steps
