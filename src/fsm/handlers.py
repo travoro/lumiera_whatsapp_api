@@ -209,7 +209,12 @@ class ClarificationManager:
             logger.info(f"Cleaned up {expired_count} expired clarifications")
             return expired_count
         except Exception as e:
-            logger.error(f"Error cleaning up expired clarifications: {str(e)}")
+            error_msg = str(e)
+            # If table doesn't exist, log as debug instead of error to avoid spam
+            if "Could not find the table" in error_msg and "fsm_clarification_requests" in error_msg:
+                logger.debug(f"fsm_clarification_requests table not found - skipping cleanup")
+            else:
+                logger.error(f"Error cleaning up expired clarifications: {error_msg}")
             return 0
 
     async def _abandon_user_session(self, user_id: str, reason: str) -> None:

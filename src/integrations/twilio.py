@@ -193,6 +193,7 @@ class TwilioClient:
                 auth=HTTPBasicAuth(
                     settings.twilio_account_sid, settings.twilio_auth_token
                 ),
+                timeout=30,  # 30 second timeout for API calls
             )
 
             log.info(f"📊 Response status code: {response.status_code}")
@@ -439,7 +440,7 @@ class TwilioClient:
                 import re
 
                 # Create a hash of the original filename for uniqueness
-                name_hash = hashlib.md5(filename.encode()).hexdigest()[:8]
+                name_hash = hashlib.md5(filename.encode(), usedforsecurity=False).hexdigest()[:8]
 
                 # Extract just the base name without path, and limit length
                 base_name = os.path.basename(filename)

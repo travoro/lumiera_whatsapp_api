@@ -69,8 +69,9 @@ jobs:
 
     # Optional: Send Slack/Discord notification
     - name: Notify Slack
-      if: always() && secrets.SLACK_WEBHOOK_URL != ''
+      if: ${{ always() }}
       uses: slackapi/slack-github-action@v1.26.0
+      continue-on-error: true
       with:
         payload: |
           {

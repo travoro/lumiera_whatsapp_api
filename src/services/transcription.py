@@ -1,6 +1,7 @@
 """Audio transcription service using OpenAI Whisper."""
 
 import os
+import tempfile
 from typing import Optional, Tuple
 
 import httpx
@@ -112,25 +113,26 @@ class TranscriptionService:
             if not audio_data:
                 return None
 
-            # Save temporarily
-            temp_file_path = "/tmp/audio_temp.ogg"
-            with open(temp_file_path, "wb") as f:
-                f.write(audio_data)
+            # Save temporarily using secure temp file
+            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_file:
+                temp_file.write(audio_data)
+                temp_file_path = temp_file.name
 
-            # Transcribe using Whisper (original language only)
-            with open(temp_file_path, "rb") as audio_file:
-                transcript = self.client.audio.transcriptions.create(
-                    model=self.model,
-                    file=audio_file,
-                    response_format="text",
-                    # language parameter removed - let Whisper auto-detect the language
-                )
-
-            # Clean up temp file
             try:
-                os.remove(temp_file_path)
-            except BaseException:
-                pass
+                # Transcribe using Whisper (original language only)
+                with open(temp_file_path, "rb") as audio_file:
+                    transcript = self.client.audio.transcriptions.create(
+                        model=self.model,
+                        file=audio_file,
+                        response_format="text",
+                        # language parameter removed - let Whisper auto-detect the language
+                    )
+            finally:
+                # Clean up temp file
+                try:
+                    os.remove(temp_file_path)
+                except BaseException:
+                    pass
 
             transcribed_text = (
                 transcript if isinstance(transcript, str) else transcript.text
@@ -177,33 +179,35 @@ class TranscriptionService:
             )
 
             # Transcribe (we already have the audio data)
-            temp_file_path = "/tmp/audio_temp.ogg"
-            with open(temp_file_path, "wb") as f:
-                f.write(audio_data)
+            # Save temporarily using secure temp file
+            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_file:
+                temp_file.write(audio_data)
+                temp_file_path = temp_file.name
 
-            # Log what we're about to send to Whisper
-            log.info("📤 CALLING WHISPER API:")
-            log.info(f"   → model: {self.model}")
-            log.info("   → response_format: verbose_json")
-            log.info(f"   → target_language (received): {target_language}")
-            log.info(
-                "   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)"
-            )
-
-            with open(temp_file_path, "rb") as audio_file:
-                # Use verbose_json to get detected language from Whisper
-                transcript = self.client.audio.transcriptions.create(
-                    model=self.model,
-                    file=audio_file,
-                    response_format="verbose_json",
-                    # No language parameter - let Whisper auto-detect
+            try:
+                # Log what we're about to send to Whisper
+                log.info("📤 CALLING WHISPER API:")
+                log.info(f"   → model: {self.model}")
+                log.info("   → response_format: verbose_json")
+                log.info(f"   → target_language (received): {target_language}")
+                log.info(
+                    "   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)"
                 )
 
-            # Clean up
-            try:
-                os.remove(temp_file_path)
-            except BaseException:
-                pass
+                with open(temp_file_path, "rb") as audio_file:
+                    # Use verbose_json to get detected language from Whisper
+                    transcript = self.client.audio.transcriptions.create(
+                        model=self.model,
+                        file=audio_file,
+                        response_format="verbose_json",
+                        # No language parameter - let Whisper auto-detect
+                    )
+            finally:
+                # Clean up
+                try:
+                    os.remove(temp_file_path)
+                except BaseException:
+                    pass
 
             # Extract text from Whisper response
             transcribed_text = (

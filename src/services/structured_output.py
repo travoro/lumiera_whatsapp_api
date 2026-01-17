@@ -45,7 +45,7 @@ class WhatsAppListSection(BaseModel):
 
     title: str = Field(..., max_length=24, description="Section title")
     items: List[WhatsAppListItem] = Field(
-        ..., min_items=1, description="Items in this section"
+        ..., min_length=1, description="Items in this section"
     )
 
     @validator("title")
@@ -184,7 +184,7 @@ class ActionButtonsOutput(BaseModel):
     message_type: Literal["action_buttons"] = "action_buttons"
     intro_text: str = Field(..., description="Introduction message")
     buttons: List[WhatsAppButton] = Field(
-        ..., max_items=3, description="Action buttons (max 3)"
+        ..., max_length=3, description="Action buttons (max 3)"
     )
 
     @validator("buttons")

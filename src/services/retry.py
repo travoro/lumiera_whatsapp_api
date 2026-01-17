@@ -1,6 +1,7 @@
 """Retry logic and error handling with Tenacity."""
 
 import asyncio
+import logging
 from typing import Any, Callable
 
 import httpx
@@ -41,8 +42,8 @@ def retry_on_api_error(max_attempts: int = 3):
                 httpx.TimeoutException,
             )
         ),
-        before_sleep=before_sleep_log(log, "WARNING"),
-        after=after_log(log, "INFO"),
+        before_sleep=before_sleep_log(log, logging.WARNING),
+        after=after_log(log, logging.INFO),
         reraise=True,
     )
 
@@ -64,8 +65,8 @@ def retry_on_rate_limit(max_attempts: int = 5):
                 OpenAIRateLimitError,
             )
         ),
-        before_sleep=before_sleep_log(log, "WARNING"),
-        after=after_log(log, "INFO"),
+        before_sleep=before_sleep_log(log, logging.WARNING),
+        after=after_log(log, logging.INFO),
         reraise=True,
     )
 
@@ -89,8 +90,8 @@ def retry_on_network_error(max_attempts: int = 3):
                 TimeoutError,
             )
         ),
-        before_sleep=before_sleep_log(log, "WARNING"),
-        after=after_log(log, "INFO"),
+        before_sleep=before_sleep_log(log, logging.WARNING),
+        after=after_log(log, logging.INFO),
         reraise=True,
     )
 

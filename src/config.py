@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # Application Settings
     environment: str = "development"
     port: int = 8000
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 - intentional bind to all interfaces for server
     log_level: str = "INFO"
     server_url: str = "https://whatsapp-api.lumiera.paris"  # Public URL for this server
 
@@ -145,4 +145,5 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-settings = Settings()
+# mypy doesn't understand that Pydantic loads these from environment variables
+settings = Settings()  # type: ignore[call-arg]
