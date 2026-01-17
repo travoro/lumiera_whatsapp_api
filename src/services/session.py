@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from src.integrations.supabase import supabase_client
+from src.services.metrics import metrics_service
 from src.utils.logger import log
 
 
@@ -94,6 +95,8 @@ class SessionManagementService:
                 log.info(
                     f"Created new session {session['id']} for user {subcontractor_id}"
                 )
+                # Track metrics
+                metrics_service.track_session_created(subcontractor_id, session["id"])
                 return session
 
             return None

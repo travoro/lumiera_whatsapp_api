@@ -216,6 +216,10 @@ async def handle_direct_action(
             session_id = session["id"]
         else:
             log.debug(f"✅ Using passed session_id: {session_id}")
+            # Track metrics: session reused (Phase 7 monitoring)
+            from src.services.metrics import metrics_service
+
+            metrics_service.track_session_reused(user_id, session_id)
 
         # Load recent messages
         messages = await supabase_client.get_messages_by_session(
