@@ -64,6 +64,8 @@ jobs:
         # Database
         SUPABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db
         SUPABASE_KEY=test-key-for-ci
+        SUPABASE_ANON_KEY=test-anon-key-for-ci
+        SUPABASE_SERVICE_ROLE_KEY=test-service-role-key-for-ci
         DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db
 
         # Redis
@@ -79,6 +81,10 @@ jobs:
         # PlanRadar API
         PLANRADAR_API_URL=https://api.test.planradar.com
         PLANRADAR_API_KEY=test-planradar-key
+        PLANRADAR_ACCOUNT_ID=test-account-id
+
+        # Security
+        SECRET_KEY=test-secret-key-for-ci-minimum-32-characters-long
 
         # Webhook
         WEBHOOK_BASE_URL=http://localhost:8000
