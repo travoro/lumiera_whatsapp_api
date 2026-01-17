@@ -14,7 +14,6 @@ from src.services.transcription import transcription_service
 from src.services.escalation import escalation_service
 from src.services.memory import memory_service
 from src.services.session import session_service
-from src.services.user_context import user_context_service
 from src.services.validation import validate_input
 from src.services.intent import intent_classifier
 from src.integrations.supabase import supabase_client

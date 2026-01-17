@@ -15,7 +15,6 @@ def verify_migrations():
         # Check tables
         tables_to_check = [
             'conversation_sessions',
-            'user_context',
             'intent_classifications'
         ]
 
@@ -61,20 +60,11 @@ def verify_migrations():
         except Exception as e:
             print(f"  ❌ Function 'get_or_create_session' error: {e}")
 
-        # Test cleanup_expired_context
-        try:
-            result = client.rpc('cleanup_expired_context').execute()
-            print(f"  ✅ Function 'cleanup_expired_context' works")
-            print(f"     Cleaned up {result.data} expired contexts")
-        except Exception as e:
-            print(f"  ❌ Function 'cleanup_expired_context' error: {e}")
-
         # Check indexes
         print("\n📇 Checking Indexes:")
         indexes = [
             'idx_sessions_subcontractor',
             'idx_sessions_status',
-            'idx_user_context_subcontractor',
             'idx_messages_session'
         ]
 

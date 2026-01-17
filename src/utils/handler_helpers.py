@@ -5,7 +5,6 @@ happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 """
 from typing import Tuple, List, Dict, Any, Optional
 from src.integrations.supabase import supabase_client
-from src.services.user_context import user_context_service
 from src.utils.whatsapp_formatter import get_translation
 from src.utils.logger import log
 
@@ -14,41 +13,37 @@ async def get_projects_with_context(
     user_id: str,
     language: str
 ) -> Tuple[List[Dict[str, Any]], Optional[str], Optional[str]]:
-    """Get user's projects and current project context.
-    
+    """Get user's projects.
+
     This is a common pattern used across multiple handlers to:
-    1. Check for current_project in user context
-    2. Fetch all projects for the user  
-    3. Return formatted response based on scenario
-    
+    1. Fetch all projects for the user
+    2. Return formatted response based on scenario
+
     Args:
         user_id: Subcontractor ID
         language: User's language code
-        
+
     Returns:
-        Tuple of (projects, current_project_id, message_if_no_projects)
+        Tuple of (projects, None, message_if_no_projects)
         - projects: List of project dicts
-        - current_project_id: Current project ID from context or None
+        - None: Placeholder for backwards compatibility (previously current_project_id)
         - message_if_no_projects: Translated "no projects" message if applicable, else None
-        
+
     Example:
-        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, "fr")
+        projects, _, no_projects_msg = await get_projects_with_context(user_id, "fr")
         if no_projects_msg:
             return {"message": no_projects_msg, ...}
     """
     try:
-        # Check for current project in context
-        current_project_id = await user_context_service.get_context(user_id, 'current_project')
-        
         # Get user's projects
         projects = await supabase_client.list_projects(user_id)
-        
+
         # If no projects, return error message (ALWAYS French)
         if not projects:
             no_projects_msg = get_translation("fr", "no_projects")
             return ([], None, no_projects_msg)
 
-        return (projects, current_project_id, None)
+        return (projects, None, None)
 
     except Exception as e:
         log.error(f"Error in get_projects_with_context for user {user_id}: {e}")

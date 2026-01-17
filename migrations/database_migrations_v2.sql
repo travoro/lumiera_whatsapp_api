@@ -56,48 +56,6 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- USER CONTEXT TABLE
--- ============================================================================
--- Store learned facts, preferences, and frequently mentioned entities
-
-CREATE TABLE IF NOT EXISTS user_context (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    subcontractor_id UUID NOT NULL REFERENCES subcontractors(id) ON DELETE CASCADE,
-
-    -- Context data
-    context_key TEXT NOT NULL,  -- 'current_project', 'preferred_language_style', etc.
-    context_value TEXT NOT NULL,
-    context_type TEXT NOT NULL,  -- 'preference', 'fact', 'entity', 'state'
-
-    -- Metadata
-    confidence FLOAT DEFAULT 1.0,  -- 0.0 to 1.0
-    source TEXT NOT NULL,  -- 'user_stated', 'inferred', 'system', 'tool'
-    metadata JSONB DEFAULT '{}',  -- Additional structured data
-
-    -- Expiry
-    expires_at TIMESTAMP WITH TIME ZONE,  -- Optional expiry for temporary context
-
-    -- Timestamps
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-    -- Unique constraint per user + key
-    CONSTRAINT unique_user_context UNIQUE(subcontractor_id, context_key),
-
-    -- Validation
-    CONSTRAINT valid_context_type CHECK (context_type IN ('preference', 'fact', 'entity', 'state')),
-    CONSTRAINT valid_confidence CHECK (confidence >= 0.0 AND confidence <= 1.0)
-);
-
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_user_context_subcontractor
-    ON user_context(subcontractor_id);
-CREATE INDEX IF NOT EXISTS idx_user_context_type
-    ON user_context(context_type);
-CREATE INDEX IF NOT EXISTS idx_user_context_expiry
-    ON user_context(expires_at) WHERE expires_at IS NOT NULL;
-
--- ============================================================================
 -- INTENT CLASSIFICATION LOG
 -- ============================================================================
 -- Track intent classification for analytics and monitoring
@@ -244,21 +202,6 @@ CREATE TRIGGER trigger_update_session_on_message
 -- CLEANUP FUNCTIONS
 -- ============================================================================
 
--- Function to cleanup expired context
-CREATE OR REPLACE FUNCTION cleanup_expired_context()
-RETURNS INTEGER AS $$
-DECLARE
-    v_deleted_count INTEGER;
-BEGIN
-    DELETE FROM user_context
-    WHERE expires_at IS NOT NULL
-      AND expires_at < NOW();
-
-    GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
-    RETURN v_deleted_count;
-END;
-$$ LANGUAGE plpgsql;
-
 -- Function to generate session summary
 CREATE OR REPLACE FUNCTION generate_session_summary(p_session_id UUID)
 RETURNS TEXT AS $$
@@ -298,14 +241,10 @@ $$ LANGUAGE plpgsql;
 
 -- Enable RLS on new tables
 ALTER TABLE conversation_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_context ENABLE ROW LEVEL SECURITY;
 ALTER TABLE intent_classifications ENABLE ROW LEVEL SECURITY;
 
 -- Service role can access everything
 CREATE POLICY "Service role full access to sessions" ON conversation_sessions
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access to user_context" ON user_context
     FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "Service role full access to intent_classifications" ON intent_classifications
@@ -316,7 +255,6 @@ CREATE POLICY "Service role full access to intent_classifications" ON intent_cla
 -- ============================================================================
 
 GRANT ALL ON conversation_sessions TO service_role;
-GRANT ALL ON user_context TO service_role;
 GRANT ALL ON intent_classifications TO service_role;
 
 -- ============================================================================
@@ -330,10 +268,6 @@ BEGIN
 
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'conversation_sessions') THEN
         RAISE NOTICE '✓ conversation_sessions table created';
-    END IF;
-
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user_context') THEN
-        RAISE NOTICE '✓ user_context table created';
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'intent_classifications') THEN

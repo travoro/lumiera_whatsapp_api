@@ -4,7 +4,6 @@ from langchain.tools import tool
 from src.actions import projects, tasks, incidents, documents
 from src.integrations.supabase import supabase_client
 from src.services.escalation import escalation_service
-from src.services.user_context import user_context_service
 from src.utils.logger import log
 
 
@@ -609,55 +608,6 @@ async def escalate_to_human_tool(
 
 
 @tool
-async def remember_user_context_tool(
-    user_id: str,
-    key: str,
-    value: str,
-    context_type: str = 'fact'
-) -> str:
-    """Remember important information about the user for future personalization.
-
-    Use this tool to learn and store facts, preferences, or context about the user
-    that will help personalize future conversations.
-
-    Args:
-        user_id: The ID of the user
-        key: Context key (use snake_case, e.g., 'preferred_contact_time', 'current_project_name')
-        value: Context value (the information to remember)
-        context_type: Type of context - one of:
-            - 'fact': General facts about the user (role, team size, etc.)
-            - 'preference': User preferences (communication style, etc.)
-            - 'state': Temporary state (current_task, reporting_incident, etc.)
-            - 'entity': Named entities (favorite_project, frequent_location, etc.)
-
-    Returns:
-        Success or error message
-
-    Examples:
-        - User mentions "I'm an electrician" → remember_user_context(user_id, "role", "electrician", "fact")
-        - User says "Call me in the morning" → remember_user_context(user_id, "preferred_contact_time", "morning", "preference")
-        - User discussing "Building ABC project" → remember_user_context(user_id, "current_project_name", "Building ABC", "state")
-    """
-    log.info(f"🔧 Tool called: remember_user_context_tool(user_id={user_id[:8]}..., key={key}, value={value[:50]}..., type={context_type})")
-
-    success = await user_context_service.set_context(
-        subcontractor_id=user_id,
-        key=key,
-        value=value,
-        context_type=context_type,
-        source='inferred',
-        confidence=0.8
-    )
-
-    if success:
-        log.info(f"✅ remember_user_context_tool: Context saved ({key}={value[:30]}...)")
-        return f"✅ Remembered: {key} = {value}"
-
-    log.warning(f"❌ remember_user_context_tool failed to save context")
-    return f"❌ Could not remember context"
-
-
-@tool
 async def find_project_by_name(user_id: str, project_name: str) -> str:
     """Find a project by its name when the user mentions it.
 
@@ -1236,54 +1186,6 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         return "❌ Erreur lors de la transmission de votre demande. Veuillez réessayer."
 
     @tool
-    async def remember_user_context_tool(
-        key: str,
-        value: str,
-        context_type: str = 'fact'
-    ) -> str:
-        """Remember important information about the user for future personalization.
-
-        Use this tool to learn and store facts, preferences, or context about the user
-        that will help personalize future conversations.
-
-        Args:
-            key: Context key (use snake_case, e.g., 'preferred_contact_time', 'current_project_name')
-            value: Context value (the information to remember)
-            context_type: Type of context - one of:
-                - 'fact': General facts about the user (role, team size, etc.)
-                - 'preference': User preferences (communication style, etc.)
-                - 'state': Temporary state (current_task, reporting_incident, etc.)
-                - 'entity': Named entities (favorite_project, frequent_location, etc.)
-
-        Returns:
-            Success or error message
-
-        Examples:
-            - User mentions "I'm an electrician" → remember_user_context("role", "electrician", "fact")
-            - User says "Call me in the morning" → remember_user_context("preferred_contact_time", "morning", "preference")
-            - User discussing "Building ABC project" → remember_user_context("current_project_name", "Building ABC", "state")
-        """
-        # user_id captured from closure ↓
-        log.info(f"🔧 Tool called: remember_user_context_tool(user_id={user_id[:8]}..., key={key}, value={value[:50]}..., type={context_type})")
-        get_execution_context().record_tool_call("remember_user_context_tool")
-
-        success = await user_context_service.set_context(
-            subcontractor_id=user_id,
-            key=key,
-            value=value,
-            context_type=context_type,
-            source='inferred',
-            confidence=0.8
-        )
-
-        if success:
-            log.info(f"✅ remember_user_context_tool: Context saved ({key}={value[:30]}...)")
-            return f"✅ Remembered: {key} = {value}"
-
-        log.warning(f"❌ remember_user_context_tool failed to save context")
-        return f"❌ Could not remember context"
-
-    @tool
     async def find_project_by_name(project_name: str) -> str:
         """Find a project by its name when the user mentions it.
 
@@ -1376,7 +1278,6 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         mark_task_complete_tool,
         set_language_tool,
         escalate_to_human_tool,
-        remember_user_context_tool,
         find_project_by_name,
     ]
 
@@ -1404,6 +1305,5 @@ all_tools = [
     mark_task_complete_tool,
     set_language_tool,
     escalate_to_human_tool,
-    remember_user_context_tool,
     find_project_by_name,  # Layer 3: Fallback lookup when no explicit state
 ]
