@@ -214,9 +214,9 @@ def create_agent(user_id: str, phone_number: str, language: str) -> AgentExecuto
         log.debug(
             f"🤖 Initializing OpenAI agent with model: {settings.openai_model} (user: {user_id[:8]}...)"
         )
-        llm = ChatOpenAI(
+        llm = ChatOpenAI(  # type: ignore[call-arg]
             model=settings.openai_model,
-            api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,  # type: ignore[arg-type]
             temperature=settings.openai_temperature,
             max_tokens=settings.openai_max_tokens,
         )
@@ -224,9 +224,9 @@ def create_agent(user_id: str, phone_number: str, language: str) -> AgentExecuto
         log.debug(
             f"🤖 Initializing Anthropic agent with model: {settings.anthropic_model} (user: {user_id[:8]}...)"
         )
-        llm = ChatAnthropic(
+        llm = ChatAnthropic(  # type: ignore[call-arg,assignment]
             model=settings.anthropic_model,
-            api_key=settings.anthropic_api_key,
+            api_key=settings.anthropic_api_key,  # type: ignore[arg-type]
             temperature=settings.anthropic_temperature,
             max_tokens=settings.anthropic_max_tokens,
         )
@@ -346,7 +346,7 @@ class LumieraAgent:
 
                 # Prepare agent input (SIMPLIFIED - no user_id/phone/language in dict)
                 # These are captured in tool closures, not passed to LLM
-                agent_input = {
+                agent_input: Dict[str, Any] = {
                     "input": f"{context_prefix}{message_text}",
                 }
 

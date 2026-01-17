@@ -49,6 +49,10 @@ class MessageContext:
     intent: Optional[str] = None
     confidence: Optional[float] = None
     response_text: Optional[str] = None
+    response_type: Optional[str] = None  # Type of response (text, list, buttons, etc.)
+    list_type: Optional[str] = None  # Type of list if response is a list
+    attachments: list = field(default_factory=list)  # Media attachments
+    agent_used: bool = False  # Whether AI agent was used
     escalation: bool = False
     tools_called: list = field(default_factory=list)
     tool_outputs: list = field(
@@ -148,48 +152,48 @@ class MessagePipeline:
             # Stage 1: Authenticate user
             result = await self._authenticate_user(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 2: Get or create session
             result = await self._manage_session(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 3: Detect language
             result = await self._detect_language(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 4: Process media (audio transcription)
             if ctx.media_url and ctx.media_type and "audio" in ctx.media_type:
                 result = await self._process_audio(ctx)
                 if not result.success:
-                    return result
+                    return result  # type: ignore[return-value]
 
             # Stage 5: Translate to French (internal language)
             result = await self._translate_to_french(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 5.5: Check for active session (FSM context preservation)
             result = await self._check_active_session(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 6: Classify intent (now with FSM context)
             result = await self._classify_intent(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 7: Route to handler
             result = await self._route_message(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 8: Translate response back to user language
             result = await self._translate_response(ctx)
             if not result.success:
-                return result
+                return result  # type: ignore[return-value]
 
             # Stage 9: Save to database
             await self._persist_messages(ctx)
@@ -677,7 +681,7 @@ class MessagePipeline:
                 log.info("🚀 HIGH CONFIDENCE - Attempting fast path")
 
                 # Load last bot message's tool_outputs for resolving numeric selections
-                last_tool_outputs = []
+                last_tool_outputs: list[Any] = []
                 last_bot_message = None
                 try:
                     messages = await supabase_client.get_messages_by_session(
@@ -822,7 +826,7 @@ class MessagePipeline:
                 )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
-            chat_history = []
+            chat_history: list[Any] = []
             try:
                 import json
 
@@ -1104,7 +1108,7 @@ class MessagePipeline:
             )
 
             # Build metadata for outbound message
-            outbound_metadata = {}
+            outbound_metadata: Dict[str, Any] = {}
 
             # Store the intent that generated this response (for list selection routing)
             if ctx.intent:

@@ -684,7 +684,7 @@ class DynamicTemplateService:
         Returns:
             Content SID if successful, None otherwise
         """
-        content_data = {"body": body_text}
+        content_data: Dict[str, Any] = {"body": body_text}
 
         if media_url:
             content_data["media"] = [media_url]
@@ -1297,7 +1297,7 @@ class DynamicTemplateService:
             if not result.data:
                 return None
 
-            total_lifecycle = 0
+            total_lifecycle = 0.0
             count = 0
 
             for template in result.data:
@@ -1375,14 +1375,14 @@ class DynamicTemplateService:
         timestamp = int(time.time() * 1000)
         return f"dynamic_{content_type}_{timestamp}"
 
-    def estimate_template_cost(self, operations: Dict[str, int]) -> Dict[str, float]:
+    def estimate_template_cost(self, operations: Dict[str, int]) -> Dict[str, Any]:
         """Estimate API call costs.
 
         Args:
             operations: Dict with operation counts (create, send, delete)
 
         Returns:
-            Cost estimate dict
+            Cost estimate dict with operations (int), cost_per_operation (float), and total_cost_usd (float)
         """
         # Twilio pricing (approximate)
         costs = {

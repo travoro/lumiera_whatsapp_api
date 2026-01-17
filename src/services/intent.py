@@ -327,7 +327,7 @@ class IntentClassifier:
             # Exact keyword matching for high confidence
             for intent_name, intent_config in INTENTS.items():
                 keywords = intent_config.get("keywords", [])
-                for keyword in keywords:
+                for keyword in keywords:  # type: ignore[attr-defined]
                     if keyword in message_lower:
                         # Exact match = high confidence
                         if (

@@ -643,7 +643,7 @@ def convert_messages_to_langchain(messages: list) -> list:
     Returns:
         List of LangChain messages (HumanMessage, AIMessage)
     """
-    langchain_messages = []
+    langchain_messages: list[Any] = []
     for msg in messages:
         content = msg.get("content", "")
         direction = msg.get("direction", "")
@@ -651,7 +651,7 @@ def convert_messages_to_langchain(messages: list) -> list:
         if direction == "inbound":
             langchain_messages.append(HumanMessage(content=content))
         elif direction == "outbound":
-            langchain_messages.append(AIMessage(content=content))
+            langchain_messages.append(AIMessage(content=content))  # type: ignore[arg-type]
 
     return langchain_messages
 

@@ -64,7 +64,7 @@ async def execute_direct_handler(
         return None
 
     try:
-        result = await handler(
+        result = await handler(  # type: ignore[operator]
             user_id=user_id,
             phone_number=phone_number,
             user_name=user_name,

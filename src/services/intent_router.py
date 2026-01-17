@@ -31,7 +31,7 @@ class IntentRouter:
             handle_list_tasks,
             handle_report_incident,
             handle_task_details,
-            handle_update_progress,
+            # handle_update_progress removed - now handled by specialized agent
         )
 
         handler_mapping = {
@@ -41,7 +41,7 @@ class IntentRouter:
             "view_documents": handle_list_documents,
             "list_documents": handle_list_documents,
             "report_incident": handle_report_incident,
-            "update_progress": handle_update_progress,
+            # "update_progress": handle_update_progress,  # Removed - use specialized agent
             "greeting": handle_greeting,
             "escalate": handle_escalation,
             "talk_team": handle_escalation,
