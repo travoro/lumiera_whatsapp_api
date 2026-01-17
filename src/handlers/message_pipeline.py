@@ -769,6 +769,7 @@ class MessagePipeline:
                         message_body=ctx.message_in_french,
                         media_url=ctx.media_url,
                         media_type=ctx.media_type,
+                        session_id=ctx.session_id,
                     )
 
                     if specialized_result:

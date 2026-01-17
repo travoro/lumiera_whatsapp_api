@@ -23,6 +23,7 @@ async def handle_direct_action(
     message_body: Optional[str] = None,
     media_url: Optional[str] = None,
     media_type: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Handle direct action execution without AI agent.
 
@@ -34,6 +35,7 @@ async def handle_direct_action(
         message_body: Optional message text content
         media_url: Optional media URL (for images, voice, etc.)
         media_type: Optional media type
+        session_id: Optional session ID (prevents redundant session fetches)
 
     Returns:
         Dict with 'message' and optional 'tool_outputs' if action was handled,
@@ -208,9 +210,12 @@ async def handle_direct_action(
         from src.integrations.supabase import supabase_client
         from src.services.session import session_service
 
-        # Get session
-        session = await session_service.get_or_create_session(user_id)
-        session_id = session["id"]
+        # Get session (use passed session_id if available to avoid redundant fetch)
+        if not session_id:
+            session = await session_service.get_or_create_session(user_id)
+            session_id = session["id"]
+        else:
+            log.debug(f"✅ Using passed session_id: {session_id}")
 
         # Load recent messages
         messages = await supabase_client.get_messages_by_session(
@@ -372,6 +377,7 @@ async def handle_direct_action(
                                     phone_number=phone_number,
                                     language=language,
                                     message_body=task_title,
+                                    session_id=session_id,
                                 )
                             else:
                                 log.warning(f"⚠️ Task index {index} out of range")
@@ -578,6 +584,7 @@ async def handle_direct_action(
                         phone_number=phone_number,
                         language=language,
                         message_body="Non, autre tâche",  # Triggers agent clarification flow
+                        session_id=session_id,
                     )
 
             elif list_type in ["project", "projects", "option"]:
@@ -763,6 +770,7 @@ async def process_inbound_message(
                 user_id=user_id,
                 phone_number=phone_number,
                 language=user_language,
+                session_id=session_id,
             )
 
             log.info(
