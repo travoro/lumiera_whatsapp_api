@@ -30,7 +30,9 @@ class TwilioContentClient:
         """
         # Create a hash of the items to generate unique but consistent name
         items_str = json.dumps(items, sort_keys=True)
-        hash_suffix = hashlib.md5(items_str.encode(), usedforsecurity=False).hexdigest()[:8]
+        hash_suffix = hashlib.md5(
+            items_str.encode(), usedforsecurity=False
+        ).hexdigest()[:8]
         return f"list_picker_{hash_suffix}"
 
     @retry_on_network_error(max_attempts=3)

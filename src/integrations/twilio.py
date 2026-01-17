@@ -440,7 +440,9 @@ class TwilioClient:
                 import re
 
                 # Create a hash of the original filename for uniqueness
-                name_hash = hashlib.md5(filename.encode(), usedforsecurity=False).hexdigest()[:8]
+                name_hash = hashlib.md5(
+                    filename.encode(), usedforsecurity=False
+                ).hexdigest()[:8]
 
                 # Extract just the base name without path, and limit length
                 base_name = os.path.basename(filename)

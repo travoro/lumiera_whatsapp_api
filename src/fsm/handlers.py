@@ -211,8 +211,13 @@ class ClarificationManager:
         except Exception as e:
             error_msg = str(e)
             # If table doesn't exist, log as debug instead of error to avoid spam
-            if "Could not find the table" in error_msg and "fsm_clarification_requests" in error_msg:
-                logger.debug("fsm_clarification_requests table not found - skipping cleanup")
+            if (
+                "Could not find the table" in error_msg
+                and "fsm_clarification_requests" in error_msg
+            ):
+                logger.debug(
+                    "fsm_clarification_requests table not found - skipping cleanup"
+                )
             else:
                 logger.error(f"Error cleaning up expired clarifications: {error_msg}")
             return 0

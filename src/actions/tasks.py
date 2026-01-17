@@ -576,7 +576,9 @@ async def update_task_progress(
         }
 
 
-async def mark_task_complete(user_id: str, task_id: str, project_id: str) -> Dict[str, Any]:
+async def mark_task_complete(
+    user_id: str, task_id: str, project_id: str
+) -> Dict[str, Any]:
     """Mark a task as complete."""
     try:
         success = await planradar_client.mark_task_complete(task_id, project_id)
