@@ -106,11 +106,6 @@ class Settings(BaseSettings):
     allowed_webhook_ips: str = ""
     verify_webhook_signature: bool = True
 
-    # Redis (Optional)
-    redis_url: str = "redis://localhost:6379/0"
-    redis_timeout: int = 5
-    enable_redis_cache: bool = False
-
     # Monitoring (Optional)
     sentry_dsn: str = ""
     enable_sentry: bool = False
