@@ -212,7 +212,7 @@ class SupabaseClient:
             if source is None:
                 source = "user" if direction == "inbound" else "agent"
 
-            message_data = {
+            message_data: Dict[str, Any] = {
                 "subcontractor_id": user_id,
                 "content": message_text,
                 "language": original_language,

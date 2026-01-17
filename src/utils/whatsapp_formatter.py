@@ -811,7 +811,7 @@ def format_menu_as_interactive_list(
         Dict with formatted interactive list data
     """
     # Build rows from options
-    rows = []
+    rows: list[dict[str, Any]] = []
     for opt in options[:10]:  # WhatsApp limit: 10 items
         row = {
             "id": opt.get("id", f"opt_{len(rows)}"),

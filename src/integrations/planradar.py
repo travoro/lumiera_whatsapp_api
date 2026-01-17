@@ -846,7 +846,7 @@ class PlanRadarClient:
         """
         # PlanRadar v2 API requires customer_id in path
         endpoint = f"{self.account_id}/projects/{project_id}/tickets"
-        data = {
+        data: Dict[str, Any] = {
             "title": title,
             "description": description,
             "type": "incident",

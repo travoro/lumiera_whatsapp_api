@@ -100,6 +100,7 @@ async def submit_incident_report(
 async def update_incident_report(
     user_id: str,
     incident_id: str,
+    project_id: str,
     additional_text: Optional[str] = None,
     additional_images: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
@@ -108,6 +109,7 @@ async def update_incident_report(
     Args:
         user_id: User ID updating the report
         incident_id: ID of the incident to update
+        project_id: Project ID where the incident exists
         additional_text: Additional text/notes to add
         additional_images: Additional images to attach
 
@@ -125,6 +127,7 @@ async def update_incident_report(
         # Update incident in PlanRadar
         success = await planradar_client.update_incident_report(
             task_id=incident_id,
+            project_id=project_id,
             additional_text=additional_text,
             additional_images=additional_images,
         )

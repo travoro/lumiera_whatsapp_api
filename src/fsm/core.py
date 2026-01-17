@@ -226,7 +226,7 @@ class StateManager:
             True if successful, False otherwise
         """
         try:
-            update_data = {
+            update_data: Dict[str, Any] = {
                 "fsm_state": new_state.value,
                 "last_activity": datetime.utcnow().isoformat(),
             }

@@ -493,6 +493,7 @@ async def submit_incident_report_tool(
 async def update_incident_report_tool(
     user_id: str,
     incident_id: str,
+    project_id: str,
     additional_text: Optional[str] = None,
     additional_images: Optional[List[str]] = None,
 ) -> str:
@@ -501,6 +502,7 @@ async def update_incident_report_tool(
     Args:
         user_id: The ID of the user updating the report
         incident_id: The ID of the incident to update
+        project_id: The ID of the project containing the incident
         additional_text: Additional text to add
         additional_images: Additional image URLs to attach
 
@@ -508,11 +510,11 @@ async def update_incident_report_tool(
         Success or error message
     """
     log.info(
-        f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})"
+        f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., project_id={project_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})"
     )
 
     result = await incidents.update_incident_report(
-        user_id, incident_id, additional_text, additional_images
+        user_id, incident_id, project_id, additional_text, additional_images
     )
 
     if result["success"]:
@@ -579,21 +581,22 @@ async def update_task_progress_tool(
 
 
 @tool
-async def mark_task_complete_tool(user_id: str, task_id: str) -> str:
+async def mark_task_complete_tool(user_id: str, task_id: str, project_id: str) -> str:
     """Mark a task as complete.
 
     Args:
         user_id: The ID of the user marking the task complete
         task_id: The ID of the task to mark complete
+        project_id: The ID of the project containing the task
 
     Returns:
         Success or error message
     """
     log.info(
-        f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+        f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8]}...)"
     )
 
-    result = await tasks.mark_task_complete(user_id, task_id)
+    result = await tasks.mark_task_complete(user_id, task_id, project_id)
 
     if result["success"]:
         log.info("✅ mark_task_complete_tool: Task marked as complete")
@@ -1165,6 +1168,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
     @tool
     async def update_incident_report_tool(
         incident_id: str,
+        project_id: str,
         additional_text: Optional[str] = None,
         additional_images: Optional[List[str]] = None,
     ) -> str:
@@ -1172,6 +1176,7 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
 
         Args:
             incident_id: The ID of the incident to update
+            project_id: The ID of the project containing the incident
             additional_text: Additional text to add
             additional_images: Additional image URLs to attach
 
@@ -1180,12 +1185,12 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         """
         # user_id captured from closure ↓
         log.info(
-            f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})"
+            f"🔧 Tool called: update_incident_report_tool(user_id={user_id[:8]}..., incident_id={incident_id[:8]}..., project_id={project_id[:8]}..., has_text={additional_text is not None}, images={len(additional_images) if additional_images else 0})"
         )
         get_execution_context().record_tool_call("update_incident_report_tool")
 
         result = await incidents.update_incident_report(
-            user_id, incident_id, additional_text, additional_images
+            user_id, incident_id, project_id, additional_text, additional_images
         )
 
         if result["success"]:
@@ -1250,22 +1255,23 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
         return result["message"]
 
     @tool
-    async def mark_task_complete_tool(task_id: str) -> str:
+    async def mark_task_complete_tool(task_id: str, project_id: str) -> str:
         """Mark a task as complete.
 
         Args:
             task_id: The ID of the task to mark complete
+            project_id: The ID of the project containing the task
 
         Returns:
             Success or error message
         """
         # user_id captured from closure ↓
         log.info(
-            f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}...)"
+            f"🔧 Tool called: mark_task_complete_tool(user_id={user_id[:8]}..., task_id={task_id[:8]}..., project_id={project_id[:8]}...)"
         )
         get_execution_context().record_tool_call("mark_task_complete_tool")
 
-        result = await tasks.mark_task_complete(user_id, task_id)
+        result = await tasks.mark_task_complete(user_id, task_id, project_id)
 
         if result["success"]:
             log.info("✅ mark_task_complete_tool: Task marked as complete")

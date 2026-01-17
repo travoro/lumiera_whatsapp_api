@@ -42,7 +42,7 @@ class StructuredLogger:
         Returns:
             Structured log entry as dictionary
         """
-        log_entry = {
+        log_entry: Dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat(),
             "level": level,
             "component": self.component,
