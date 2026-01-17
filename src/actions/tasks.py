@@ -94,9 +94,22 @@ async def list_tasks(user_id: str, project_id: Optional[str] = None, status: Opt
 
             # Skip resolved, closed, or rejected tasks by status ID
             # Only show: 1=Open, 2=In-Progress, 4=Feedback
-            # Note: status-id can be numeric (1,2,3...) or string ("lm", etc.)
-            if status_id in [3, 5, 6, "3", "5", "6"]:
+            # Note: status-id can be numeric (1,2,3...) or string ("lm", "ma", etc.)
+            # String status codes observed: "lm" (in-progress), "ma" (marked as complete/resolved)
+            # Numeric status codes: 1=Open, 2=In-Progress, 3=Resolved, 4=Feedback, 5=Closed, 6=Rejected
+            resolved_status_ids = [
+                3, 5, 6,  # Numeric: Resolved, Closed, Rejected
+                "3", "5", "6",  # String equivalents
+                "ma",  # PlanRadar string code for resolved/marked as complete
+            ]
+            if status_id in resolved_status_ids:
                 log.info(f"   ⏭️  Skipping task {short_id_val} - status {status_id} (resolved/closed/rejected)")
+                continue
+
+            # Additional safety check: Filter tasks with 100% progress that might be complete
+            # but not yet marked with a closed status (edge case)
+            if progress == 100 and status_id not in [1, 2, 4, "1", "2", "4", "lm"]:
+                log.info(f"   ⏭️  Skipping task {short_id_val} - 100% complete with status {status_id}")
                 continue
 
             formatted_tasks.append({
