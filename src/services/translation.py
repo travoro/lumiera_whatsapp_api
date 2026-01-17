@@ -37,7 +37,7 @@ class TranslationService:
     async def detect_language(self, text: str) -> str:
         """Detect the language of input text with automatic retries."""
         try:
-            prompt = """Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., 'en', 'fr', 'es', 'ar', 'pt', 'de', 'it').
+            prompt = f"""Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., 'en', 'fr', 'es', 'ar', 'pt', 'de', 'it').
 
 Text: {text}
 
@@ -67,7 +67,7 @@ Language code:"""
             return text
 
         try:
-            prompt = """Translate the following text to French. Maintain the tone and context. Respond with ONLY the translated text, nothing else.
+            prompt = f"""Translate the following text to French. Maintain the tone and context. Respond with ONLY the translated text, nothing else.
 
 Text to translate: {text}
 
@@ -122,9 +122,9 @@ French translation:"""
                 "ar": "Arabic",
             }
 
-            language_names.get(target_language, target_language)
+            target_lang_name = language_names.get(target_language, target_language)
 
-            prompt = """Translate the following text from French to {target_lang_name}. Maintain the tone and context. Respond with ONLY the translated text, nothing else.
+            prompt = f"""Translate the following text from French to {target_lang_name}. Maintain the tone and context. Respond with ONLY the translated text, nothing else.
 
 Text to translate: {text}
 
