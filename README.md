@@ -424,3 +424,5 @@ For issues and questions:
 - [ ] Image recognition for incident reports
 - [ ] Batch operations
 - [ ] Mobile admin app
+
+<!-- Deployment test: Sat Jan 17 20:06:45 CET 2026 -->
