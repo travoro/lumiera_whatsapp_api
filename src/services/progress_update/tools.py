@@ -153,7 +153,7 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                             ]
                         )
 
-                        result_text = """✅ Active project: {project_name}
+                        result_text = f"""✅ Active project: {project_name}
 
 Show the user this list (SIMPLE FORMAT, no IDs visible):
 {task_list_display}
