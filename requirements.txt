@@ -23,7 +23,7 @@ aiohttp==3.11.10
 requests==2.32.3
 
 # OpenAI for Whisper transcription
-openai==1.57.2
+openai==1.58.1
 
 # Environment & Configuration
 python-dotenv==1.0.1
