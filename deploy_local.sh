@@ -56,17 +56,25 @@ fi
 echo "✅ Tests passed!"
 echo ""
 
-# 6. Restart app
-echo "🔄 Restarting application..."
-if sudo systemctl is-active --quiet lumiera-whatsapp.service; then
-    echo "Restarting systemd service..."
-    sudo systemctl restart lumiera-whatsapp.service
-    sleep 3
-    sudo systemctl status lumiera-whatsapp.service --no-pager
-else
-    echo "⚠️  Service not running via systemd."
-    echo "If running manually with ./run.sh, the app will auto-reload."
+# 6. Kill any manually running processes
+echo "🔄 Stopping any running instances..."
+MANUAL_PIDS=$(pgrep -f "python.*uvicorn.*src.main:app" 2>/dev/null || true)
+if [ -n "$MANUAL_PIDS" ]; then
+    echo "Found manually running processes: $MANUAL_PIDS"
+    echo "Killing them..."
+    kill $MANUAL_PIDS 2>/dev/null || true
+    sleep 2
+    # Force kill if still running
+    kill -9 $MANUAL_PIDS 2>/dev/null || true
+    echo "✓ Stopped manually running instances"
 fi
+echo ""
+
+# 7. Restart app via systemd
+echo "🔄 Starting application via systemd..."
+sudo systemctl restart lumiera-whatsapp.service
+sleep 3
+sudo systemctl status lumiera-whatsapp.service --no-pager
 echo ""
 
 echo "✨ Deployment complete!"
