@@ -1,5 +1,6 @@
 """Supabase client for database operations."""
 
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -118,7 +119,7 @@ class SupabaseClient:
 
             if response.data and len(response.data) > 0:
                 log.info(
-                    f"🔄 Updated user language in profile: "
+                    "🔄 Updated user language in profile: "
                     f"user_id={user_id}, new_language={language}"
                 )
                 return True
@@ -747,7 +748,6 @@ class SupabaseClient:
 
 # Global instance
 # Skip instantiation in test environment to avoid API key validation
-import os
 
 if os.getenv("ENVIRONMENT") == "test":
     supabase_client = None  # Will be mocked by pytest fixtures

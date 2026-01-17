@@ -4,12 +4,11 @@ Tests each pipeline stage method in isolation with proper mocking.
 These are TRUE unit tests - fast, isolated, and testing one thing at a time.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from src.handlers.message_pipeline import MessageContext, MessagePipeline
-from src.utils.result import Result
 
 # ============================================================================
 # Utility Method Tests

@@ -76,7 +76,7 @@ class ProgressUpdateState:
                         f"   ❌ CRITICAL: Transition {inserted_id} NOT found immediately after insert!"
                     )
             else:
-                log.warning(f"⚠️ FSM transition log returned no data")
+                log.warning("⚠️ FSM transition log returned no data")
 
         except Exception as e:
             # Non-fatal: logging shouldn't break the flow
@@ -142,7 +142,7 @@ class ProgressUpdateState:
                         ],
                     },
                 )
-                log.info(f"🔄 FSM: Set expecting_response=True at session creation")
+                log.info("🔄 FSM: Set expecting_response=True at session creation")
 
                 # Log transition: idle → awaiting_action
                 await self._log_transition(

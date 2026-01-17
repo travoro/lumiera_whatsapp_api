@@ -14,16 +14,12 @@ Tests simulate actual Twilio webhooks without external dependencies.
 import asyncio
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.fsm.core import FSMEngine, StateManager
 from src.fsm.handlers import clarification_manager, session_recovery_manager
-from src.fsm.models import FSMContext, SessionState
-from src.fsm.routing import IntentRouter
 from src.handlers.message import process_inbound_message
-from src.services.intent_router import intent_router
 
 # ============================================================================
 # Test Fixtures - Mocked Services

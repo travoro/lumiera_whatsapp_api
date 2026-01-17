@@ -71,7 +71,8 @@ class PlanRadarClient:
 
                 # Log response status with timing
                 log.info(
-                    f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {response.status_code} | Duration: {duration_ms}ms"
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {
+                        response.status_code} | Duration: {duration_ms}ms"
                 )
 
                 response.raise_for_status()
@@ -100,7 +101,7 @@ class PlanRadarClient:
                     f"🔵 PLANRADAR_API_CALL #{request_id} | RATE_LIMIT | 429 Too Many Requests | Duration: {duration_ms}ms"
                 )
                 log.warning(
-                    f"   ⚠️ PlanRadar API rate limit exceeded (30 requests/minute)"
+                    "   ⚠️ PlanRadar API rate limit exceeded (30 requests/minute)"
                 )
                 log.warning(f"   URL was: {url}")
 
@@ -108,14 +109,14 @@ class PlanRadarClient:
                 try:
                     error_body = e.response.json()
                     log.warning(f"   📄 Rate limit response: {error_body}")
-                except:
+                except BaseException:
                     try:
                         error_text = e.response.text
                         if error_text:
                             log.warning(
                                 f"   📄 Rate limit response (text): {error_text[:500]}"
                             )
-                    except:
+                    except BaseException:
                         pass
 
                 # Check response headers for rate limit info
@@ -134,13 +135,15 @@ class PlanRadarClient:
                 return {"_rate_limited": True, "error": "Rate limit exceeded"}
             else:
                 log.error(
-                    f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {e.response.status_code} {e.response.reason_phrase} | Duration: {duration_ms}ms"
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {
+                        e.response.status_code} {
+                        e.response.reason_phrase} | Duration: {duration_ms}ms"
                 )
                 log.error(f"   URL was: {url}")
                 try:
                     error_body = e.response.json()
                     log.error(f"   Error details: {error_body}")
-                except:
+                except BaseException:
                     log.error(f"   Error text: {e.response.text[:200]}")
                 return None
         except httpx.HTTPError as e:
@@ -204,7 +207,7 @@ class PlanRadarClient:
         if task_data:
             log.info(f"   ✅ Task retrieved: {task_data.get('id')}")
         else:
-            log.warning(f"   ⚠️ Task not found")
+            log.warning("   ⚠️ Task not found")
         return task_data
 
     async def get_task_description(
@@ -224,7 +227,7 @@ class PlanRadarClient:
         if description:
             log.info(f"   ✅ Description retrieved ({len(description)} chars)")
         else:
-            log.info(f"   ℹ️ No description available")
+            log.info("   ℹ️ No description available")
         return description
 
     async def get_task_plans(
@@ -361,7 +364,7 @@ class PlanRadarClient:
             )
             return all_attachments
 
-        log.info(f"   ℹ️ No attachments found")
+        log.info("   ℹ️ No attachments found")
         return []
 
     async def get_documents(
@@ -407,7 +410,7 @@ class PlanRadarClient:
         Returns:
             List of components for the project with selected-plan relationships
         """
-        log.info(f"🏗️ STEP 1: Fetching project components")
+        log.info("🏗️ STEP 1: Fetching project components")
         log.info(f"   Project ID: {project_id}")
         endpoint = (
             f"{self.account_id}/projects/{project_id}/components/project_components"
@@ -454,7 +457,7 @@ class PlanRadarClient:
                 plan_type = selected_plan.get("type")
                 log.info(f"      🔗 Selected plan: {plan_id} (type: {plan_type})")
             else:
-                log.info(f"      ℹ️ No selected plan relationship")
+                log.info("      ℹ️ No selected plan relationship")
 
         return components
 
@@ -512,7 +515,7 @@ class PlanRadarClient:
                 plan_id = plan.get("id")
                 plan_type = plan.get("type")
                 plan_attributes = plan.get("attributes", {})
-                plan_relationships = plan.get("relationships", {})
+                plan.get("relationships", {})
 
                 log.info(f"   📄 Plan {idx}/{len(plans)}: {plan_id}")
                 log.info(f"      Type: {plan_type}")
@@ -538,7 +541,7 @@ class PlanRadarClient:
                 # PRIORITY 1: Try to extract original-url (the actual PDF)
                 original_url = plan_attributes.get("original-url")
                 if original_url:
-                    log.info(f"      ✅ Found original-url (full PDF):")
+                    log.info("      ✅ Found original-url (full PDF):")
                     log.info(f"         {original_url[:120]}...")
 
                 # PRIORITY 2: Fallback URLs
@@ -580,7 +583,7 @@ class PlanRadarClient:
                     if not content_type and plan_name.lower().endswith(".pdf"):
                         content_type = "application/pdf"
                         log.info(
-                            f"      ℹ️ Inferred content-type as application/pdf from filename"
+                            "      ℹ️ Inferred content-type as application/pdf from filename"
                         )
 
                     plan_data = {
@@ -594,11 +597,11 @@ class PlanRadarClient:
                         "attributes": plan_attributes,
                     }
                     all_plans.append(plan_data)
-                    log.info(f"      ✅ Plan successfully extracted with URL")
+                    log.info("      ✅ Plan successfully extracted with URL")
                 else:
                     # Try to find in included section (fallback)
                     log.info(
-                        f"      ⚠️ No direct URL in plan attributes, checking included section..."
+                        "      ⚠️ No direct URL in plan attributes, checking included section..."
                     )
                     found_in_included = False
                     for inc in included:
@@ -640,9 +643,7 @@ class PlanRadarClient:
                                 }
                                 all_plans.append(plan_data)
                             else:
-                                log.warning(
-                                    f"      ❌ No URL found in included section"
-                                )
+                                log.warning("      ❌ No URL found in included section")
                                 log.warning(
                                     f"         Available keys: {list(inc_attributes.keys())}"
                                 )
@@ -658,7 +659,7 @@ class PlanRadarClient:
             log.info(f"   ✅ Successfully extracted {len(all_plans)} plan(s) with URLs")
             return all_plans
 
-        log.info(f"   ℹ️ No plans found in response")
+        log.info("   ℹ️ No plans found in response")
         return []
 
     async def get_project_documents(
@@ -679,12 +680,12 @@ class PlanRadarClient:
         Returns:
             List of all plans across all components, with URLs and metadata
         """
-        log.info(f"📚 ========== GET PROJECT DOCUMENTS WORKFLOW ==========")
+        log.info("📚 ========== GET PROJECT DOCUMENTS WORKFLOW ==========")
         log.info(f"   Project ID: {project_id}")
 
         try:
             # Step 1: Fetch all components for this project
-            log.info(f"\n🏗️ STEP 1: Fetching all project components...")
+            log.info("\n🏗️ STEP 1: Fetching all project components...")
             components = await self.get_project_components(project_id)
 
             if not components:
@@ -694,7 +695,7 @@ class PlanRadarClient:
             log.info(f"   ✅ Found {len(components)} component(s)")
 
             # Step 2: Fetch plans for each component
-            log.info(f"\n📐 STEP 2: Fetching plans for each component...")
+            log.info("\n📐 STEP 2: Fetching plans for each component...")
             all_plans = []
             for idx, component in enumerate(components, 1):
                 component_id = component.get("id")
@@ -723,7 +724,7 @@ class PlanRadarClient:
             log.info(f"\n   📊 Total plans collected: {len(all_plans)}")
 
             # Step 3: Filter plans with valid URLs
-            log.info(f"\n🔍 STEP 3: Filtering plans with valid URLs...")
+            log.info("\n🔍 STEP 3: Filtering plans with valid URLs...")
             plans_with_urls = [p for p in all_plans if p.get("url")]
             plans_without_urls = [p for p in all_plans if not p.get("url")]
 
@@ -755,7 +756,7 @@ class PlanRadarClient:
                     log.info(f"         Component: {p.get('component_name')}")
                     log.info(f"         URL: {p.get('url')[:100]}...")
             else:
-                log.warning(f"   ⚠️ No documents with valid URLs found")
+                log.warning("   ⚠️ No documents with valid URLs found")
 
             log.info(
                 f"\n📚 ========== WORKFLOW COMPLETE: {len(plans_with_urls)} documents ready ==========\n"
@@ -799,9 +800,9 @@ class PlanRadarClient:
         )
         success = result is not None
         if success:
-            log.info(f"   ✅ Comment added successfully")
+            log.info("   ✅ Comment added successfully")
         else:
-            log.warning(f"   ⚠️ Failed to add comment")
+            log.warning("   ⚠️ Failed to add comment")
         return success
 
     async def get_task_comments(
@@ -940,15 +941,15 @@ class PlanRadarClient:
                 if result and isinstance(result, dict):
                     if result.get("_rate_limited"):
                         log.error(
-                            f"   ❌ Rate limit exceeded - please wait before uploading more images"
+                            "   ❌ Rate limit exceeded - please wait before uploading more images"
                         )
                         return False
                     # Success if result has data
                     if "data" in result or result.get("id"):
-                        log.info(f"   ✅ Image uploaded successfully")
+                        log.info("   ✅ Image uploaded successfully")
                         return True
 
-                log.error(f"   ❌ Failed to upload image")
+                log.error("   ❌ Failed to upload image")
                 return False
 
         except Exception as e:

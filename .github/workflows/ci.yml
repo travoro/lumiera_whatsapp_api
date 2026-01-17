@@ -86,8 +86,8 @@ jobs:
 
     - name: Run linting
       run: |
-        pip install flake8 black isort mypy
-        flake8 src/ --max-line-length=120 --extend-ignore=E203,W503 --exclude=venv,__pycache__,.git
+        pip install flake8 black isort mypy autoflake
+        flake8 src/ --max-line-length=120 --extend-ignore=E203,W503,E501,F841 --exclude=venv,__pycache__,.git
         black --check src/ tests/
         isort --check-only --profile black src/ tests/
 

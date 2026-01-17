@@ -8,7 +8,6 @@ from langchain_anthropic import ChatAnthropic
 
 from src.agent.tools import escalate_to_human_tool
 from src.config import settings
-from src.integrations.supabase import supabase_client
 from src.services.progress_update.tools import (
     add_progress_comment_tool,
     add_progress_image_tool,
@@ -17,7 +16,6 @@ from src.services.progress_update.tools import (
     mark_task_complete_tool,
     start_progress_update_session_tool,
 )
-from src.services.project_context import project_context_service
 from src.utils.logger import log
 
 PROGRESS_UPDATE_PROMPT = """Tu es un assistant spécialisé pour guider les utilisateurs dans la mise à jour de leurs tâches.
@@ -250,7 +248,7 @@ class ProgressUpdateAgent:
 
                 # Case 2: Task confirmation or task list
                 elif tool_name == "get_active_task_context_tool":
-                    log.info(f"🔍 Checking get_active_task_context_tool observation")
+                    log.info("🔍 Checking get_active_task_context_tool observation")
                     log.info(
                         f"   Has 'Show the user this list': {'Show the user this list' in observation}"
                     )
@@ -294,7 +292,7 @@ class ProgressUpdateAgent:
                         response["response_type"] = "interactive_list"
                         response["list_type"] = "option"  # Use "option" not "tasks"
                         log.info(
-                            f"✅ Detected confirmation → response_type=interactive_list, list_type=option"
+                            "✅ Detected confirmation → response_type=interactive_list, list_type=option"
                         )
                         log.info(f"   Confirmation data: {confirmation_data}")
                         break

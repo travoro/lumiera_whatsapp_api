@@ -1,5 +1,6 @@
 """Retry logic and error handling with Tenacity."""
 
+import asyncio
 from typing import Any, Callable
 
 import httpx
@@ -202,4 +203,3 @@ class ErrorContext:
 
 
 # Import asyncio for coroutine checks
-import asyncio

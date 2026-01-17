@@ -41,7 +41,7 @@ class LanguageDetectionService:
             ISO 639-1 language code or None if detection fails
         """
         try:
-            prompt = f"""Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., 'en', 'fr', 'es', 'ro', 'pt', 'de', 'it', 'ar').
+            prompt = """Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., 'en', 'fr', 'es', 'ro', 'pt', 'de', 'it', 'ar').
 
 Text: {text}
 

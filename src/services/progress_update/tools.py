@@ -1,7 +1,5 @@
 """Specialized LangChain tools for progress update agent."""
 
-from typing import Optional
-
 from langchain.tools import tool
 
 from src.actions.tasks import list_tasks
@@ -61,7 +59,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
                     "title", "Unknown Task"
                 )
 
-                return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+                return """✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
 Project: {project_name}
 Task ID: {active_task_id}
@@ -111,13 +109,13 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                     if tasks:
                         # SPECIAL CASE: If only ONE task, ask for confirmation instead of showing list
                         if len(tasks) == 1:
-                            task_title = tasks[0].get("title", "No title")
-                            task_id = tasks[0].get("id")
+                            tasks[0].get("title", "No title")
+                            tasks[0].get("id")
 
                             log.info(
-                                f"📌 Only 1 task found - showing confirmation instead of list"
+                                "📌 Only 1 task found - showing confirmation instead of list"
                             )
-                            return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+                            return """✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
 Project: {project_name}
 Task ID: {task_id}
@@ -138,7 +136,7 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
 - NEVER say "session", "prête", "active", "contexte" - too technical!"""
 
                         # MULTIPLE TASKS: Show list for selection
-                        log.info(f"✅ Building task list for user display")
+                        log.info("✅ Building task list for user display")
                         # Format task list - SIMPLE format for user display
                         task_list_display = "\n".join(
                             [
@@ -155,7 +153,7 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                             ]
                         )
 
-                        result_text = f"""✅ Active project: {project_name}
+                        result_text = """✅ Active project: {project_name}
 
 Show the user this list (SIMPLE FORMAT, no IDs visible):
 {task_list_display}
@@ -175,14 +173,17 @@ AGENT INSTRUCTIONS:
                     else:
                         return f"⚠️ Active project: {project_name}\nBut NO tasks found for this project. Ask user if they want to select a different project."
                 else:
-                    return f"⚠️ Active project: {project_name}\nError retrieving tasks: {tasks_result.get('message', 'Unknown error')}. Ask user to provide task name or number."
+                    return f"⚠️ Active project: {project_name}\nError retrieving tasks: {
+                        tasks_result.get(
+                            'message', 'Unknown error')}. Ask user to provide task name or number."
 
         # No active context
         return "❌ No active project or task context. Ask user to select a project first, then a task."
 
     except Exception as e:
         log.error(f"Error in get_active_task_context_tool: {e}")
-        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate using escalate_to_human_tool."
+        return f"❌ TECHNICAL ERROR: {
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate using escalate_to_human_tool."
 
 
 @tool
@@ -219,10 +220,10 @@ async def get_progress_update_context_tool(user_id: str) -> str:
             attributes = task.get("attributes", {})
             task_title = attributes.get("subject") or task.get("title", "Unknown")
 
-        output = f"📋 Session de mise à jour active :\n"
+        output = "📋 Session de mise à jour active :\n"
         output += f"Tâche : {task_title}\n"
         output += f"Projet ID : {session['project_id']}\n\n"
-        output += f"Actions déjà effectuées :\n"
+        output += "Actions déjà effectuées :\n"
         output += f"- Photos ajoutées : {session['images_uploaded']}\n"
         output += f"- Commentaires ajoutés : {session['comments_added']}\n"
         output += (
@@ -239,7 +240,7 @@ async def get_progress_update_context_tool(user_id: str) -> str:
             remaining.append("✅ Marquer comme terminé")
 
         if remaining:
-            output += f"Actions possibles :\n" + "\n".join(f"- {a}" for a in remaining)
+            output += "Actions possibles :\n" + "\n".join(f"- {a}" for a in remaining)
         else:
             output += "✅ Toutes les actions ont été complétées !"
 
@@ -247,7 +248,8 @@ async def get_progress_update_context_tool(user_id: str) -> str:
 
     except Exception as e:
         log.error(f"Error in get_progress_update_context_tool: {e}")
-        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate using escalate_to_human_tool."
+        return f"❌ TECHNICAL ERROR: {
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate using escalate_to_human_tool."
 
 
 @tool
@@ -278,13 +280,14 @@ async def add_progress_image_tool(user_id: str, image_url: str) -> str:
             # Record action
             await progress_update_state.add_action(user_id, "image")
 
-            return f"✅ Photo ajoutée avec succès à la tâche !\n\nActions restantes disponibles :\n- 💬 Laisser un commentaire\n- ✅ Marquer comme terminé"
+            return "✅ Photo ajoutée avec succès à la tâche !\n\nActions restantes disponibles :\n- 💬 Laisser un commentaire\n- ✅ Marquer comme terminé"
         else:
             return "❌ Erreur lors de l'ajout de la photo. Veuillez réessayer."
 
     except Exception as e:
         log.error(f"Error adding progress image: {e}")
-        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique lors de l'ajout de la photo. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
+        return f"❌ TECHNICAL ERROR: {
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique lors de l'ajout de la photo. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
@@ -320,7 +323,8 @@ async def add_progress_comment_tool(user_id: str, comment_text: str) -> str:
 
     except Exception as e:
         log.error(f"Error adding progress comment: {e}")
-        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique lors de l'ajout du commentaire. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
+        return f"❌ TECHNICAL ERROR: {
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique lors de l'ajout du commentaire. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
@@ -349,11 +353,11 @@ async def mark_task_complete_tool(user_id: str) -> str:
 
             # Get summary
             updated_session = await progress_update_state.get_session(user_id)
-            summary = f"✅ Tâche marquée comme terminée !\n\n"
-            summary += f"📊 Résumé :\n"
+            summary = "✅ Tâche marquée comme terminée !\n\n"
+            summary += "📊 Résumé :\n"
             summary += f"- Photos ajoutées : {updated_session['images_uploaded']}\n"
             summary += f"- Commentaires ajoutés : {updated_session['comments_added']}\n"
-            summary += f"- Statut : Terminé\n\n"
+            summary += "- Statut : Terminé\n\n"
             summary += "Excellent travail ! 🎉"
 
             # Clear session
@@ -365,7 +369,8 @@ async def mark_task_complete_tool(user_id: str) -> str:
 
     except Exception as e:
         log.error(f"Error marking task complete: {e}")
-        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour marquer la tâche comme terminée. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
+        return f"❌ TECHNICAL ERROR: {
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour marquer la tâche comme terminée. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
@@ -408,4 +413,5 @@ async def start_progress_update_session_tool(
 
     except Exception as e:
         log.error(f"Error starting progress update session: {e}")
-        return f"❌ TECHNICAL ERROR: {str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour démarrer la session. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
+        return f"❌ TECHNICAL ERROR: {
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour démarrer la session. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."

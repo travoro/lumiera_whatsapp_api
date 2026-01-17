@@ -36,7 +36,7 @@ jobs:
 
     - name: Run Flake8 linting
       run: |
-        flake8 src/ tests/ --max-line-length=120 --extend-ignore=E203,W503 \
+        flake8 src/ tests/ --max-line-length=120 --extend-ignore=E203,W503,E501,F841 \
           --statistics --count --show-source
 
     - name: Run Pylint

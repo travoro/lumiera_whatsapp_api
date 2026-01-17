@@ -138,7 +138,6 @@ class ConfidenceAdjuster:
 
     def __init__(self):
         """Initialize confidence adjuster."""
-        pass
 
     def detect_conflict(
         self, intent: IntentClassification, context: Optional[FSMContext]

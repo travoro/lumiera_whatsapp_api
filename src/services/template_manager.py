@@ -1,6 +1,6 @@
 """Template manager for creating dynamic WhatsApp list-picker templates."""
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from twilio.rest import Client
 
@@ -58,9 +58,9 @@ class TemplateManager:
             for idx, item in enumerate(items[:10]):
                 template_items.append(
                     {
-                        "item": f"{{{{{idx*3 + 2}}}}}",  # {{2}}, {{5}}, {{8}}, etc.
-                        "id": f"{{{{{idx*3 + 3}}}}}",  # {{3}}, {{6}}, {{9}}, etc.
-                        "description": f"{{{{{idx*3 + 4}}}}}",  # {{4}}, {{7}}, {{10}}, etc.
+                        "item": f"{{{{{idx * 3 + 2}}}}}",  # {{2}}, {{5}}, {{8}}, etc.
+                        "id": f"{{{{{idx * 3 + 3}}}}}",  # {{3}}, {{6}}, {{9}}, etc.
+                        "description": f"{{{{{idx * 3 + 4}}}}}",  # {{4}}, {{7}}, {{10}}, etc.
                     }
                 )
 
@@ -220,7 +220,7 @@ class TemplateManager:
             if not result.data and language != "all":
                 # Fallback to universal template
                 log.info(
-                    f"Language-specific template not found, trying universal template"
+                    "Language-specific template not found, trying universal template"
                 )
                 result = (
                     supabase_client.client.table("templates")

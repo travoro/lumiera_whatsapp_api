@@ -1,30 +1,18 @@
 """Message processing handler."""
 
-import os
 import re
 from typing import Any, Dict, Optional
 
-import httpx
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
-from src.agent.agent import lumiera_agent
-from src.agent.tools import (
-    escalate_to_human_tool,
-    list_projects_tool,
-)
+from src.agent.tools import escalate_to_human_tool, list_projects_tool
 from src.integrations.supabase import supabase_client
 from src.integrations.twilio import twilio_client
 from src.services.escalation import escalation_service
-from src.services.intent import intent_classifier
 from src.services.intent_router import intent_router
-from src.services.memory import memory_service
 from src.services.session import session_service
-from src.services.transcription import transcription_service
 from src.services.translation import translation_service
-from src.services.validation import validate_input
 from src.utils.logger import log
-from src.utils.response_parser import format_for_interactive
-from src.utils.whatsapp_formatter import send_whatsapp_message_smart
 
 
 async def handle_direct_action(
@@ -326,7 +314,7 @@ async def handle_direct_action(
                 # Check if this selection is from progress update intent
                 if previous_intent == "update_progress":
                     log.info(
-                        f"📋 Task selection from update_progress intent → Routing to progress update flow"
+                        "📋 Task selection from update_progress intent → Routing to progress update flow"
                     )
 
                     # Extract task from tool_outputs
@@ -348,7 +336,7 @@ async def handle_direct_action(
                                     )
                                 )
                                 if not project_id:
-                                    log.error(f"❌ No active project to re-fetch tasks")
+                                    log.error("❌ No active project to re-fetch tasks")
                                     return None
 
                                 task_result = await task_actions.list_tasks(
@@ -361,7 +349,7 @@ async def handle_direct_action(
 
                                     tasks = compact_tasks(task_result["data"])
                                 else:
-                                    log.error(f"❌ Failed to re-fetch tasks")
+                                    log.error("❌ Failed to re-fetch tasks")
                                     return None
                             else:
                                 tasks = tasks_output
@@ -403,7 +391,7 @@ async def handle_direct_action(
                                 f"⚠️ Found old string format in tool_outputs (length: {len(tasks_output)})"
                             )
                             log.warning(
-                                f"   Re-fetching structured task data from database..."
+                                "   Re-fetching structured task data from database..."
                             )
 
                             from src.actions import tasks as task_actions
@@ -418,7 +406,7 @@ async def handle_direct_action(
                                 )
                             )
                             if not project_id:
-                                log.error(f"   ❌ No active project to re-fetch tasks")
+                                log.error("   ❌ No active project to re-fetch tasks")
                                 return None
 
                             # Re-fetch tasks
@@ -433,7 +421,7 @@ async def handle_direct_action(
                                     f"   ✅ Re-fetched {len(tasks)} tasks from database"
                                 )
                             else:
-                                log.error(f"   ❌ Failed to re-fetch tasks")
+                                log.error("   ❌ Failed to re-fetch tasks")
                                 return None
                         elif isinstance(tasks_output, list):
                             # New format: structured list of dicts
@@ -492,14 +480,14 @@ async def handle_direct_action(
                             )
 
                             if result:
-                                log.info(f"✅ Task details called for selected task")
+                                log.info("✅ Task details called for selected task")
                                 return result
                             else:
-                                log.warning(f"⚠️ Task details handler returned None")
+                                log.warning("⚠️ Task details handler returned None")
                                 return None
                         else:
                             log.warning(
-                                f"⚠️ Option {option_number} out of range (0-{len(tasks)-1})"
+                                f"⚠️ Option {option_number} out of range (0-{len(tasks) - 1})"
                             )
                         break
 
@@ -509,7 +497,7 @@ async def handle_direct_action(
             ):
                 # For "option" type from progress update confirmation
                 log.info(
-                    f"📋 Option selection detected from progress update confirmation"
+                    "📋 Option selection detected from progress update confirmation"
                 )
 
                 # Extract confirmation data from tool_outputs
@@ -523,14 +511,14 @@ async def handle_direct_action(
                             break
 
                 if not confirmation_data:
-                    log.error(f"❌ No confirmation data found in tool_outputs")
+                    log.error("❌ No confirmation data found in tool_outputs")
                     return None
 
                 # User selected an option from confirmation (1=Yes, 2=No)
                 if option_number == "1":
                     # User confirmed - start progress update session directly
                     log.info(
-                        f"✅ User confirmed task - starting progress update session"
+                        "✅ User confirmed task - starting progress update session"
                     )
                     log.info(f"   Task ID: {confirmation_data.get('task_id')}")
                     log.info(f"   Project ID: {confirmation_data.get('project_id')}")
@@ -544,7 +532,7 @@ async def handle_direct_action(
                     project_id = confirmation_data.get("project_id")
                     if not project_id:
                         log.warning(
-                            f"⚠️ No project_id in confirmation data, fetching from user context"
+                            "⚠️ No project_id in confirmation data, fetching from user context"
                         )
                         # Get user's active project
                         user = supabase_client.get_user(user_id)
@@ -560,7 +548,7 @@ async def handle_direct_action(
                                 )
 
                     if not project_id:
-                        log.error(f"❌ Cannot start session: no project_id available")
+                        log.error("❌ Cannot start session: no project_id available")
                         return {
                             "message": "❌ Erreur : impossible de démarrer la session de mise à jour. Veuillez réessayer.",
                             "tool_outputs": [],
@@ -583,7 +571,7 @@ async def handle_direct_action(
                     }
                 else:
                     # User said no - route to agent to ask clarification (change task vs change project)
-                    log.info(f"❌ User declined - routing to agent for clarification")
+                    log.info("❌ User declined - routing to agent for clarification")
                     return await handle_direct_action(
                         action="update_progress",
                         user_id=user_id,
@@ -627,14 +615,14 @@ async def handle_direct_action(
                             )
 
                             if result:
-                                log.info(f"✅ List tasks called for selected project")
+                                log.info("✅ List tasks called for selected project")
                                 return result
                             else:
-                                log.warning(f"⚠️ List tasks handler returned None")
+                                log.warning("⚠️ List tasks handler returned None")
                                 return None
                         else:
                             log.warning(
-                                f"⚠️ Option {option_number} out of range (0-{len(projects)-1})"
+                                f"⚠️ Option {option_number} out of range (0-{len(projects) - 1})"
                             )
                         break
 
@@ -794,7 +782,7 @@ async def process_inbound_message(
                     response_message = direct_response
                     tool_outputs = []
                     attachments = None
-                    log.info(f"📝 String response (no attachments)")
+                    log.info("📝 String response (no attachments)")
 
                 log.info(f"✅ Direct action '{action_id}' executed successfully")
                 log.info(f"🔤 Handler response (French): {response_message[:100]}...")
@@ -808,7 +796,7 @@ async def process_inbound_message(
                     log.info(f"✅ Translated response: {response_text[:100]}...")
                 else:
                     response_text = response_message
-                    log.info(f"ℹ️ No translation needed (user language is French)")
+                    log.info("ℹ️ No translation needed (user language is French)")
 
                 # Check if escalation action
                 is_escalation_action = action_id == "talk_team"
@@ -846,7 +834,7 @@ async def process_inbound_message(
 
                 # Send response with interactive formatting
                 log.info(
-                    f"📱 Formatting direct action response for potential interactive list"
+                    "📱 Formatting direct action response for potential interactive list"
                 )
 
                 # Import formatting utilities
@@ -921,7 +909,7 @@ async def process_inbound_message(
                             exc_info=True,
                         )
                 else:
-                    log.info(f"ℹ️ No attachments to send")
+                    log.info("ℹ️ No attachments to send")
 
                 return
             else:
@@ -930,7 +918,7 @@ async def process_inbound_message(
                     f"⚠️ Direct action '{action_id}' returned None - falling back to AI pipeline"
                 )
                 log.info(
-                    f"   Handler could not resolve parameters, letting AI agent handle it"
+                    "   Handler could not resolve parameters, letting AI agent handle it"
                 )
                 # Don't return - continue to pipeline processing below
 
@@ -942,7 +930,7 @@ async def process_inbound_message(
         if button_payload or button_text:
             interactive_data = {"payload": button_payload, "text": button_text}
 
-        log.info(f"🔄 Processing message through pipeline")
+        log.info("🔄 Processing message through pipeline")
         result = await message_pipeline.process(
             from_number=phone_number,
             message_body=message_body,
@@ -1019,7 +1007,7 @@ async def process_inbound_message(
         if response_type == "interactive_list":
             # Agent explicitly indicated this should be interactive
             log.info(
-                f"📱 Agent response_type=interactive_list → Formatting as interactive"
+                "📱 Agent response_type=interactive_list → Formatting as interactive"
             )
             list_type = response_data.get("list_type", "option")
             log.info(f"🏷️  List type: {list_type}")
@@ -1030,7 +1018,7 @@ async def process_inbound_message(
         elif response_type == "escalation":
             # Agent escalated to human
             log.info(
-                f"🔧 Agent response_type=escalation → Plain text with escalation flag"
+                "🔧 Agent response_type=escalation → Plain text with escalation flag"
             )
             message_text = response_text
             interactive_data = None
@@ -1038,7 +1026,7 @@ async def process_inbound_message(
         elif response_type == "no_tasks_available":
             # No tasks available - agent provided options but they're informational
             log.info(
-                f"⚠️ Agent response_type=no_tasks_available → Plain text (no interactive)"
+                "⚠️ Agent response_type=no_tasks_available → Plain text (no interactive)"
             )
             message_text = response_text
             interactive_data = None
@@ -1046,7 +1034,7 @@ async def process_inbound_message(
         elif response_type == "session_started":
             # Session started - could format action menu as interactive
             log.info(
-                f"✅ Agent response_type=session_started → Plain text (action menu)"
+                "✅ Agent response_type=session_started → Plain text (action menu)"
             )
             message_text = response_text
             interactive_data = None

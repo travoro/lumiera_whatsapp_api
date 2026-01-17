@@ -222,7 +222,7 @@ def format_for_interactive(
     log.info(f"📝 Original text length: {len(text)} chars")
     log.info(f"📝 Interactive body length: {len(interactive_body)} chars")
     log.info(f"📋 Items extracted: {[item['title'] for item in items]}")
-    log.info(f"✅ Returning ORIGINAL TEXT as fallback")
+    log.info("✅ Returning ORIGINAL TEXT as fallback")
 
     # Return ORIGINAL TEXT as fallback (with the numbered list intact)
     return text, interactive_data

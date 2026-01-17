@@ -786,7 +786,7 @@ class DynamicTemplateService:
             formatted_cards.append(card_data)
 
         if not formatted_cards:
-            log.error(f"❌ No valid cards after validation")
+            log.error("❌ No valid cards after validation")
             return None
 
         content_data = {"body": body or "Photos", "cards": formatted_cards}

@@ -9,12 +9,7 @@ This module provides:
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from src.config import settings
-from src.fsm.models import (
-    ClarificationRequest,
-    FSMContext,
-    SessionState,
-)
+from src.fsm.models import FSMContext, SessionState
 from src.integrations.supabase import supabase_client
 from src.utils.structured_logger import get_structured_logger
 

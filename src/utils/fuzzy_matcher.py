@@ -91,10 +91,13 @@ def fuzzy_match_project(
         return best_match
     elif best_match:
         log.debug(
-            f"❌ Fuzzy match: Best match '{best_match['project_name']}' ({best_score:.2%}) below threshold ({threshold:.2%})"
+            f"❌ Fuzzy match: Best match '{
+                best_match['project_name']}' ({
+                best_score:.2%}) below threshold ({
+                threshold:.2%})"
         )
     else:
-        log.debug(f"❌ Fuzzy match: No matches found")
+        log.debug("❌ Fuzzy match: No matches found")
 
     return None
 
@@ -157,9 +160,12 @@ def fuzzy_match_task(
         return best_match
     elif best_match:
         log.debug(
-            f"❌ Fuzzy match: Best match '{best_match['task_title']}' ({best_score:.2%}) below threshold ({threshold:.2%})"
+            f"❌ Fuzzy match: Best match '{
+                best_match['task_title']}' ({
+                best_score:.2%}) below threshold ({
+                threshold:.2%})"
         )
     else:
-        log.debug(f"❌ Fuzzy match: No matches found")
+        log.debug("❌ Fuzzy match: No matches found")
 
     return None

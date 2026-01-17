@@ -8,14 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
-from src.config import settings
-from src.fsm.models import (
-    FSMContext,
-    IdempotencyRecord,
-    SessionState,
-    TransitionResult,
-    TransitionRule,
-)
+from src.fsm.models import FSMContext, SessionState, TransitionResult, TransitionRule
 from src.integrations.supabase import supabase_client
 from src.utils.structured_logger import get_structured_logger, set_correlation_id
 

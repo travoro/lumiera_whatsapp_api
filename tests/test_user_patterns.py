@@ -9,7 +9,6 @@ This test suite simulates actual user behavior patterns observed in production:
 """
 
 import asyncio
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest

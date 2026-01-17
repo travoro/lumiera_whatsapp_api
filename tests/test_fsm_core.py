@@ -7,13 +7,12 @@ Tests:
 - Session management
 """
 
-from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from src.fsm.core import TRANSITION_RULES, FSMEngine, StateManager
-from src.fsm.models import FSMContext, SessionState, TransitionResult
+from src.fsm.models import FSMContext, SessionState
 
 
 class TestTransitionValidation:

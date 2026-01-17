@@ -5,13 +5,7 @@ from typing import Any, Dict
 
 # === Agent Execution Context ===
 # Thread-safe execution context (replaces global mutable dict)
-from src.agent.execution_context import (
-    execution_context,  # Backward compatibility proxy
-)
-from src.agent.execution_context import (
-    execution_context_scope,
-    get_execution_context,
-)
+from src.agent.execution_context import execution_context_scope
 
 # === LangSmith Integration ===
 # CRITICAL: Set environment variables BEFORE importing LangChain modules
@@ -371,7 +365,7 @@ class LumieraAgent:
                 # Normalize output to string (LangChain sometimes returns dict/list)
                 if isinstance(output, dict):
                     # Extract 'text' field from dict: {'text': '...', 'type': 'text', 'index': 0}
-                    log.warning(f"Agent returned dict output, extracting text field")
+                    log.warning("Agent returned dict output, extracting text field")
                     output = output.get("text", str(output))
                 elif isinstance(output, list):
                     # List items might be dicts with 'text' field or plain strings

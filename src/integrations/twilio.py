@@ -3,7 +3,6 @@
 import json
 import os
 import tempfile
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -54,7 +53,7 @@ class TwilioClient:
                 message_params["media_url"] = media_url
                 log.info(f"📎 Adding {len(media_url)} media URLs to message")
                 for idx, url in enumerate(media_url):
-                    log.info(f"   Media {idx+1}: {url[:80]}")
+                    log.info(f"   Media {idx + 1}: {url[:80]}")
 
             message = self.client.messages.create(**message_params)
 
@@ -166,13 +165,18 @@ class TwilioClient:
                 log.info(f"📋 Section 0: {len(sections[0].get('rows', []))} items")
                 for idx, row in enumerate(sections[0].get("rows", [])):
                     log.info(
-                        f"   - Item {idx+1}: id={row.get('id')}, title={row.get('title')}, desc={row.get('description')}"
+                        f"   - Item {
+                            idx +
+                            1}: id={
+                            row.get('id')}, title={
+                            row.get('title')}, desc={
+                            row.get('description')}"
                     )
 
-            log.info(f"🔧 Interactive payload structure:")
-            log.info(f"--- START INTERACTIVE ---")
+            log.info("🔧 Interactive payload structure:")
+            log.info("--- START INTERACTIVE ---")
             log.info(json.dumps(interactive_payload, indent=2))
-            log.info(f"--- END INTERACTIVE ---")
+            log.info("--- END INTERACTIVE ---")
 
             # Send POST request to Twilio API with FORM DATA (not JSON)
             # The interactive parameter must be a JSON string in form data
@@ -204,7 +208,7 @@ class TwilioClient:
                 )
                 return message_sid
             else:
-                log.error(f"❌ Failed to send interactive list")
+                log.error("❌ Failed to send interactive list")
                 log.error(f"Status code: {response.status_code}")
                 log.error(f"Response: {response.text}")
                 return None
@@ -253,23 +257,28 @@ class TwilioClient:
 
             log.info(f"🚀 Attempting to send interactive list to {to}")
             log.info(f"📝 Body text ({len(body)} chars):")
-            log.info(f"--- START BODY ---")
+            log.info("--- START BODY ---")
             log.info(body)
-            log.info(f"--- END BODY ---")
+            log.info("--- END BODY ---")
             log.info(f"📋 Sections: {len(sections)} sections")
             if sections:
                 log.info(f"📋 Section 0: {len(sections[0].get('rows', []))} items")
                 for idx, row in enumerate(sections[0].get("rows", [])):
                     log.info(
-                        f"   - Item {idx+1}: id={row.get('id')}, title={row.get('title')}, desc={row.get('description')}"
+                        f"   - Item {
+                            idx +
+                            1}: id={
+                            row.get('id')}, title={
+                            row.get('title')}, desc={
+                            row.get('description')}"
                     )
 
-            log.info(f"🔧 FULL Interactive payload:")
-            log.info(f"--- START INTERACTIVE ---")
+            log.info("🔧 FULL Interactive payload:")
+            log.info("--- START INTERACTIVE ---")
             log.info(json.dumps(interactive_payload, indent=2))
-            log.info(f"--- END INTERACTIVE ---")
+            log.info("--- END INTERACTIVE ---")
 
-            log.info(f"📤 Twilio API call parameters:")
+            log.info("📤 Twilio API call parameters:")
             log.info(f"   from_: {from_number}")
             log.info(f"   to: {to}")
             log.info(f"   interactive: {interactive_payload['type']}")
@@ -388,7 +397,7 @@ class TwilioClient:
         """
         temp_file_path = None
         try:
-            log.info(f"📥 Downloading media from external URL...")
+            log.info("📥 Downloading media from external URL...")
             log.info(f"   URL: {media_url[:100]}...")
             if filename:
                 log.info(f"   Target filename: {filename}")
@@ -399,7 +408,7 @@ class TwilioClient:
 
             file_size = len(response.content)
             log.info(
-                f"   ✅ Downloaded {file_size} bytes ({file_size/1024/1024:.2f} MB)"
+                f"   ✅ Downloaded {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)"
             )
 
             # Determine file extension from content type or URL
@@ -464,7 +473,7 @@ class TwilioClient:
                 f.write(response.content)
 
             log.info(f"   💾 Saved to: {temp_file_path}")
-            log.info(f"   ✅ File ready with correct filename")
+            log.info("   ✅ File ready with correct filename")
 
             return temp_file_path
 
@@ -474,7 +483,7 @@ class TwilioClient:
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.unlink(temp_file_path)
-                    log.info(f"   🗑️ Cleaned up temp file after error")
+                    log.info("   🗑️ Cleaned up temp file after error")
                 except Exception as cleanup_error:
                     log.warning(f"   ⚠️ Could not clean up temp file: {cleanup_error}")
             return None
@@ -507,7 +516,7 @@ class TwilioClient:
             if not from_number.startswith("whatsapp:"):
                 from_number = f"whatsapp:{from_number}"
 
-            log.info(f"📤 Sending message with local file via temporary hosting")
+            log.info("📤 Sending message with local file via temporary hosting")
             log.info(f"   To: {to}")
             log.info(f"   File: {local_file_path}")
             log.info(f"   Size: {os.path.getsize(local_file_path)} bytes")

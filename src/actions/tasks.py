@@ -67,7 +67,7 @@ async def list_tasks(
             return {
                 "success": True,
                 "message": f"Le projet '{project_name}' n'a actuellement aucune tâche active. "
-                f"Il n'y a pas encore de tâches assignées ou toutes les tâches ont été complétées.",
+                "Il n'y a pas encore de tâches assignées ou toutes les tâches ont été complétées.",
                 "data": [],
             }
 
@@ -144,7 +144,7 @@ async def list_tasks(
             return {
                 "success": True,
                 "message": f"Le projet '{project_name}' n'a actuellement aucune tâche active. "
-                f"Toutes les tâches ont été complétées ou fermées. 🎉",
+                "Toutes les tâches ont été complétées ou fermées. 🎉",
                 "data": [],
             }
 
@@ -191,10 +191,10 @@ async def get_task_description(
     try:
         # Get project_id from active context if not provided
         if not project_id:
-            log.info(f"   🔍 Fetching active project from context")
+            log.info("   🔍 Fetching active project from context")
             project_id = await project_context_service.get_active_project(user_id)
             if not project_id:
-                log.warning(f"   ⚠️ No active project found")
+                log.warning("   ⚠️ No active project found")
                 return {
                     "success": False,
                     "message": "Contexte du projet non trouvé. Veuillez d'abord sélectionner un projet.",
@@ -202,20 +202,20 @@ async def get_task_description(
             log.info(f"   ✅ Active project: {project_id[:8]}...")
 
         # Get PlanRadar project ID from database
-        log.info(f"   🔍 Fetching PlanRadar project ID from DB")
+        log.info("   🔍 Fetching PlanRadar project ID from DB")
         project = await supabase_client.get_project(project_id, user_id=user_id)
         if not project:
-            log.warning(f"   ⚠️ Project not found in DB")
+            log.warning("   ⚠️ Project not found in DB")
             return {"success": False, "message": "Projet non trouvé."}
 
         planradar_project_id = project.get("planradar_project_id")
         if not planradar_project_id:
-            log.warning(f"   ⚠️ Project not linked to PlanRadar")
+            log.warning("   ⚠️ Project not linked to PlanRadar")
             return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
         log.info(f"   ✅ PlanRadar project ID: {planradar_project_id[:8]}...")
 
         # Get full task details to include title
-        log.info(f"   🌐 Calling PlanRadar API for task details")
+        log.info("   🌐 Calling PlanRadar API for task details")
         task = await planradar_client.get_task(task_id, planradar_project_id)
 
         if not task:
@@ -334,26 +334,26 @@ async def get_task_images(
     try:
         # Get project_id from active context if not provided
         if not project_id:
-            log.info(f"   🔍 Fetching active project from context")
+            log.info("   🔍 Fetching active project from context")
             project_id = await project_context_service.get_active_project(user_id)
             if not project_id:
-                log.warning(f"   ⚠️ No active project found")
+                log.warning("   ⚠️ No active project found")
                 return {"success": False, "message": "Contexte du projet non trouvé."}
             log.info(f"   ✅ Active project: {project_id[:8]}...")
 
-        log.info(f"   🔍 Fetching PlanRadar project ID from DB")
+        log.info("   🔍 Fetching PlanRadar project ID from DB")
         project = await supabase_client.get_project(project_id, user_id=user_id)
         if not project:
-            log.warning(f"   ⚠️ Project not found in DB")
+            log.warning("   ⚠️ Project not found in DB")
             return {"success": False, "message": "Projet non trouvé."}
 
         planradar_project_id = project.get("planradar_project_id")
         if not planradar_project_id:
-            log.warning(f"   ⚠️ Project not linked to PlanRadar")
+            log.warning("   ⚠️ Project not linked to PlanRadar")
             return {"success": False, "message": "Ce projet n'est pas lié à PlanRadar."}
         log.info(f"   ✅ PlanRadar project ID: {planradar_project_id[:8]}...")
 
-        log.info(f"   🌐 Calling PlanRadar API for task attachments")
+        log.info("   🌐 Calling PlanRadar API for task attachments")
         # task_id is now UUID, pass it directly to get_task_images (now returns all attachments)
         attachments = await planradar_client.get_task_images(
             task_id, planradar_project_id, task_uuid=task_id

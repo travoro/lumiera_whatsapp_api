@@ -11,9 +11,8 @@ Key principles:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from src.integrations.supabase import supabase_client
 from src.services.project_context import project_context_service
 from src.utils.logger import log
 

@@ -1,6 +1,6 @@
 """Session management service for conversation tracking."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from src.integrations.supabase import supabase_client

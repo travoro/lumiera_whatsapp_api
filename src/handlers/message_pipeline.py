@@ -7,10 +7,14 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from src.agent.agent import lumiera_agent
-from src.exceptions import *
+from src.exceptions import (
+    AgentExecutionException,
+    IntegrationException,
+    LumieraException,
+    UserNotFoundException,
+)
 from src.integrations.supabase import supabase_client
 from src.services.intent import intent_classifier
-from src.services.intent_router import intent_router
 from src.services.session import session_service
 from src.services.transcription import transcription_service
 from src.services.translation import translation_service
@@ -348,7 +352,10 @@ class MessagePipeline:
                                 len(ctx.message_body.strip())
                                 < settings.language_update_min_message_length
                             ):
-                                update_blocked_reason = f"message too short ({len(ctx.message_body.strip())} chars < {settings.language_update_min_message_length})"
+                                update_blocked_reason = f"message too short ({
+                                    len(
+                                        ctx.message_body.strip())} chars < {
+                                    settings.language_update_min_message_length})"
                             elif not settings.auto_update_user_language:
                                 update_blocked_reason = (
                                     "auto-update disabled in settings"
@@ -360,7 +367,7 @@ class MessagePipeline:
                                 log.info(
                                     f"🌍 Language detected: {detected_language} "
                                     f"(method: {detection_method}, profile: {profile_language}) "
-                                    f"→ Profile will be updated"
+                                    "→ Profile will be updated"
                                 )
 
                                 # Update user profile language permanently
@@ -372,7 +379,7 @@ class MessagePipeline:
 
                                 if update_success:
                                     log.info(
-                                        f"✅ User profile language updated: "
+                                        "✅ User profile language updated: "
                                         f"{profile_language} → {detected_language}"
                                     )
                                 else:
@@ -430,7 +437,7 @@ class MessagePipeline:
             if not (ctx.media_url and ctx.media_type and "audio" in ctx.media_type):
                 return Result.ok(None)  # Skip if not audio
 
-            log.info(f"🎤 Processing audio message (transcribe + store)")
+            log.info("🎤 Processing audio message (transcribe + store)")
 
             # Download, store, and transcribe audio
             transcription, storage_url, whisper_detected_lang = (
@@ -471,7 +478,7 @@ class MessagePipeline:
 
                     if update_success:
                         log.info(
-                            f"✅ User profile language updated: "
+                            "✅ User profile language updated: "
                             f"{ctx.user_language} → {whisper_detected_lang}"
                         )
                     else:
@@ -589,11 +596,11 @@ class MessagePipeline:
                         if ctx.expecting_response and age_seconds < 300:
                             ctx.should_continue_session = True
                             log.info(
-                                f"   ✅ Should continue session (recent activity, expecting response)"
+                                "   ✅ Should continue session (recent activity, expecting response)"
                             )
                         else:
                             log.info(
-                                f"   💤 Session exists but not expecting response or too old"
+                                "   💤 Session exists but not expecting response or too old"
                             )
                     except Exception as e:
                         log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
@@ -602,7 +609,7 @@ class MessagePipeline:
                         f"🔄 Active session found: {ctx.active_session_id[:8]}... (no last_activity)"
                     )
             else:
-                log.info(f"💤 No active progress update session for user")
+                log.info("💤 No active progress update session for user")
 
             return Result.ok(None)
 
@@ -667,7 +674,7 @@ class MessagePipeline:
                 settings.enable_fast_path_handlers
                 and ctx.confidence >= settings.intent_confidence_threshold
             ):
-                log.info(f"🚀 HIGH CONFIDENCE - Attempting fast path")
+                log.info("🚀 HIGH CONFIDENCE - Attempting fast path")
 
                 # Load last bot message's tool_outputs for resolving numeric selections
                 last_tool_outputs = []
@@ -697,7 +704,7 @@ class MessagePipeline:
                                 )
                             else:
                                 log.debug(
-                                    f"📭 Last bot message has no tool_outputs in metadata"
+                                    "📭 Last bot message has no tool_outputs in metadata"
                                 )
                             break
                 except Exception as e:
@@ -744,7 +751,7 @@ class MessagePipeline:
                     return Result.ok(None)
                 else:
                     log.warning(
-                        f"❌ Fast path returned None - checking for specialized routing"
+                        "❌ Fast path returned None - checking for specialized routing"
                     )
 
                     # Check for specialized routing in message.py before falling back to Opus
@@ -784,19 +791,19 @@ class MessagePipeline:
                         return Result.ok(None)
                     else:
                         log.warning(
-                            f"❌ No specialized routing found - parameters unclear"
+                            "❌ No specialized routing found - parameters unclear"
                         )
                         log.info(
-                            f"🤖 Falling back to full AI agent to resolve ambiguity"
+                            "🤖 Falling back to full AI agent to resolve ambiguity"
                         )
                         log.info(f"   Intent: {ctx.intent}")
                         log.info(f"   Message: '{ctx.message_in_french}'")
                         log.info(
-                            f"   AI will use conversation history to understand user intent"
+                            "   AI will use conversation history to understand user intent"
                         )
 
             # Fallback to full agent
-            log.info(f"⚙️ Using full agent (Opus)")
+            log.info("⚙️ Using full agent (Opus)")
 
             # LAYER 1: Build AUTHORITATIVE explicit state
             from src.services.agent_state import agent_state_builder
@@ -809,7 +816,9 @@ class MessagePipeline:
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
                 log.info(
-                    f"📍 Injecting explicit state: project={agent_state.active_project_id}, task={agent_state.active_task_id}"
+                    f"📍 Injecting explicit state: project={
+                        agent_state.active_project_id}, task={
+                        agent_state.active_task_id}"
                 )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
@@ -913,7 +922,10 @@ class MessagePipeline:
                                             if isinstance(p, dict)
                                         ]
                                         if projects_compact:
-                                            tool_context += f"\nProjets: {json.dumps(projects_compact, ensure_ascii=False)}"
+                                            tool_context += f"\nProjets: {
+                                                json.dumps(
+                                                    projects_compact,
+                                                    ensure_ascii=False)}"
 
                                     elif tool_name == "list_tasks_tool" and isinstance(
                                         output_data, list
@@ -942,7 +954,10 @@ class MessagePipeline:
                                             if isinstance(d, dict)
                                         ]
                                         if docs_compact:
-                                            tool_context += f"\nDocuments: {json.dumps(docs_compact, ensure_ascii=False)}"
+                                            tool_context += f"\nDocuments: {
+                                                json.dumps(
+                                                    docs_compact,
+                                                    ensure_ascii=False)}"
 
                                 tool_context += "]"
                                 content += tool_context
@@ -973,7 +988,7 @@ class MessagePipeline:
                 )
                 chat_history = []
 
-            log.info(f"🤖 Invoking full AI agent with conversation context")
+            log.info("🤖 Invoking full AI agent with conversation context")
             log.debug(f"   User message: '{ctx.message_in_french}'")
             log.debug(f"   Chat history: {len(chat_history)} messages")
             log.debug(
@@ -994,7 +1009,7 @@ class MessagePipeline:
             ctx.escalation = agent_result.get("escalation", False)
             ctx.tools_called = agent_result.get("tools_called", [])
 
-            log.info(f"✅ AI agent completed")
+            log.info("✅ AI agent completed")
             log.debug(
                 f"   Response length: {len(ctx.response_text) if ctx.response_text else 0} chars"
             )
@@ -1004,7 +1019,7 @@ class MessagePipeline:
                 "tool_outputs", []
             )  # NEW: Store for persistence
 
-            log.info(f"✅ Agent processed message")
+            log.info("✅ Agent processed message")
             return Result.ok(None)
 
         except Exception as e:
@@ -1052,7 +1067,7 @@ class MessagePipeline:
                             )
                         else:
                             log.debug(
-                                f"ℹ️ No translation needed - user language is French"
+                                "ℹ️ No translation needed - user language is French"
                             )
                 else:
                     # Short response, assume French and translate
@@ -1064,7 +1079,7 @@ class MessagePipeline:
                         )
                         log.info(f"✅ Response translated to {ctx.user_language}")
                     else:
-                        log.debug(f"ℹ️ No translation needed - user language is French")
+                        log.debug("ℹ️ No translation needed - user language is French")
 
             return Result.ok(None)
 
@@ -1114,7 +1129,7 @@ class MessagePipeline:
                 metadata=outbound_metadata if outbound_metadata else None,
             )
 
-            log.info(f"✅ Messages persisted")
+            log.info("✅ Messages persisted")
 
         except Exception as e:
             log.error(f"Failed to persist messages: {e}")

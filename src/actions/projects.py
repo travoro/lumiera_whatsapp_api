@@ -1,6 +1,6 @@
 """Project (Chantier) action handlers."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from langsmith import traceable
 

@@ -95,7 +95,7 @@ async def serve_temp_file(file_id: str, request: Request = None):
         try:
             os.unlink(file_path)
             del temp_files[file_path]
-        except:
+        except BaseException:
             pass
         raise HTTPException(status_code=404, detail="File expired")
 

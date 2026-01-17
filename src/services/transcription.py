@@ -129,7 +129,7 @@ class TranscriptionService:
             # Clean up temp file
             try:
                 os.remove(temp_file_path)
-            except:
+            except BaseException:
                 pass
 
             transcribed_text = (
@@ -182,12 +182,12 @@ class TranscriptionService:
                 f.write(audio_data)
 
             # Log what we're about to send to Whisper
-            log.info(f"📤 CALLING WHISPER API:")
+            log.info("📤 CALLING WHISPER API:")
             log.info(f"   → model: {self.model}")
-            log.info(f"   → response_format: verbose_json")
+            log.info("   → response_format: verbose_json")
             log.info(f"   → target_language (received): {target_language}")
             log.info(
-                f"   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)"
+                "   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)"
             )
 
             with open(temp_file_path, "rb") as audio_file:
@@ -202,7 +202,7 @@ class TranscriptionService:
             # Clean up
             try:
                 os.remove(temp_file_path)
-            except:
+            except BaseException:
                 pass
 
             # Extract text from Whisper response
@@ -211,7 +211,7 @@ class TranscriptionService:
             )
 
             # Log Whisper's response details
-            log.info(f"📥 WHISPER API RESPONSE:")
+            log.info("📥 WHISPER API RESPONSE:")
             log.info(f"   → transcribed_text: '{transcribed_text}'")
             if hasattr(transcript, "language"):
                 log.info(f"   → Whisper detected language: {transcript.language}")
@@ -241,7 +241,7 @@ class TranscriptionService:
                             f"(method: {detection_method})"
                         )
                     else:
-                        log.warning(f"⚠️ No confident language detection")
+                        log.warning("⚠️ No confident language detection")
                         detected_language = None
                 except Exception as e:
                     log.warning(f"⚠️ Text language detection failed: {e}")

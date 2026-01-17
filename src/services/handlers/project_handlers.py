@@ -9,14 +9,11 @@ happens in the pipeline (message.py:272-278 or message_pipeline.py:414-465).
 
 from typing import Any, Dict
 
-from src.actions import documents as document_actions
-
 # Import LangChain tools for LangSmith tracing
-from src.agent.tools import get_documents_tool
 from src.integrations.supabase import supabase_client
 from src.utils.handler_helpers import format_project_list, get_projects_with_context
 from src.utils.logger import log
-from src.utils.metadata_helpers import compact_documents, compact_projects
+from src.utils.metadata_helpers import compact_projects
 from src.utils.whatsapp_formatter import get_plural_translation, get_translation
 
 
@@ -143,7 +140,7 @@ async def handle_list_documents(
                     # Fetch all documents (plans) using unified method
                     from src.integrations.planradar import planradar_client
 
-                    log.info(f"🔍 DEBUG: About to call get_project_documents")
+                    log.info("🔍 DEBUG: About to call get_project_documents")
                     log.info(f"   Project name: {project_name}")
                     log.info(f"   Project ID (database): {project_id}")
                     log.info(f"   PlanRadar project ID: {planradar_project_id}")
@@ -153,7 +150,7 @@ async def handle_list_documents(
                             planradar_project_id
                         )
 
-                        log.info(f"🔍 DEBUG: get_project_documents returned")
+                        log.info("🔍 DEBUG: get_project_documents returned")
                         log.info(f"   Type: {type(plans)}")
                         log.info(f"   Count: {len(plans) if plans else 0}")
                         if plans:

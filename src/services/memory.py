@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
@@ -59,7 +59,7 @@ class ConversationMemoryService:
             conversation = "\n".join(conversation_text)
 
             # Create summarization prompt
-            summary_prompt = f"""Résume cette conversation entre un sous-traitant BTP et un assistant virtuel.
+            summary_prompt = """Résume cette conversation entre un sous-traitant BTP et un assistant virtuel.
 Inclus les points clés, les demandes principales, et les actions effectuées.
 Sois concis et factuel.
 
@@ -175,7 +175,8 @@ Résumé:"""
         if len(messages) <= recent_message_count:
             # Short conversation, no need to summarize
             log.info(
-                f"Conversation has {len(messages)} messages, no summarization needed (threshold: {recent_message_count})"
+                f"Conversation has {
+                    len(messages)} messages, no summarization needed (threshold: {recent_message_count})"
             )
             return messages, ""
 
@@ -205,7 +206,9 @@ Résumé:"""
             log.info(f"Cached summary for user {user_id}")
 
         log.info(
-            f"Optimized history: {len(older_messages)} old messages → summary, {len(recent_messages)} recent messages kept"
+            f"Optimized history: {
+                len(older_messages)} old messages → summary, {
+                len(recent_messages)} recent messages kept"
         )
 
         return recent_messages, summary

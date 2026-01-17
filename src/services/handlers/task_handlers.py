@@ -81,7 +81,7 @@ async def handle_list_tasks(
                         break
                     else:
                         log.warning(
-                            f"⚠️ Selection index {selection_index} out of range (0-{len(output_projects)-1})"
+                            f"⚠️ Selection index {selection_index} out of range (0-{len(output_projects) - 1})"
                         )
 
             if not mentioned_project_id:
@@ -114,7 +114,9 @@ async def handle_list_tasks(
             if fuzzy_result:
                 mentioned_project_id = fuzzy_result["project_id"]
                 log.info(
-                    f"✅ Fuzzy match: '{message_text}' → '{fuzzy_result['project_name']}' (confidence: {fuzzy_result['confidence']:.2%})"
+                    f"✅ Fuzzy match: '{message_text}' → '{
+                        fuzzy_result['project_name']}' (confidence: {
+                        fuzzy_result['confidence']:.2%})"
                 )
             else:
                 log.debug(f"❌ Fuzzy match failed for '{message_text}'")
@@ -256,12 +258,12 @@ async def handle_list_tasks(
 
         # Scenario 5: Parameters unclear - Route to full AI agent
         else:
-            log.warning(f"🤖 FAST PATH FALLBACK → Routing to full AI agent")
-            log.info(f"   Reason: Could not determine which project user wants")
+            log.warning("🤖 FAST PATH FALLBACK → Routing to full AI agent")
+            log.info("   Reason: Could not determine which project user wants")
             log.info(f"   User message: '{message_text}'")
             log.info(f"   Available projects: {[p.get('nom') for p in projects[:5]]}")
             log.info(
-                f"   AI agent will use conversation history to understand user intent"
+                "   AI agent will use conversation history to understand user intent"
             )
 
             # Return None to signal that full AI agent should handle this
@@ -335,7 +337,7 @@ async def handle_update_progress(
                         break
                     else:
                         log.warning(
-                            f"⚠️ Selection index {selection_index} out of range (0-{len(output_projects)-1})"
+                            f"⚠️ Selection index {selection_index} out of range (0-{len(output_projects) - 1})"
                         )
 
             if not mentioned_project_id:
@@ -490,7 +492,7 @@ async def handle_task_details(
                 f"📥 Tool output keys: {[t.get('tool') for t in last_tool_outputs]}"
             )
         else:
-            log.warning(f"⚠️ No last_tool_outputs available")
+            log.warning("⚠️ No last_tool_outputs available")
 
         # Scenario 1a: Numeric selection from task list
         if message_text and message_text.strip().isdigit() and last_tool_outputs:
@@ -519,7 +521,7 @@ async def handle_task_details(
                         break
                     else:
                         log.warning(
-                            f"⚠️ Selection index {selection_index} out of range (0-{len(output_tasks)-1})"
+                            f"⚠️ Selection index {selection_index} out of range (0-{len(output_tasks) - 1})"
                         )
 
         # Scenario 1b: Check active task context (if user just asks for "details" without specifying)
@@ -534,8 +536,8 @@ async def handle_task_details(
 
         # Scenario 2: No task selected - fallback to AI agent
         if not selected_task_id:
-            log.warning(f"🤖 FAST PATH FALLBACK → Routing to full AI agent")
-            log.info(f"   Reason: Could not determine which task user wants")
+            log.warning("🤖 FAST PATH FALLBACK → Routing to full AI agent")
+            log.info("   Reason: Could not determine which task user wants")
             log.info(f"   User message: '{message_text}'")
             return None
 
@@ -551,7 +553,9 @@ async def handle_task_details(
         images_result = await task_actions.get_task_images(user_id, selected_task_id)
 
         log.info(
-            f"📊 Description result: success={desc_result.get('success')}, has_data={desc_result.get('data') is not None}"
+            f"📊 Description result: success={
+                desc_result.get('success')}, has_data={
+                desc_result.get('data') is not None}"
         )
         log.info(
             f"📊 Images result: success={images_result.get('success')}, data_count={len(images_result.get('data', []))}"
@@ -589,10 +593,10 @@ async def handle_task_details(
             log.info(f"✅ Added description to message ({len(description)} chars)")
         else:
             message += "\n\n📄 Aucune description disponible pour cette tâche."
-            log.warning(f"⚠️ No description available")
+            log.warning("⚠️ No description available")
 
         # Prepare attachment data for sending
-        log.info(f"🔍 Preparing attachment data...")
+        log.info("🔍 Preparing attachment data...")
         log.info(f"   images_result['success'] = {images_result.get('success')}")
         log.info(f"   images_result['data'] = {images_result.get('data')}")
 
@@ -641,7 +645,7 @@ async def handle_task_details(
                         filename.replace(".jpg", "")
                         .replace(".jpeg", "")
                         .replace(".png", "")
-                        .replace(".pdf", "")
+                        .replace(".pd", "")
                     )
 
                     attachments.append(
@@ -696,7 +700,10 @@ async def handle_task_details(
         else:
             message += "\n\n📎 Aucune pièce jointe disponible pour cette tâche."
             log.warning(
-                f"⚠️ No attachments to display (success={images_result.get('success')}, has_data={bool(images_result.get('data'))})"
+                f"⚠️ No attachments to display (success={
+                    images_result.get('success')}, has_data={
+                    bool(
+                        images_result.get('data'))})"
             )
 
         result = {
@@ -708,7 +715,7 @@ async def handle_task_details(
             "attachments": attachments,  # Direct attachments for sending
         }
 
-        log.info(f"📦 Returning result:")
+        log.info("📦 Returning result:")
         log.info(f"   message length: {len(result['message'])}")
         log.info(f"   has attachments: {result['attachments'] is not None}")
         if result["attachments"]:
