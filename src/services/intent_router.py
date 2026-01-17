@@ -24,9 +24,14 @@ class IntentRouter:
 
         # Lazy import handlers
         from src.services.handlers import (  # handle_update_progress removed - now handled by specialized agent
-            handle_escalation, handle_greeting, handle_list_documents,
-            handle_list_projects, handle_list_tasks, handle_report_incident,
-            handle_task_details)
+            handle_escalation,
+            handle_greeting,
+            handle_list_documents,
+            handle_list_projects,
+            handle_list_tasks,
+            handle_report_incident,
+            handle_task_details,
+        )
 
         handler_mapping = {
             "view_tasks": handle_list_tasks,
