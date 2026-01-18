@@ -935,7 +935,8 @@ class MessagePipeline:
                         elif direction == "outbound":
                             content = msg.get("content", "")
 
-                            # Check if this message has tool outputs AND is within last 3 tool-using turns
+                            # Check if this message has tool outputs
+                            # AND is within last 3 tool-using turns
                             metadata = msg.get("metadata", {})
                             if metadata is None:
                                 metadata = {}
@@ -946,25 +947,29 @@ class MessagePipeline:
                                 else []
                             )
 
-                            # Only append tool outputs if from recent turns (prevent token bloat!)
+                            # Only append tool outputs if from recent turns
+                            # (prevent token bloat!)
                             is_recent_enough = (len(messages_for_history) - idx) <= (
                                 recent_tool_turns if recent_tool_turns <= 3 else 3
                             )
 
                             if tool_outputs and is_recent_enough:
-                                # Append structured data for agent reference (compact format)
+                                # Append structured data for agent reference
+                                # (compact format)
                                 tool_context = "\n[Données précédentes:"
                                 for tool_output in tool_outputs:
                                     if not isinstance(tool_output, dict):
                                         log.debug(
-                                            f"⚠️ Skipping non-dict tool_output: {type(tool_output)}"
+                                            f"⚠️ Skipping non-dict tool_output: "
+                                            f"{type(tool_output)}"
                                         )
                                         continue
 
                                     tool_name = tool_output.get("tool", "unknown")
                                     output_data = tool_output.get("output")
 
-                                    # Only include essential structured data (not full details)
+                                    # Only include essential structured data
+                                    # (not full details)
                                     if (
                                         tool_name == "list_projects_tool"
                                         and isinstance(output_data, list)
@@ -986,12 +991,18 @@ class MessagePipeline:
                                     ):
                                         # Extract just IDs and titles
                                         tasks_compact = [
-                                            {"id": t.get("id"), "title": t.get("title")}
+                                            {
+                                                "id": t.get("id"),
+                                                "title": t.get("title"),
+                                            }
                                             for t in output_data
                                             if isinstance(t, dict)
                                         ]
                                         if tasks_compact:
-                                            tool_context += f"\nTâches: {json.dumps(tasks_compact, ensure_ascii=False)}"
+                                            tasks_json = json.dumps(
+                                                tasks_compact, ensure_ascii=False
+                                            )
+                                            tool_context += f"\nTâches: {tasks_json}"
 
                                     elif (
                                         tool_name == "list_documents_tool"
@@ -1008,10 +1019,10 @@ class MessagePipeline:
                                             if isinstance(d, dict)
                                         ]
                                         if docs_compact:
-                                            tool_context += f"\nDocuments: {
-                                                json.dumps(
-                                                    docs_compact,
-                                                    ensure_ascii=False)}"
+                                            docs_json = json.dumps(
+                                                docs_compact, ensure_ascii=False
+                                            )
+                                            tool_context += f"\nDocuments: {docs_json}"
 
                                 tool_context += "]"
                                 content += tool_context
@@ -1019,27 +1030,32 @@ class MessagePipeline:
                             chat_history.append(AIMessage(content=content))
 
                     except Exception as msg_error:
-                        # Log error but continue processing other messages (graceful degradation)
+                        # Log error but continue processing other messages
+                        # (graceful degradation)
                         log.warning(
-                            f"⚠️ Error processing message at index {idx}: {msg_error}"
+                            f"⚠️ Error processing message at index {idx}: "
+                            f"{msg_error}"
                         )
                         log.debug(f"   Problematic message: {msg}")
                         continue
 
                 log.info(f"📜 Loaded {len(chat_history)} messages for agent context")
                 log.debug(
-                    f"   Chat history has {len([m for m in chat_history if isinstance(m, HumanMessage)])} user messages"
+                    f"   Chat history has "
+                    f"{len([m for m in chat_history if isinstance(m, HumanMessage)])} "
+                    f"user messages"
                 )
                 log.debug(
-                    f"   Chat history has {len([m for m in chat_history if isinstance(m, AIMessage)])} AI messages"
+                    f"   Chat history has "
+                    f"{len([m for m in chat_history if isinstance(m, AIMessage)])} "
+                    f"AI messages"
                 )
             except Exception as e:
                 log.warning(f"Could not load chat history for agent: {e}")
                 log.exception(e)  # Full stack trace for debugging
                 log.debug(f"   Session ID: {ctx.session_id}")
-                log.debug(
-                    f"   Messages loaded: {len(messages) if 'messages' in locals() else 'N/A'}"
-                )
+                msg_count = len(messages) if "messages" in locals() else "N/A"
+                log.debug(f"   Messages loaded: {msg_count}")
                 chat_history = []
 
             log.info("🤖 Invoking full AI agent with conversation context")
@@ -1056,7 +1072,7 @@ class MessagePipeline:
                 language=ctx.user_language,
                 message_text=ctx.message_in_french,
                 chat_history=chat_history,
-                state_context=state_context,  # NEW: Inject explicit state
+                state_context=state_context,  # NEW: Inject state
             )
 
             ctx.response_text = agent_result.get("message")
@@ -1064,9 +1080,8 @@ class MessagePipeline:
             ctx.tools_called = agent_result.get("tools_called", [])
 
             log.info("✅ AI agent completed")
-            log.debug(
-                f"   Response length: {len(ctx.response_text) if ctx.response_text else 0} chars"
-            )
+            resp_len = len(ctx.response_text) if ctx.response_text else 0
+            log.debug(f"   Response length: {resp_len} chars")
             log.debug(f"   Tools called: {ctx.tools_called}")
             log.debug(f"   Escalation: {ctx.escalation}")
             ctx.tool_outputs = agent_result.get(
@@ -1088,15 +1103,16 @@ class MessagePipeline:
 
                 # Only check if response is substantial enough
                 if len(ctx.response_text.strip()) > 10:
-                    detected_lang, method = (
-                        await language_detection_service.detect_async(
+                    detected_lang, method = await (
+                        language_detection_service.detect_async(
                             ctx.response_text, fallback_language="fr"
                         )
                     )
 
                     if detected_lang != "fr":
                         log.warning(
-                            f"⚠️ Agent responded in {detected_lang} instead of French! "
+                            f"⚠️ Agent responded in {detected_lang} "
+                            f"instead of French! "
                             f"Response preview: {ctx.response_text[:100]}..."
                         )
                         # Translate from detected language instead
@@ -1106,7 +1122,8 @@ class MessagePipeline:
                             target_language=ctx.user_language,
                         )
                         log.info(
-                            f"✅ Response translated from {detected_lang} to {ctx.user_language}"
+                            f"✅ Response translated from {detected_lang} "
+                            f"to {ctx.user_language}"
                         )
                     else:
                         # Agent correctly responded in French
@@ -1117,7 +1134,8 @@ class MessagePipeline:
                                 )
                             )
                             log.info(
-                                f"✅ Response translated from French to {ctx.user_language}"
+                                f"✅ Response translated from French "
+                                f"to {ctx.user_language}"
                             )
                         else:
                             log.debug(
@@ -1152,7 +1170,9 @@ class MessagePipeline:
                 message_sid=ctx.message_sid,
                 media_url=ctx.media_url,
                 message_type=(
-                    "audio" if ctx.media_type and "audio" in ctx.media_type else "text"
+                    "audio"
+                    if ctx.media_type and "audio" in ctx.media_type
+                    else "text"
                 ),
                 session_id=ctx.session_id,
             )
@@ -1169,7 +1189,8 @@ class MessagePipeline:
             if ctx.tool_outputs:
                 outbound_metadata["tool_outputs"] = ctx.tool_outputs
                 log.debug(
-                    f"💾 Storing {len(ctx.tool_outputs)} tool outputs in message metadata"
+                    f"💾 Storing {len(ctx.tool_outputs)} tool outputs "
+                    f"in message metadata"
                 )
 
             # Save outbound message with metadata
