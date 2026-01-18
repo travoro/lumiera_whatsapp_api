@@ -56,11 +56,17 @@ class SessionManagementService:
                 session = await supabase_client.get_session_by_id(session_id)
 
                 if session:
-                    log.info(f"Session {session_id} active for user {subcontractor_id[:8]}...")
+                    log.info(
+                        f"Session {session_id} active for user {subcontractor_id[:8]}..."
+                    )
                     return session
                 else:
-                    log.error(f"❌ RPC returned {session_id} but get_session_by_id failed!")
-                    log.warning("⚠️ Session returned by RPC doesn't exist, using fallback")
+                    log.error(
+                        f"❌ RPC returned {session_id} but get_session_by_id failed!"
+                    )
+                    log.warning(
+                        "⚠️ Session returned by RPC doesn't exist, using fallback"
+                    )
 
             else:
                 log.warning("⚠️ RPC returned None, using fallback")

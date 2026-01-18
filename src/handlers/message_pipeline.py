@@ -125,7 +125,7 @@ class MessagePipeline:
         media_url: Optional[str] = None,
         media_type: Optional[str] = None,
         interactive_data: Optional[Dict[str, Any]] = None,
-        session_id: Optional[str] = None,  # NEW: Accept session_id to prevent duplicate creation
+        session_id: Optional[str] = None,  # NEW: Accept session_id
     ) -> Result[Dict[str, Any]]:
         """Process message through pipeline stages.
 
@@ -254,7 +254,7 @@ class MessagePipeline:
             return Result.from_exception(e)
 
     async def _manage_session(self, ctx: MessageContext) -> Result[None]:
-        """Stage 2: Get or create conversation session and load conversation context."""
+        """Stage 2: Get or create session and load conversation context."""
         try:
             # NEW: Reuse session_id if already set (from earlier in request)
             if ctx.session_id:
@@ -263,7 +263,9 @@ class MessagePipeline:
                 if session:
                     log.info(f"✅ Session: {ctx.session_id} (reused)")
                 else:
-                    log.warning(f"⚠️ Session {ctx.session_id} not found, creating new one")
+                    log.warning(
+                        f"⚠️ Session {ctx.session_id} not found, creating new one"
+                    )
                     ctx.session_id = None  # Reset to trigger new creation below
 
             # Only call get_or_create if no session yet
@@ -275,7 +277,8 @@ class MessagePipeline:
                 else:
                     raise AgentExecutionException(stage="session_management")
 
-            # Load conversation context for intent classification (happens regardless of reuse/create)
+            # Load conversation context for intent classification
+            # (happens regardless of reuse/create)
             try:
                 messages = await supabase_client.get_messages_by_session(
                     ctx.session_id, fields="content,direction,created_at"
