@@ -866,9 +866,11 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(f"📍 Injecting explicit state: project={
+                log.info(
+                    f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}")
+                        agent_state.active_task_id}"
+                )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
