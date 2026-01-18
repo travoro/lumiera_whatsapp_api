@@ -25,6 +25,39 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "fsm: mark test as FSM-related test")
     config.addinivalue_line("markers", "pipeline: mark test as pipeline test")
     config.addinivalue_line("markers", "pattern: mark test as user pattern test")
+    config.addinivalue_line(
+        "markers",
+        "requires_db: mark test as requiring real database (skip in CI with dummy credentials)",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Automatically skip integration tests that require real database."""
+    import os
+
+    # Check if we're using dummy test credentials (CI environment)
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    is_test_env = "test" in supabase_key.lower()
+
+    skip_db = pytest.mark.skip(
+        reason="Requires real database connection (not available in CI with dummy credentials)"
+    )
+
+    for item in items:
+        # Skip session race condition tests - they need real Supabase/database
+        if "test_session_race_conditions" in str(item.fspath):
+            # These specific tests call real session_service and need database
+            test_name = item.name
+            needs_db_tests = [
+                "test_no_duplicate_sessions_on_concurrent_creates",
+                "test_session_reuse_ratio_healthy",
+                "test_context_preserved_across_actions",
+                "test_progress_update_session_reset_on_new_task",
+                "test_no_orphaned_sessions_after_error",
+            ]
+
+            if test_name in needs_db_tests and is_test_env:
+                item.add_marker(skip_db)
 
 
 # ============================================================================
