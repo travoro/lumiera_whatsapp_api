@@ -299,9 +299,7 @@ class MessagePipeline:
 
                 # Find the last outbound message (from bot to user) for menu context
                 outbound_messages = [
-                    msg
-                    for msg in sorted_messages
-                    if msg.get("direction") == "outbound"
+                    msg for msg in sorted_messages if msg.get("direction") == "outbound"
                 ]
                 if outbound_messages:
                     ctx.last_bot_message = outbound_messages[-1].get("content")
@@ -531,8 +529,7 @@ class MessagePipeline:
                         f"(matches profile)"
                     )
                     log.info(
-                        f"🔍 TRACE: Context language UNCHANGED: "
-                        f"{ctx.user_language}"
+                        f"🔍 TRACE: Context language UNCHANGED: " f"{ctx.user_language}"
                     )
             else:
                 log.info(
@@ -869,11 +866,9 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(
-                    f"📍 Injecting explicit state: project={
+                log.info(f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}"
-                )
+                        agent_state.active_task_id}")
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
@@ -1103,10 +1098,11 @@ class MessagePipeline:
 
                 # Only check if response is substantial enough
                 if len(ctx.response_text.strip()) > 10:
-                    detected_lang, method = await (
-                        language_detection_service.detect_async(
-                            ctx.response_text, fallback_language="fr"
-                        )
+                    (
+                        detected_lang,
+                        method,
+                    ) = await language_detection_service.detect_async(
+                        ctx.response_text, fallback_language="fr"
                     )
 
                     if detected_lang != "fr":
@@ -1170,9 +1166,7 @@ class MessagePipeline:
                 message_sid=ctx.message_sid,
                 media_url=ctx.media_url,
                 message_type=(
-                    "audio"
-                    if ctx.media_type and "audio" in ctx.media_type
-                    else "text"
+                    "audio" if ctx.media_type and "audio" in ctx.media_type else "text"
                 ),
                 session_id=ctx.session_id,
             )

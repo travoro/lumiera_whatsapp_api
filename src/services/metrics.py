@@ -121,9 +121,7 @@ class MetricsService:
         log.info(f"   Sessions created: {metrics['sessions_created']}")
         log.info(f"   Sessions reused: {metrics['sessions_reused']}")
         log.info(f"   Reuse ratio: {metrics['session_reuse_ratio']:.2%}")
-        log.info(
-            f"   Context loss incidents: {metrics['context_loss_incidents']}"
-        )
+        log.info(f"   Context loss incidents: {metrics['context_loss_incidents']}")
 
         if metrics["reuse_ratio_healthy"]:
             log.info("   ✅ Reuse ratio is healthy (≥95%)")

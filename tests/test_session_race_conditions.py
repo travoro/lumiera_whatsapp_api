@@ -168,9 +168,7 @@ async def test_context_preserved_across_actions():
 
     assert metrics["sessions_created"] == 1, "Should have created exactly 1 session"
     assert metrics["sessions_reused"] == 2, "Should have reused session 2 times"
-    assert (
-        metrics["session_reuse_ratio"] == 2 / 3
-    ), "Reuse ratio should be 2/3 (66.7%)"
+    assert metrics["session_reuse_ratio"] == 2 / 3, "Reuse ratio should be 2/3 (66.7%)"
 
 
 @pytest.mark.asyncio
