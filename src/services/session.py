@@ -42,26 +42,38 @@ class SessionManagementService:
             Session dict with id, started_at, etc.
         """
         try:
+            log.debug(f"🔍 Calling RPC for user {subcontractor_id[:8]}...")
+
             # Call PostgreSQL function to get or create session
             session_id = await supabase_client.get_or_create_session_rpc(
                 subcontractor_id
             )
 
             if session_id:
+                log.debug(f"✅ RPC returned session: {session_id}")
+
                 # Get full session details
                 session = await supabase_client.get_session_by_id(session_id)
 
                 if session:
-                    log.info(f"Session {session_id} active for user {subcontractor_id}")
+                    log.info(f"Session {session_id} active for user {subcontractor_id[:8]}...")
                     return session
+                else:
+                    log.error(f"❌ RPC returned {session_id} but get_session_by_id failed!")
+                    log.warning("⚠️ Session returned by RPC doesn't exist, using fallback")
+
+            else:
+                log.warning("⚠️ RPC returned None, using fallback")
 
             # Fallback: Create session manually if function fails
-            log.warning("PostgreSQL function failed, creating session manually")
+            log.warning("📝 Creating session manually (fallback)")
             return await self._create_session_manual(subcontractor_id)
 
         except Exception as e:
-            log.error(f"Error getting/creating session: {e}")
+            log.error(f"❌ Error getting/creating session: {e}")
+            log.exception(e)  # Full stack trace for debugging
             # Fallback to manual creation
+            log.warning("📝 Using manual session creation due to error")
             return await self._create_session_manual(subcontractor_id)
 
     async def _create_session_manual(

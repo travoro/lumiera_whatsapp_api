@@ -950,6 +950,7 @@ async def process_inbound_message(
             media_url=media_url,
             media_type=media_content_type,
             interactive_data=interactive_data,
+            session_id=session_id,  # NEW: Pass session_id to prevent duplicate creation
         )
 
         if not result.success:

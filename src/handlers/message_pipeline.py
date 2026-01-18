@@ -125,6 +125,7 @@ class MessagePipeline:
         media_url: Optional[str] = None,
         media_type: Optional[str] = None,
         interactive_data: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,  # NEW: Accept session_id to prevent duplicate creation
     ) -> Result[Dict[str, Any]]:
         """Process message through pipeline stages.
 
@@ -135,6 +136,7 @@ class MessagePipeline:
             media_url: Media URL if present
             media_type: Media MIME type
             interactive_data: Interactive button data
+            session_id: Optional session_id to reuse (prevents duplicate creation)
 
         Returns:
             Result with response dict or error
@@ -146,6 +148,7 @@ class MessagePipeline:
             media_url=media_url,
             media_type=media_type,
             interactive_data=interactive_data,
+            session_id=session_id,  # NEW: Set from parameter to enable reuse
         )
 
         try:
@@ -253,52 +256,64 @@ class MessagePipeline:
     async def _manage_session(self, ctx: MessageContext) -> Result[None]:
         """Stage 2: Get or create conversation session and load conversation context."""
         try:
-            session = await session_service.get_or_create_session(ctx.user_id)
-            if session:
-                ctx.session_id = session["id"]
-                log.info(f"✅ Session: {ctx.session_id}")
+            # NEW: Reuse session_id if already set (from earlier in request)
+            if ctx.session_id:
+                log.debug(f"✅ Reusing existing session_id: {ctx.session_id}")
+                session = await supabase_client.get_session_by_id(ctx.session_id)
+                if session:
+                    log.info(f"✅ Session: {ctx.session_id} (reused)")
+                else:
+                    log.warning(f"⚠️ Session {ctx.session_id} not found, creating new one")
+                    ctx.session_id = None  # Reset to trigger new creation below
 
-                # Load conversation context for intent classification
-                try:
-                    messages = await supabase_client.get_messages_by_session(
-                        ctx.session_id, fields="content,direction,created_at"
+            # Only call get_or_create if no session yet
+            if not ctx.session_id:
+                session = await session_service.get_or_create_session(ctx.user_id)
+                if session:
+                    ctx.session_id = session["id"]
+                    log.info(f"✅ Session: {ctx.session_id}")
+                else:
+                    raise AgentExecutionException(stage="session_management")
+
+            # Load conversation context for intent classification (happens regardless of reuse/create)
+            try:
+                messages = await supabase_client.get_messages_by_session(
+                    ctx.session_id, fields="content,direction,created_at"
+                )
+
+                # Sort messages by created_at (oldest to newest)
+                sorted_messages = sorted(
+                    messages, key=lambda x: x.get("created_at", "")
+                )
+
+                # Get last 3 messages for intent context
+                if sorted_messages:
+                    ctx.recent_messages = sorted_messages[-3:]
+                    log.info(
+                        f"📜 Loaded {len(ctx.recent_messages)} recent messages for intent context"
                     )
 
-                    # Sort messages by created_at (oldest to newest)
-                    sorted_messages = sorted(
-                        messages, key=lambda x: x.get("created_at", "")
+                # Find the last outbound message (from bot to user) for menu context
+                outbound_messages = [
+                    msg
+                    for msg in sorted_messages
+                    if msg.get("direction") == "outbound"
+                ]
+                if outbound_messages:
+                    ctx.last_bot_message = outbound_messages[-1].get("content")
+                    log.info(
+                        f"📜 Last bot message: '{ctx.last_bot_message[:50]}...' "
+                        if ctx.last_bot_message and len(ctx.last_bot_message) > 50
+                        else f"📜 Last bot message: '{ctx.last_bot_message}'"
                     )
 
-                    # Get last 3 messages for intent context
-                    if sorted_messages:
-                        ctx.recent_messages = sorted_messages[-3:]
-                        log.info(
-                            f"📜 Loaded {len(ctx.recent_messages)} recent messages for intent context"
-                        )
+            except Exception as e:
+                # Don't fail the pipeline if we can't load messages
+                log.warning(f"Could not load conversation context: {e}")
+                ctx.last_bot_message = None
+                ctx.recent_messages = []
 
-                    # Find the last outbound message (from bot to user) for menu context
-                    outbound_messages = [
-                        msg
-                        for msg in sorted_messages
-                        if msg.get("direction") == "outbound"
-                    ]
-                    if outbound_messages:
-                        ctx.last_bot_message = outbound_messages[-1].get("content")
-                        log.info(
-                            f"📜 Last bot message: '{ctx.last_bot_message[:50]}...' "
-                            if ctx.last_bot_message and len(ctx.last_bot_message) > 50
-                            else f"📜 Last bot message: '{ctx.last_bot_message}'"
-                        )
-
-                except Exception as e:
-                    # Don't fail the pipeline if we can't load messages
-                    log.warning(f"Could not load conversation context: {e}")
-                    ctx.last_bot_message = None
-                    ctx.recent_messages = []
-
-                return Result.ok(None)
-            else:
-                raise AgentExecutionException(stage="session_management")
+            return Result.ok(None)
 
         except Exception as e:
             return Result.from_exception(e)
