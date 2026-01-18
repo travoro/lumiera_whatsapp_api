@@ -36,9 +36,7 @@ async def test_no_duplicate_sessions_on_concurrent_creates():
     user_id = str(uuid4())
 
     # Simulate 3 concurrent get_or_create_session calls
-    tasks = [
-        session_service.get_or_create_session(user_id) for _ in range(3)
-    ]
+    tasks = [session_service.get_or_create_session(user_id) for _ in range(3)]
 
     sessions = await asyncio.gather(*tasks, return_exceptions=True)
 

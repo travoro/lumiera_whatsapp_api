@@ -54,7 +54,9 @@ class MetricsService:
                 f"⚠️ METRIC ALERT: User {user_id} created {recent_creates} sessions "
                 f"in {self._window_seconds}s - possible race condition!"
             )
-            log.warning(f"   Session IDs: {session_id} (and {recent_creates - 1} others)")
+            log.warning(
+                f"   Session IDs: {session_id} (and {recent_creates - 1} others)"
+            )
 
     def track_session_reused(self, user_id: str, session_id: str) -> None:
         """Track a session being reused (passed through call chain).
