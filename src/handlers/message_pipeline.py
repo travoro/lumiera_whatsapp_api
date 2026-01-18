@@ -293,7 +293,8 @@ class MessagePipeline:
                 if sorted_messages:
                     ctx.recent_messages = sorted_messages[-3:]
                     log.info(
-                        f"📜 Loaded {len(ctx.recent_messages)} recent messages for intent context"
+                        f"📜 Loaded {len(ctx.recent_messages)} recent messages "
+                        f"for intent context"
                     )
 
                 # Find the last outbound message (from bot to user) for menu context
@@ -341,7 +342,8 @@ class MessagePipeline:
                         else ctx.message_body
                     )
                     log.info(
-                        f"🔍 Detecting language for message: '{message_preview}' (profile: {profile_language})"
+                        f"🔍 Detecting language for message: '{message_preview}' "
+                        f"(profile: {profile_language})"
                     )
 
                     detected_language, detection_method = (
@@ -388,7 +390,8 @@ class MessagePipeline:
                             if should_update_profile:
                                 log.info(
                                     f"🌍 Language detected: {detected_language} "
-                                    f"(method: {detection_method}, profile: {profile_language}) "
+                                    f"(method: {detection_method}, "
+                                    f"profile: {profile_language}) "
                                     "→ Profile will be updated"
                                 )
 
@@ -406,38 +409,45 @@ class MessagePipeline:
                                     )
                                 else:
                                     log.warning(
-                                        f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                                        f"⚠️ Failed to update profile language "
+                                        f"for user {ctx.user_id}"
                                     )
                             else:
                                 log.info(
                                     f"🌍 Language detected: {detected_language} "
-                                    f"(method: {detection_method}, profile: {profile_language}) "
+                                    f"(method: {detection_method}, "
+                                    f"profile: {profile_language}) "
                                     f"→ Profile update BLOCKED: {update_blocked_reason}"
                                 )
 
-                            # Use detected language for this message regardless of profile update
+                            # Use detected language for this message
+                            # regardless of profile update
                             ctx.user_language = detected_language
                         else:
                             log.info(
                                 f"✅ Language detected: {detected_language} "
-                                f"(method: {detection_method}) → Matches profile, no update needed"
+                                f"(method: {detection_method}) → Matches profile, "
+                                f"no update needed"
                             )
                     else:
                         # Fallback method means no confident detection
                         log.info(
-                            f"⚠️ Language detection fallback: Using profile language {profile_language} "
+                            f"⚠️ Language detection fallback: "
+                            f"Using profile language {profile_language} "
                             f"(method: {detection_method})"
                         )
                         ctx.user_language = profile_language
 
                 except Exception as e:
                     log.warning(
-                        f"❌ Language detection error: {e} → Using profile language: {profile_language}"
+                        f"❌ Language detection error: {e} → "
+                        f"Using profile language: {profile_language}"
                     )
                     ctx.user_language = profile_language
             else:
                 log.info(
-                    f"⏩ Message too short for detection → Using profile language: {profile_language}"
+                    f"⏩ Message too short for detection → "
+                    f"Using profile language: {profile_language}"
                 )
 
             return Result.ok(None)
@@ -505,27 +515,33 @@ class MessagePipeline:
                         )
                     else:
                         log.warning(
-                            f"⚠️ Failed to update profile language for user {ctx.user_id}"
+                            f"⚠️ Failed to update profile language "
+                            f"for user {ctx.user_id}"
                         )
 
                     # Use detected language for this message
                     ctx.user_language = whisper_detected_lang
                     log.info(
-                        f"🔍 TRACE: Context language UPDATED to: {ctx.user_language}"
+                        f"🔍 TRACE: Context language UPDATED to: "
+                        f"{ctx.user_language}"
                     )
                 else:
                     log.info(
-                        f"✅ Detected language: {whisper_detected_lang} (matches profile)"
+                        f"✅ Detected language: {whisper_detected_lang} "
+                        f"(matches profile)"
                     )
                     log.info(
-                        f"🔍 TRACE: Context language UNCHANGED: {ctx.user_language}"
+                        f"🔍 TRACE: Context language UNCHANGED: "
+                        f"{ctx.user_language}"
                     )
             else:
                 log.info(
-                    "⚠️ No confident language detection from audio, keeping profile language"
+                    "⚠️ No confident language detection from audio, "
+                    "keeping profile language"
                 )
                 log.info(
-                    f"🔍 TRACE: Context language UNCHANGED (no detection): {ctx.user_language}"
+                    f"🔍 TRACE: Context language UNCHANGED (no detection): "
+                    f"{ctx.user_language}"
                 )
 
             # Update media URL to point to stored file (not Twilio URL)
@@ -557,7 +573,10 @@ class MessagePipeline:
             return Result.from_exception(e)
 
     async def _check_active_session(self, ctx: MessageContext) -> Result[None]:
-        """Stage 5.5: Check if user has active progress update session (for context preservation)."""
+        """Stage 5.5: Check for active progress update session.
+
+        Checks if user has active progress update session for context preservation.
+        """
         try:
             # Query for active progress update session
             result = (
@@ -596,7 +615,8 @@ class MessagePipeline:
                             last_activity_str.replace("Z", "+00:00")
                         )
 
-                        # Ensure both datetimes are timezone-aware for accurate comparison
+                        # Ensure both datetimes are timezone-aware
+                        # for accurate comparison
                         if last_activity.tzinfo is None:
                             # Treat naive datetime as UTC
                             last_activity = last_activity.replace(tzinfo=timezone.utc)
@@ -614,21 +634,24 @@ class MessagePipeline:
                         log.info(f"   Expecting response: {ctx.expecting_response}")
                         log.info(f"   Age: {age_seconds:.0f}s")
 
-                        # If expecting response and recent activity (< 5 minutes = 300s)
+                        # If expecting response and recent activity (< 5 min = 300s)
                         if ctx.expecting_response and age_seconds < 300:
                             ctx.should_continue_session = True
                             log.info(
-                                "   ✅ Should continue session (recent activity, expecting response)"
+                                "   ✅ Should continue session "
+                                "(recent activity, expecting response)"
                             )
                         else:
                             log.info(
-                                "   💤 Session exists but not expecting response or too old"
+                                "   💤 Session exists but not expecting response "
+                                "or too old"
                             )
                     except Exception as e:
                         log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
                 else:
                     log.info(
-                        f"🔄 Active session found: {ctx.active_session_id[:8]}... (no last_activity)"
+                        f"🔄 Active session found: {ctx.active_session_id[:8]}... "
+                        f"(no last_activity)"
                     )
             else:
                 log.info("💤 No active progress update session for user")
@@ -659,14 +682,15 @@ class MessagePipeline:
 
             if has_media:
                 log.info(
-                    f"📎 Message has media: {media_type_simple} (url: {ctx.media_url[:50]}...)"
+                    f"📎 Message has media: {media_type_simple} "
+                    f"(url: {ctx.media_url[:50]}...)"
                 )
 
             intent_result = await intent_classifier.classify(
                 ctx.message_in_french,
                 ctx.user_id,
-                last_bot_message=ctx.last_bot_message,  # Pass for menu context
-                conversation_history=ctx.recent_messages,  # Pass last 3 messages for better context
+                last_bot_message=ctx.last_bot_message,  # Menu context
+                conversation_history=ctx.recent_messages,  # Last 3 messages
                 # FSM context for session continuation (context preservation)
                 active_session_id=ctx.active_session_id,
                 fsm_state=ctx.fsm_state,
@@ -719,10 +743,12 @@ class MessagePipeline:
 
                             if last_tool_outputs:
                                 log.info(
-                                    f"📦 Loaded {len(last_tool_outputs)} tool outputs from last bot message"
+                                    f"📦 Loaded {len(last_tool_outputs)} tool outputs "
+                                    f"from last bot message"
                                 )
                                 log.debug(
-                                    f"📋 Tool outputs: {[t.get('tool') for t in last_tool_outputs]}"
+                                    f"📋 Tool outputs: "
+                                    f"{[t.get('tool') for t in last_tool_outputs]}"
                                 )
                             else:
                                 log.debug(
@@ -741,10 +767,10 @@ class MessagePipeline:
                     phone_number=ctx.from_number,
                     user_name=ctx.user_name,
                     language=ctx.user_language,
-                    message_text=ctx.message_in_french,  # Pass message for project name extraction
-                    session_id=ctx.session_id,  # Pass session for context queries
-                    last_tool_outputs=last_tool_outputs,  # For resolving numeric selections
-                    last_bot_message=last_bot_message,  # For menu context
+                    message_text=ctx.message_in_french,  # For project extraction
+                    session_id=ctx.session_id,  # For context queries
+                    last_tool_outputs=last_tool_outputs,  # Numeric selections
+                    last_bot_message=last_bot_message,  # Menu context
                 )
 
                 if result:
@@ -764,11 +790,13 @@ class MessagePipeline:
                         ctx.attachments = result.get("attachments")
                         if ctx.attachments:
                             log.info(
-                                f"📦 Captured {len(ctx.attachments)} attachments from fast path"
+                                f"📦 Captured {len(ctx.attachments)} attachments "
+                                f"from fast path"
                             )
 
                     log.info(
-                        f"✅ Fast path succeeded (captured {len(ctx.tool_outputs)} tool outputs)"
+                        f"✅ Fast path succeeded "
+                        f"(captured {len(ctx.tool_outputs)} tool outputs)"
                     )
                     return Result.ok(None)
                 else:
@@ -776,7 +804,8 @@ class MessagePipeline:
                         "❌ Fast path returned None - checking for specialized routing"
                     )
 
-                    # Check for specialized routing in message.py before falling back to Opus
+                    # Check for specialized routing in message.py
+                    # before falling back to Opus
                     from src.handlers.message import handle_direct_action
 
                     specialized_result = await handle_direct_action(
@@ -809,7 +838,8 @@ class MessagePipeline:
                             ctx.attachments = specialized_result.get("attachments")
                             if ctx.attachments:
                                 log.info(
-                                    f"📦 Captured {len(ctx.attachments)} attachments from specialized handler"
+                                    f"📦 Captured {len(ctx.attachments)} attachments "
+                                    f"from specialized handler"
                                 )
                         return Result.ok(None)
                     else:
@@ -822,7 +852,8 @@ class MessagePipeline:
                         log.info(f"   Intent: {ctx.intent}")
                         log.info(f"   Message: '{ctx.message_in_french}'")
                         log.info(
-                            "   AI will use conversation history to understand user intent"
+                            "   AI will use conversation history "
+                            "to understand user intent"
                         )
 
             # Fallback to full agent
