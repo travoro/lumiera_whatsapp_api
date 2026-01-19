@@ -33,6 +33,7 @@ from langchain.agents import (
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
+
 # isort: on
 
 # NOTE: all_tools import removed - now using build_tools_for_user() for closure pattern
