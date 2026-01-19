@@ -24,8 +24,8 @@ if settings.langchain_api_key:
 else:
     log.warning("LangSmith API key not configured - tracing disabled")
 
-from langchain.agents import (
-    AgentExecutor,  # type: ignore[attr-defined]
+from langchain.agents import (  # type: ignore[attr-defined]
+    AgentExecutor,
     create_tool_calling_agent,
 )
 
