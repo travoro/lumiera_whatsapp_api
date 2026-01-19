@@ -2,12 +2,14 @@
 
 from typing import Any, Dict, Optional
 
-from langchain.agents import (  # isort: skip
+# isort: off
+from langchain.agents import (
     AgentExecutor,  # type: ignore[attr-defined]
     create_tool_calling_agent,  # type: ignore[attr-defined]
 )
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_anthropic import ChatAnthropic
+# isort: on
 
 from src.agent.tools import escalate_to_human_tool
 from src.config import settings

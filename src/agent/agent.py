@@ -24,15 +24,16 @@ if settings.langchain_api_key:
 else:
     log.warning("LangSmith API key not configured - tracing disabled")
 
-from langchain.agents import (  # isort: skip
+# isort: off
+# Import LangChain AFTER setting environment variables
+from langchain.agents import (
     AgentExecutor,  # type: ignore[attr-defined]
     create_tool_calling_agent,  # type: ignore[attr-defined]
 )
-
-# Import LangChain AFTER setting environment variables
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
+# isort: on
 
 # NOTE: all_tools import removed - now using build_tools_for_user() for closure pattern
 
