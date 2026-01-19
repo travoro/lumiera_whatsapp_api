@@ -556,15 +556,13 @@ async def update_task_progress_tool(
         6: "Rejected",
     }
     status_name = status_names.get(status_id, f"ID:{status_id}")
-    log.info(
-        f"🔧 Tool called: update_task_progress_tool(user_id={
+    log.info(f"🔧 Tool called: update_task_progress_tool(user_id={
             user_id[
                 :8]}..., task_id={
             task_id[
                 :8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={
             progress_note is not None}, images={
-            len(image_urls) if image_urls else 0})"
-    )
+            len(image_urls) if image_urls else 0})")
 
     result = await tasks.update_task_progress(
         user_id, task_id, status_id, progress, progress_note, image_urls
@@ -1230,15 +1228,13 @@ def build_tools_for_user(user_id: str, phone_number: str, language: str):
             6: "Rejected",
         }
         status_name = status_names.get(status_id, f"ID:{status_id}")
-        log.info(
-            f"🔧 Tool called: update_task_progress_tool(user_id={
+        log.info(f"🔧 Tool called: update_task_progress_tool(user_id={
                 user_id[
                     :8]}..., task_id={
                 task_id[
                     :8]}..., status_id={status_id} ({status_name}), progress={progress}, has_note={
                         progress_note is not None}, images={
-                            len(image_urls) if image_urls else 0})"
-        )
+                            len(image_urls) if image_urls else 0})")
         get_execution_context().record_tool_call("update_task_progress_tool")
 
         result = await tasks.update_task_progress(

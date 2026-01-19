@@ -62,7 +62,7 @@ pytest-watch==4.2.0
 httpx==0.28.1
 
 # Code Quality
-black==24.10.0
+black==26.1.0
 flake8==7.1.1
 mypy==1.13.0
 isort==5.13.2
