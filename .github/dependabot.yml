@@ -48,6 +48,21 @@ updates:
           - "isort"
           - "pre-commit"
 
+  # Enable version updates for Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    commit-message:
+      prefix: "chore(docker)"
+      include: "scope"
+    # Ignore Python major version updates (test before upgrading Python)
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
