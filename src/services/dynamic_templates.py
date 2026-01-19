@@ -1095,8 +1095,10 @@ class DynamicTemplateService:
             )
 
             if result.data:
+                template_data = cast(Dict[str, Any], result.data[0])
+                created_at_str = cast(str, template_data["created_at"])
                 created_at = datetime.fromisoformat(
-                    result.data[0]["created_at"].replace("Z", "+00:00")
+                    created_at_str.replace("Z", "+00:00")
                 )
                 age = (datetime.now(created_at.tzinfo) - created_at).total_seconds()
                 return age
@@ -1129,11 +1131,11 @@ class DynamicTemplateService:
                 .execute()
             )
 
-            expired_templates = result.data or []
+            expired_templates = cast(List[Dict[str, Any]], result.data) if result.data else []
             stats["found"] = len(expired_templates)
 
             for template in expired_templates:
-                content_sid = template["twilio_content_sid"]
+                content_sid = cast(str, template["twilio_content_sid"])
                 if self.delete_template(content_sid):
                     stats["deleted"] += 1
                 else:
@@ -1304,13 +1306,16 @@ class DynamicTemplateService:
             total_lifecycle = 0.0
             count = 0
 
-            for template in result.data:
+            templates = cast(List[Dict[str, Any]], result.data)
+            for template in templates:
                 if template["created_at"] and template["updated_at"]:
+                    created_at_str = cast(str, template["created_at"])
+                    updated_at_str = cast(str, template["updated_at"])
                     created = datetime.fromisoformat(
-                        template["created_at"].replace("Z", "+00:00")
+                        created_at_str.replace("Z", "+00:00")
                     )
                     updated = datetime.fromisoformat(
-                        template["updated_at"].replace("Z", "+00:00")
+                        updated_at_str.replace("Z", "+00:00")
                     )
                     lifecycle = (updated - created).total_seconds()
                     total_lifecycle += lifecycle
