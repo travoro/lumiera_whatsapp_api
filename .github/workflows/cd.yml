@@ -79,7 +79,7 @@ jobs:
     # Optional: Send Slack/Discord notification
     - name: Notify Slack
       if: ${{ always() }}
-      uses: slackapi/slack-github-action@v1.26.0
+      uses: slackapi/slack-github-action@v2.1.1
       continue-on-error: true
       with:
         payload: |
