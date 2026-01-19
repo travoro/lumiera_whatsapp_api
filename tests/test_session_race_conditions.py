@@ -8,7 +8,6 @@ Tests Phases 1-5 of the race condition remediation:
 """
 
 import asyncio
-from datetime import datetime
 from uuid import uuid4
 
 import pytest
