@@ -131,7 +131,9 @@ class TranscriptionService:
                         transcription_kwargs["language"] = target_language
                         log.info(f"Transcribing with language hint: {target_language}")
 
-                    transcript = self.client.audio.transcriptions.create(**transcription_kwargs)
+                    transcript = self.client.audio.transcriptions.create(
+                        **transcription_kwargs
+                    )
             finally:
                 # Clean up temp file
                 try:
@@ -210,7 +212,9 @@ class TranscriptionService:
                     if target_language:
                         transcription_kwargs["language"] = target_language
 
-                    transcript = self.client.audio.transcriptions.create(**transcription_kwargs)
+                    transcript = self.client.audio.transcriptions.create(
+                        **transcription_kwargs
+                    )
             finally:
                 # Clean up
                 try:
