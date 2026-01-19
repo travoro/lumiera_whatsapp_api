@@ -1051,7 +1051,9 @@ class DynamicTemplateService:
                 .select("twilio_content_sid")
                 .execute()
             )
-            db_data = cast(List[Dict[str, Any]], db_result.data) if db_result.data else []
+            db_data = (
+                cast(List[Dict[str, Any]], db_result.data) if db_result.data else []
+            )
             db_sids = {cast(str, t["twilio_content_sid"]) for t in db_data}
 
             # Find orphaned templates (in Twilio but not in DB)
