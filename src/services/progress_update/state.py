@@ -130,7 +130,8 @@ class ProgressUpdateState:
             )
 
             if response.data:
-                session_id = response.data[0]["id"]
+                session_data = cast(Dict[str, Any], response.data[0])
+                session_id = cast(str, session_data["id"])
                 log.info(
                     f"✅ Created/updated progress update session {session_id} for user {user_id} "
                     f"(task: {task_id})"
@@ -198,12 +199,13 @@ class ProgressUpdateState:
             )
 
             if response.data:
-                session = response.data[0]
+                session = cast(Dict[str, Any], response.data[0])
                 # Check expiration
                 from datetime import timezone
 
+                expires_at_str = cast(str, session["expires_at"])
                 expires_at = datetime.fromisoformat(
-                    session["expires_at"].replace("Z", "+00:00")
+                    expires_at_str.replace("Z", "+00:00")
                 )
 
                 # Ensure timezone-aware comparison
@@ -417,8 +419,10 @@ class ProgressUpdateState:
                 return 0
 
             cleaned_count = 0
-            for session in response.data:
-                await self.clear_session(session["subcontractor_id"], reason="expired")
+            sessions = cast(list[Dict[str, Any]], response.data)
+            for session in sessions:
+                subcontractor_id = cast(str, session["subcontractor_id"])
+                await self.clear_session(subcontractor_id, reason="expired")
                 cleaned_count += 1
 
             if cleaned_count > 0:
