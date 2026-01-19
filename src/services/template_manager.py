@@ -1,6 +1,6 @@
 """Template manager for creating dynamic WhatsApp list-picker templates."""
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from twilio.rest import Client
 
@@ -233,7 +233,8 @@ class TemplateManager:
                 )
 
             if result.data:
-                content_sid = result.data["twilio_content_sid"]
+                data = cast(Dict[str, Any], result.data)
+                content_sid = cast(str, data["twilio_content_sid"])
                 log.info(
                     f"Retrieved template from database: {cache_key} (SID: {content_sid})"
                 )
