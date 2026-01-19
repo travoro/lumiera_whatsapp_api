@@ -38,7 +38,7 @@ python-dateutil==2.9.0
 
 # Logging & Monitoring
 loguru==0.7.3
-langsmith==0.1.147
+langsmith>=0.3.45,<1.0.0  # Required by langchain-core 0.3.27+
 
 # Error Tracking (Optional)
 sentry-sdk==2.19.2
