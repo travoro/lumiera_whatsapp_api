@@ -1131,7 +1131,9 @@ class DynamicTemplateService:
                 .execute()
             )
 
-            expired_templates = cast(List[Dict[str, Any]], result.data) if result.data else []
+            expired_templates = (
+                cast(List[Dict[str, Any]], result.data) if result.data else []
+            )
             stats["found"] = len(expired_templates)
 
             for template in expired_templates:
