@@ -61,7 +61,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
                     "title", "Unknown Task"
                 )
 
-                return """✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+                return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
 Project: {project_name}
 Task ID: {active_task_id}
