@@ -24,7 +24,10 @@ if settings.langchain_api_key:
 else:
     log.warning("LangSmith API key not configured - tracing disabled")
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent  # type: ignore[attr-defined]
+from langchain.agents import (  # isort: skip
+    AgentExecutor,  # type: ignore[attr-defined]
+    create_tool_calling_agent,  # type: ignore[attr-defined]
+)
 
 # Import LangChain AFTER setting environment variables
 from langchain_anthropic import ChatAnthropic

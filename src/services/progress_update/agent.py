@@ -2,7 +2,10 @@
 
 from typing import Any, Dict, Optional
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent  # type: ignore[attr-defined]
+from langchain.agents import (  # isort: skip
+    AgentExecutor,  # type: ignore[attr-defined]
+    create_tool_calling_agent,  # type: ignore[attr-defined]
+)
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_anthropic import ChatAnthropic
 
