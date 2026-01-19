@@ -5,11 +5,12 @@ pydantic==2.9.2
 pydantic-settings==2.6.1
 
 # LangChain & AI
-langchain-core==0.3.30  # Explicitly pin core version
-langchain==0.3.13
-langchain-anthropic==0.3.3
-langchain-openai==0.2.14
-langchain-community==0.3.13
+# Using latest 0.3.x versions - AgentExecutor deprecated but still available
+langchain-core<0.4.0,>=0.3.27
+langchain<0.4.0,>=0.3.27
+langchain-anthropic<0.4.0,>=0.3.3
+langchain-openai<0.4.0,>=0.2.14
+langchain-community<0.4.0,>=0.3.27
 anthropic>=0.41.0
 
 # Twilio for WhatsApp
