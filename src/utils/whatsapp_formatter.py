@@ -29,7 +29,11 @@ TRANSLATIONS = {
             "Vous pouvez m'envoyer les éléments un par un, je vous guiderai pas à pas."
         ),
         "menu_items": [
-            {"title": "🏗️ Voir mes chantiers", "id": "view_sites_fr", "description": ""},
+            {
+                "title": "🏗️ Voir mes chantiers",
+                "id": "view_sites_fr",
+                "description": "",
+            },
             {
                 "title": "✅ Consulter mes taches",
                 "id": "view_tasks_fr",
