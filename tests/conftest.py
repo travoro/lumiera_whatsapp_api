@@ -361,7 +361,7 @@ def setup_test_environment(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-async def cleanup_after_test():
+def cleanup_after_test():
     """Cleanup resources after each test."""
     yield
     # Add any necessary cleanup here
