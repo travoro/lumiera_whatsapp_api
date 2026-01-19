@@ -160,7 +160,11 @@ class SupabaseClient:
                 log.info(
                     f"Updated subcontractor {existing_user['id']} language to {language}"
                 )
-                return cast(Dict[str, Any], response.data[0]) if response.data else existing_user
+                return (
+                    cast(Dict[str, Any], response.data[0])
+                    if response.data
+                    else existing_user
+                )
             else:
                 # Subcontractor not found - cannot auto-create
                 log.warning(
