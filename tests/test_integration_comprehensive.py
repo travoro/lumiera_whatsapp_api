@@ -110,9 +110,7 @@ def mock_planradar():
 
 
 @pytest.fixture
-def setup_test_environment(
-    mock_twilio, mock_supabase, mock_anthropic, mock_planradar
-):
+def setup_test_environment(mock_twilio, mock_supabase, mock_anthropic, mock_planradar):
     """Setup complete test environment with all mocks."""
     # Enable FSM for tests
     with patch("src.config.settings.enable_fsm", True):
