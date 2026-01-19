@@ -26,7 +26,7 @@ else:
 
 # isort: off
 # Import LangChain AFTER setting environment variables
-from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent  # type: ignore[attr-defined]
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI

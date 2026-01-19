@@ -3,7 +3,7 @@
 from typing import Any, Dict, Optional
 
 # isort: off
-from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent  # type: ignore[attr-defined]
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_anthropic import ChatAnthropic
 
