@@ -2,17 +2,23 @@
 
 from typing import Any, Dict, Optional
 
-from langchain.agents import (AgentExecutor,  # type: ignore[attr-defined]
-                              create_tool_calling_agent)
+from langchain.agents import (
+    AgentExecutor,  # type: ignore[attr-defined]
+    create_tool_calling_agent,
+)
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_anthropic import ChatAnthropic
 
 from src.agent.tools import escalate_to_human_tool
 from src.config import settings
 from src.services.progress_update.tools import (
-    add_progress_comment_tool, add_progress_image_tool,
-    get_active_task_context_tool, get_progress_update_context_tool,
-    mark_task_complete_tool, start_progress_update_session_tool)
+    add_progress_comment_tool,
+    add_progress_image_tool,
+    get_active_task_context_tool,
+    get_progress_update_context_tool,
+    mark_task_complete_tool,
+    start_progress_update_session_tool,
+)
 from src.utils.logger import log
 
 PROGRESS_UPDATE_PROMPT = """Tu es un assistant spécialisé pour guider les utilisateurs dans la mise à jour de leurs tâches.

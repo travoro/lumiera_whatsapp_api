@@ -6,6 +6,7 @@ from typing import Any, Dict
 # === Agent Execution Context ===
 # Thread-safe execution context (replaces global mutable dict)
 from src.agent.execution_context import execution_context_scope
+
 # === LangSmith Integration ===
 # CRITICAL: Set environment variables BEFORE importing LangChain modules
 # LangChain checks these during import, so they must be set first
@@ -23,8 +24,11 @@ if settings.langchain_api_key:
 else:
     log.warning("LangSmith API key not configured - tracing disabled")
 
-from langchain.agents import (AgentExecutor,  # type: ignore[attr-defined]
-                              create_tool_calling_agent)
+from langchain.agents import (
+    AgentExecutor,  # type: ignore[attr-defined]
+    create_tool_calling_agent,
+)
+
 # Import LangChain AFTER setting environment variables
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
