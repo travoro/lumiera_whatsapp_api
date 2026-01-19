@@ -70,8 +70,10 @@ class PlanRadarClient:
                 duration_ms = int((time.time() - start_time) * 1000)
 
                 # Log response status with timing
-                log.info(f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {
-                        response.status_code} | Duration: {duration_ms}ms")
+                log.info(
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | COMPLETE | Status: {
+                        response.status_code} | Duration: {duration_ms}ms"
+                )
 
                 response.raise_for_status()
                 result = response.json()
@@ -132,9 +134,11 @@ class PlanRadarClient:
                 # Return special error structure for rate limits
                 return {"_rate_limited": True, "error": "Rate limit exceeded"}
             else:
-                log.error(f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {
+                log.error(
+                    f"🔵 PLANRADAR_API_CALL #{request_id} | ERROR | {
                         e.response.status_code} {
-                        e.response.reason_phrase} | Duration: {duration_ms}ms")
+                        e.response.reason_phrase} | Duration: {duration_ms}ms"
+                )
                 log.error(f"   URL was: {url}")
                 try:
                     error_body = e.response.json()

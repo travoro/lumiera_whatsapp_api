@@ -113,9 +113,11 @@ async def handle_list_tasks(
 
             if fuzzy_result:
                 mentioned_project_id = fuzzy_result["project_id"]
-                log.info(f"✅ Fuzzy match: '{message_text}' → '{
+                log.info(
+                    f"✅ Fuzzy match: '{message_text}' → '{
                         fuzzy_result['project_name']}' (confidence: {
-                        fuzzy_result['confidence']:.2%})")
+                        fuzzy_result['confidence']:.2%})"
+                )
             else:
                 log.debug(f"❌ Fuzzy match failed for '{message_text}'")
 
@@ -550,9 +552,11 @@ async def handle_task_details(
         desc_result = await task_actions.get_task_description(user_id, selected_task_id)
         images_result = await task_actions.get_task_images(user_id, selected_task_id)
 
-        log.info(f"📊 Description result: success={
+        log.info(
+            f"📊 Description result: success={
                 desc_result.get('success')}, has_data={
-                desc_result.get('data') is not None}")
+                desc_result.get('data') is not None}"
+        )
         log.info(
             f"📊 Images result: success={images_result.get('success')}, data_count={len(images_result.get('data', []))}"
         )
@@ -695,10 +699,12 @@ async def handle_task_details(
             )
         else:
             message += "\n\n📎 Aucune pièce jointe disponible pour cette tâche."
-            log.warning(f"⚠️ No attachments to display (success={
+            log.warning(
+                f"⚠️ No attachments to display (success={
                     images_result.get('success')}, has_data={
                     bool(
-                        images_result.get('data'))})")
+                        images_result.get('data'))})"
+            )
 
         result = {
             "message": message,
