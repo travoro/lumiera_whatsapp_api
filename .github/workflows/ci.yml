@@ -44,6 +44,28 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Debug langchain installation
+      run: |
+        echo "=== Checking installed langchain version ==="
+        pip show langchain langchain-core langchain-anthropic
+        echo ""
+        echo "=== Checking langchain.agents module ==="
+        python -c "import langchain; print(f'langchain version: {langchain.__version__}')"
+        python -c "import langchain.agents; print(f'langchain.agents.__file__: {langchain.agents.__file__}')"
+        python -c "import langchain.agents; print(f'Available in langchain.agents: {[x for x in dir(langchain.agents) if not x.startswith(\"_\")]}')"
+        echo ""
+        echo "=== Checking if AgentExecutor exists elsewhere ==="
+        python -c "try:
+            from langchain.agents.agent import AgentExecutor
+            print('✓ Found in langchain.agents.agent')
+        except ImportError as e:
+            print(f'✗ Not in langchain.agents.agent: {e}')"
+        python -c "try:
+            from langchain_core.agents import AgentExecutor
+            print('✓ Found in langchain_core.agents')
+        except ImportError as e:
+            print(f'✗ Not in langchain_core.agents: {e}')"
+
     - name: Create test environment file
       run: |
         cat > .env.test << EOF
