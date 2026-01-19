@@ -110,7 +110,7 @@ def mock_planradar():
 
 
 @pytest.fixture
-async def setup_test_environment(
+def setup_test_environment(
     mock_twilio, mock_supabase, mock_anthropic, mock_planradar
 ):
     """Setup complete test environment with all mocks."""
