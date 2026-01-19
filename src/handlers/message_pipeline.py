@@ -4,7 +4,7 @@ Breaks down message processing into discrete, testable stages.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from src.agent.agent import lumiera_agent
 from src.exceptions import (
@@ -587,7 +587,7 @@ class MessagePipeline:
             )
 
             if result.data and len(result.data) > 0:
-                session = result.data[0]
+                session = cast(Dict[str, Any], result.data[0])
 
                 # Extract FSM context
                 ctx.active_session_id = session["id"]

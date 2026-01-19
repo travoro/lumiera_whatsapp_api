@@ -1,7 +1,7 @@
 """Supabase client for database operations."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from supabase import Client, create_client
 
@@ -37,7 +37,7 @@ class SupabaseClient:
             )
 
             if response.data and len(response.data) > 0:
-                return response.data[0]
+                return cast(Dict[str, Any], response.data[0])
             return None
         except Exception as e:
             log.error(f"Error getting subcontractor {user_id}: {e}")
@@ -89,7 +89,7 @@ class SupabaseClient:
             )
 
             if response.data and len(response.data) > 0:
-                return response.data[0]
+                return cast(Dict[str, Any], response.data[0])
             return None
         except Exception as e:
             log.error(f"Error getting subcontractor by phone: {e}")
@@ -160,7 +160,7 @@ class SupabaseClient:
                 log.info(
                     f"Updated subcontractor {existing_user['id']} language to {language}"
                 )
-                return response.data[0] if response.data else existing_user
+                return cast(Dict[str, Any], response.data[0]) if response.data else existing_user
             else:
                 # Subcontractor not found - cannot auto-create
                 log.warning(
@@ -318,7 +318,7 @@ class SupabaseClient:
             log.info(
                 f"Retrieved {len(response.data) if response.data else 0} projects for user {user_id}"
             )
-            return response.data if response.data else []
+            return cast(List[Dict[str, Any]], response.data) if response.data else []
         except Exception as e:
             log.error(f"Error listing projects for user {user_id}: {e}")
             return []
@@ -344,7 +344,7 @@ class SupabaseClient:
             response = query.execute()
 
             if response.data and len(response.data) > 0:
-                return response.data[0]
+                return cast(Dict[str, Any], response.data[0])
             return None
         except Exception as e:
             log.error(f"Error getting project {project_id}: {e}")
@@ -370,9 +370,10 @@ class SupabaseClient:
                 return []
 
             # Filter for escalation messages
+            messages = cast(List[Dict[str, Any]], response.data)
             escalations = [
                 msg
-                for msg in response.data
+                for msg in messages
                 if msg.get("metadata", {}).get("is_escalation", False)
             ]
 
@@ -409,9 +410,10 @@ class SupabaseClient:
 
             if response.data:
                 # Filter out messages with null or empty content
+                messages_data = cast(List[Dict[str, Any]], response.data)
                 valid_messages = [
                     msg
-                    for msg in response.data
+                    for msg in messages_data
                     if msg.get("content") and msg["content"].strip()
                 ]
 
@@ -496,7 +498,7 @@ class SupabaseClient:
             result = self.client.rpc(
                 "get_or_create_session", {"p_subcontractor_id": subcontractor_id}
             ).execute()
-            return result.data if result.data else None
+            return cast(Optional[str], result.data) if result.data else None
         except Exception as e:
             log.error(f"Error calling get_or_create_session RPC: {e}")
             return None
@@ -519,7 +521,7 @@ class SupabaseClient:
             )
 
             if response.data and len(response.data) > 0:
-                return response.data[0]
+                return cast(Dict[str, Any], response.data[0])
             return None
         except Exception as e:
             log.error(f"Error getting session {session_id}: {e}")
@@ -541,7 +543,7 @@ class SupabaseClient:
             response = self.client.table("conversation_sessions").insert(data).execute()
 
             if response.data and len(response.data) > 0:
-                return response.data[0]
+                return cast(Dict[str, Any], response.data[0])
             return None
         except Exception as e:
             log.error(f"Error creating session: {e}")
@@ -600,7 +602,7 @@ class SupabaseClient:
             result = self.client.rpc(
                 "generate_session_summary", {"p_session_id": session_id}
             ).execute()
-            return result.data if result.data else None
+            return cast(Optional[str], result.data) if result.data else None
         except Exception as e:
             log.error(f"Error calling generate_session_summary RPC: {e}")
             return None
@@ -624,7 +626,7 @@ class SupabaseClient:
                 .eq("session_id", session_id)
                 .execute()
             )
-            return response.data if response.data else []
+            return cast(List[Dict[str, Any]], response.data) if response.data else []
         except Exception as e:
             log.error(f"Error getting messages for session {session_id}: {e}")
             return []
@@ -647,7 +649,7 @@ class SupabaseClient:
                 .eq("subcontractor_id", subcontractor_id)
                 .execute()
             )
-            return response.data if response.data else []
+            return cast(List[Dict[str, Any]], response.data) if response.data else []
         except Exception as e:
             log.error(f"Error getting sessions for user {subcontractor_id}: {e}")
             return []
@@ -678,7 +680,7 @@ class SupabaseClient:
                 .execute()
             )
 
-            return response.data if response.data else None
+            return cast(Dict[str, Any], response.data) if response.data else None
         except Exception as e:
             log.warning(f"Template not found or error: {e}")
             return None
@@ -725,7 +727,8 @@ class SupabaseClient:
 
             if response.data:
                 messages = []
-                for msg in reversed(response.data):  # Chronological order
+                messages_data = cast(List[Dict[str, Any]], response.data)
+                for msg in reversed(messages_data):  # Chronological order
                     # Skip messages with empty content (e.g., image-only messages)
                     # Claude API requires all messages to have non-empty content
                     if not msg["content"] or not msg["content"].strip():
