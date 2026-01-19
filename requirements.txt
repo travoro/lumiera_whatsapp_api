@@ -6,6 +6,7 @@ pydantic-settings==2.6.1
 
 # LangChain & AI
 langchain==0.3.13
+langchain-classic>=0.3.0  # Provides deprecated AgentExecutor for compatibility
 langchain-anthropic==0.3.3
 langchain-openai==0.2.14
 langchain-community==0.3.13
