@@ -1,5 +1,7 @@
 """Specialized LangChain tools for progress update agent."""
 
+from typing import Optional
+
 from langchain.tools import tool
 
 from src.actions.tasks import list_tasks
@@ -375,19 +377,36 @@ async def mark_task_complete_tool(user_id: str) -> str:
 
 @tool
 async def start_progress_update_session_tool(
-    user_id: str, task_id: str, project_id: str
+    user_id: str, task_id: Optional[str] = None, project_id: Optional[str] = None
 ) -> str:
     """Start a new progress update session for a specific task.
 
+    CRITICAL: Only call this tool when you have BOTH task_id AND project_id from get_active_task_context_tool output.
+    DO NOT call this tool if task_id or project_id is None, empty, or missing.
+    If you don't have these IDs, you MUST ask the user to select a task first using get_active_task_context_tool.
+
     Args:
-        user_id: User ID
-        task_id: Task ID to update
-        project_id: PlanRadar project ID
+        user_id: User ID (required)
+        task_id: Task ID from get_active_task_context_tool (REQUIRED - do not pass None)
+        project_id: PlanRadar project ID from get_active_task_context_tool (REQUIRED - do not pass None)
 
     Returns:
         Success message with action menu or error message
     """
     try:
+        # Validation: Ensure we have valid IDs
+        if not task_id or not project_id:
+            log.error(
+                f"❌ start_progress_update_session_tool called with missing IDs: task_id={task_id}, project_id={project_id}"
+            )
+            return """❌ ERREUR: Impossible de démarrer la session sans task_id et project_id.
+
+AGENT: Tu dois d'abord:
+1. Appeler get_active_task_context_tool pour obtenir le task_id et project_id
+2. OU demander à l'utilisateur de sélectionner une tâche
+3. NE JAMAIS appeler start_progress_update_session_tool sans ces informations!
+
+Dis à l'utilisateur: "Désolé, je rencontre un problème technique. Pouvez-vous me dire sur quelle tâche vous travaillez ?" """
         # Create session
         session_id = await progress_update_state.create_session(
             user_id=user_id, task_id=task_id, project_id=project_id
