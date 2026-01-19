@@ -94,18 +94,18 @@ class TranscriptionService:
         audio_url: str,
         target_language: Optional[str] = None,
     ) -> Optional[str]:
-        """Transcribe audio from URL to text in original language.
+        """Transcribe audio from URL to text with language hint for better accuracy.
 
         Args:
             audio_url: URL of audio file to transcribe
-            target_language: Target language code (used for logging only)
+            target_language: ISO-639-1 language code (e.g. "fr", "en", "es") to hint Whisper for better accuracy
 
         Returns:
-            Transcribed text in original language or None if transcription fails
+            Transcribed text or None if transcription fails
 
         Note:
-            This transcribes in the ORIGINAL language. Translation to French
-            happens later in the pipeline (Stage 5).
+            Passing the user's language to Whisper improves transcription accuracy.
+            Whisper will still auto-detect if the hint is wrong, but benefits from the hint.
         """
         try:
             # Download audio file
@@ -119,14 +119,19 @@ class TranscriptionService:
                 temp_file_path = temp_file.name
 
             try:
-                # Transcribe using Whisper (original language only)
+                # Transcribe using Whisper with language hint for better accuracy
                 with open(temp_file_path, "rb") as audio_file:
-                    transcript = self.client.audio.transcriptions.create(
-                        model=self.model,
-                        file=audio_file,
-                        response_format="text",
-                        # language parameter removed - let Whisper auto-detect the language
-                    )
+                    # Pass language hint to Whisper if available
+                    transcription_kwargs = {
+                        "model": self.model,
+                        "file": audio_file,
+                        "response_format": "text",
+                    }
+                    if target_language:
+                        transcription_kwargs["language"] = target_language
+                        log.info(f"Transcribing with language hint: {target_language}")
+
+                    transcript = self.client.audio.transcriptions.create(**transcription_kwargs)
             finally:
                 # Clean up temp file
                 try:
@@ -153,19 +158,19 @@ class TranscriptionService:
         target_language: Optional[str] = None,
         content_type: str = "audio/ogg",
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        """Download, store, and transcribe audio file.
+        """Download, store, and transcribe audio file with language hint for better accuracy.
 
         Args:
             audio_url: URL of audio file (e.g., from Twilio)
             user_id: User ID for storage organization
             message_sid: Message SID for unique filename
-            target_language: Language code for transcription hint (unused, kept for compatibility)
+            target_language: ISO-639-1 language code (e.g. "fr") to hint Whisper for better transcription accuracy
             content_type: MIME type of audio
 
         Returns:
             Tuple of (transcribed_text, storage_url, detected_language)
             Any can be None if that step fails
-            detected_language is the ISO 639-1 code detected by Whisper
+            detected_language is the ISO 639-1 code detected by language detection service
         """
         try:
             # Download audio
@@ -191,17 +196,21 @@ class TranscriptionService:
                 log.info("   → response_format: verbose_json")
                 log.info(f"   → target_language (received): {target_language}")
                 log.info(
-                    "   → language parameter (sending to Whisper): NOT PASSED (Whisper auto-detects)"
+                    f"   → language parameter (sending to Whisper): {target_language if target_language else 'NOT PASSED (auto-detect)'}"
                 )
 
                 with open(temp_file_path, "rb") as audio_file:
                     # Use verbose_json to get detected language from Whisper
-                    transcript = self.client.audio.transcriptions.create(
-                        model=self.model,
-                        file=audio_file,
-                        response_format="verbose_json",
-                        # No language parameter - let Whisper auto-detect
-                    )
+                    # Pass language hint if available for better accuracy
+                    transcription_kwargs = {
+                        "model": self.model,
+                        "file": audio_file,
+                        "response_format": "verbose_json",
+                    }
+                    if target_language:
+                        transcription_kwargs["language"] = target_language
+
+                    transcript = self.client.audio.transcriptions.create(**transcription_kwargs)
             finally:
                 # Clean up
                 try:
