@@ -7,7 +7,7 @@ with full emoji support.
 
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -225,9 +225,10 @@ class DynamicTemplateService:
             )
 
             if result.data:
-                template_data = result.data[0]
+                template_data = cast(Dict[str, Any], result.data[0])
+                created_at_str = cast(str, template_data["created_at"])
                 created_at = datetime.fromisoformat(
-                    template_data["created_at"].replace("Z", "+00:00")
+                    created_at_str.replace("Z", "+00:00")
                 )
 
                 return {
@@ -933,7 +934,7 @@ class DynamicTemplateService:
                 .execute()
             )
 
-            return result.data if result.data else []
+            return cast(List[Dict[str, Any]], result.data) if result.data else []
 
         except Exception as e:
             log.error(f"❌ Error getting pending deletions: {e}")
@@ -1050,7 +1051,8 @@ class DynamicTemplateService:
                 .select("twilio_content_sid")
                 .execute()
             )
-            db_sids = {t["twilio_content_sid"] for t in (db_result.data or [])}
+            db_data = cast(List[Dict[str, Any]], db_result.data) if db_result.data else []
+            db_sids = {cast(str, t["twilio_content_sid"]) for t in db_data}
 
             # Find orphaned templates (in Twilio but not in DB)
             for template in twilio_templates:

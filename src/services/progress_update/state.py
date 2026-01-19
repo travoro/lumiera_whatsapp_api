@@ -1,7 +1,7 @@
 """Progress update session state management."""
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
@@ -55,7 +55,8 @@ class ProgressUpdateState:
 
             # Log detailed result for debugging
             if result and result.data:
-                inserted_id = result.data[0]["id"]
+                inserted_data = cast(Dict[str, Any], result.data[0])
+                inserted_id = cast(str, inserted_data["id"])
                 log.info(
                     f"📊 FSM Transition logged: {from_state} → {to_state} (trigger: {trigger}, session: {session_id}, id: {inserted_id})"
                 )
