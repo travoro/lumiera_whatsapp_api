@@ -15,6 +15,18 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
+    # Ignore langchain major version updates (1.x breaks AgentExecutor)
+    ignore:
+      - dependency-name: "langchain"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "langchain-core"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "langchain-anthropic"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "langchain-openai"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "langchain-community"
+        update-types: ["version-update:semver-major"]
     # Group minor and patch updates
     groups:
       dev-dependencies:
