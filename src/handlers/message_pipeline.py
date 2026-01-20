@@ -815,156 +815,19 @@ class MessagePipeline:
 
                 return await self._standard_intent_classification(ctx)
 
-            # === USE CONTEXT CLASSIFIER (only when expecting response) ===
+            # === CONTINUE ACTIVE SESSION ===
+            # We have an active session in a state that expects user response
+            # Let the specialized agent handle the message - it will determine if
+            # the message is in-context or if the user wants to do something else
 
-            log.info("🤖 Using context classifier to determine message context")
+            log.info("✅ Continuing active session - letting specialized agent handle")
 
-            from src.services.context_classifier import context_classifier
+            ctx.intent = active_session["primary_intent"]
+            ctx.confidence = 0.95
+            ctx.session_continuation = True
 
-            # Use LLM to classify context
-            context_result = await context_classifier.classify_message_context(
-                message=ctx.message_in_french,
-                session_type=active_session["type"],
-                session_state=active_session.get("fsm_state", "unknown"),
-                last_bot_message=ctx.last_bot_message or "",
-                expecting_response=active_session.get("expecting_response", False),
-                session_metadata=None,
-                user_language=ctx.user_language,
-            )
-
-            context_classification = context_result.get("context")
-            confidence = context_result.get("confidence", 0.0)
-
-            # === DECISION LOGIC ===
-
-            if context_classification == "IN_CONTEXT" and confidence >= 0.7:
-                # ✅ Continue specialized flow
-                ctx.intent = active_session["primary_intent"]
-                ctx.confidence = 0.95
-                ctx.session_continuation = True
-                log.info(f"✅ Staying in {ctx.intent} flow")
-                return Result.ok(None)
-
-            elif context_classification == "OUT_OF_CONTEXT" and confidence >= 0.7:
-                # 🚪 Intent change detected
-
-                log.info(
-                    f"🚪 Intent change: {context_result.get('intent_change_type')}"
-                )
-
-                # === SPECIAL: ISSUE DETECTED ===
-                if context_result.get("suggest_user_choice"):
-                    issue_severity = context_result.get("issue_severity")
-                    issue_desc = context_result.get("issue_description")
-                    log.info(
-                        f"💡 Issue detected - presenting user with choices\n"
-                        f"   Severity: {issue_severity}\n"
-                        f"   Description: {issue_desc}\n"
-                        f"   Original message: {ctx.message_in_french[:50]}..."
-                    )
-
-                    # Set special intent
-                    ctx.intent = "handle_detected_issue"
-                    ctx.confidence = 0.9
-                    ctx.stay_in_session = True  # Don't exit yet
-
-                    ctx.suggestion_context = {
-                        "issue_detected": True,
-                        "issue_severity": issue_severity,
-                        "issue_description": issue_desc,
-                        "original_message": ctx.message_in_french,
-                        "from_session": active_session["type"],
-                        "session_id": active_session["id"],
-                    }
-
-                    log.info(
-                        "✅ Intent set to 'handle_detected_issue', "
-                        "staying in session until user chooses"
-                    )
-                    return Result.ok(None)
-
-                # === SPECIAL: TASK/PROJECT SWITCH ===
-                if context_result.get("suggest_task_switch"):
-                    log.info("🔄 User wants to switch task/project")
-
-                    # Exit session
-                    await self._exit_specialized_session(
-                        user_id=ctx.user_id,
-                        session_id=active_session["id"],
-                        session_type=active_session["type"],
-                        reason="user_initiated_switch",
-                    )
-
-                    # Route based on change type
-                    intent_change = context_result.get("intent_change_type")
-
-                    if intent_change == "change_project":
-                        ctx.intent = "list_projects"
-                        ctx.confidence = 0.9
-                    elif intent_change == "change_task":
-                        ctx.intent = "list_tasks"
-                        ctx.confidence = 0.9
-                    else:
-                        ctx.intent = "general"
-                        ctx.confidence = 0.7
-
-                    log.info(f"🔄 Re-routed to: {ctx.intent}")
-                    return Result.ok(None)
-
-                # === OTHER INTENT CHANGE ===
-                intent_change = context_result.get("intent_change_type")
-
-                if intent_change == "report_incident":
-                    ctx.intent = "report_incident"
-                    ctx.confidence = 0.9
-                elif intent_change == "view_documents":
-                    ctx.intent = "view_documents"
-                    ctx.confidence = 0.9
-                elif intent_change == "escalate":
-                    ctx.intent = "escalate"
-                    ctx.confidence = 0.9
-                else:
-                    # General - exit session, clear context, then re-classify
-                    log.info(
-                        "🔄 General intent change - exiting session and re-classifying"
-                    )
-                    await self._exit_specialized_session(
-                        user_id=ctx.user_id,
-                        session_id=active_session["id"],
-                        session_type=active_session["type"],
-                        reason="intent_change_general",
-                    )
-
-                    # Clear FSM context from ctx so intent classifier doesn't get biased
-                    ctx.active_session_id = None
-                    ctx.fsm_state = None
-                    ctx.expecting_response = False
-                    ctx.should_continue_session = False
-                    log.info(
-                        "   🧹 Cleared FSM context from ctx for fresh classification"
-                    )
-
-                    return await self._standard_intent_classification(ctx)
-
-                # Exit session (for specific intent changes: report_incident, view_documents, escalate)
-                await self._exit_specialized_session(
-                    user_id=ctx.user_id,
-                    session_id=active_session["id"],
-                    session_type=active_session["type"],
-                    reason="intent_change",
-                )
-
-                log.info(f"✅ Session exited, new intent: {ctx.intent}")
-                return Result.ok(None)
-
-            else:
-                # Ambiguous - keep session, let agent handle
-                ctx.intent = active_session["primary_intent"]
-                ctx.confidence = 0.5
-                ctx.session_continuation = True
-                ctx.context_ambiguous = True
-                log.info("❓ Ambiguous context - keeping session")
-                return Result.ok(None)
+            log.info(f"✅ Staying in {ctx.intent} flow (agent will handle context)")
+            return Result.ok(None)
 
         except Exception as e:
             return Result.from_exception(e)
