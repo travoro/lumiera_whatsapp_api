@@ -295,7 +295,7 @@ async def handle_update_progress(
     """
     log.info(f"🚀 FAST PATH: Handling update progress for {user_id}")
 
-    # 🛡️ CRITICAL CHECK: If user has active task, defer to specialized agent
+    # 🛡️ CRITICAL CHECK 1: If user has active task, defer to specialized agent
     # The specialized agent will show confirmation: "Update task X? 1. Oui / 2. Non"
     from src.services.project_context import project_context_service
 
@@ -307,7 +307,76 @@ async def handle_update_progress(
         )
         return None  # Let specialized agent handle confirmation flow
 
-    log.info("📋 No active task - proceeding with project/task selection")
+    log.info("📋 No active task - checking for active project")
+
+    # 🛡️ CRITICAL CHECK 2: If user has active project, show tasks for that project
+    # This skips project selection and goes straight to task selection
+    active_project_id = await project_context_service.get_active_project(user_id)
+    if active_project_id:
+        log.info(
+            f"✅ Active project exists ({active_project_id[:8]}...) - "
+            "showing task list directly"
+        )
+
+        # Get project details
+        from src.integrations.supabase import supabase_client
+
+        project = await supabase_client.get_project(active_project_id, user_id=user_id)
+        if not project:
+            log.warning("⚠️ Active project not found in DB - clearing context")
+            await project_context_service.clear_active_project(user_id)
+            # Fall through to project selection below
+        else:
+            project_name = project.get("nom", "Unknown Project")
+            planradar_project_id = project.get("planradar_project_id")
+
+            # Get tasks for active project
+            from src.actions import tasks as task_actions
+
+            task_result = await task_actions.list_tasks(user_id, active_project_id)
+
+            if task_result["success"] and task_result["data"]:
+                tasks = task_result["data"]
+
+                # Build message
+                from src.utils.metadata_helpers import compact_tasks
+
+                message = get_translation("fr", "update_progress_header")
+                message += f"\n\n📍 Projet actif : **{project_name}**\n\n"
+                message += "Quelle tâche souhaitez-vous mettre à jour ?\n\n"
+
+                for i, task in enumerate(tasks[:10], 1):
+                    progress = task.get("progress", 0)
+                    message += f"{i}. {task['title']} ({progress}%)\n"
+
+                message += get_translation("fr", "update_progress_footer")
+
+                return {
+                    "message": message,
+                    "tool_outputs": [
+                        {
+                            "tool": "list_tasks_tool",
+                            "input": {
+                                "user_id": user_id,
+                                "project_id": active_project_id,
+                            },
+                            "output": compact_tasks(tasks),
+                        }
+                    ],
+                    "list_type": "tasks",
+                    "fast_path": True,
+                    "escalation": False,
+                    "tools_called": [],
+                }
+            else:
+                # Active project has no tasks → Show project list
+                log.info(
+                    f"⚠️ Active project '{project_name}' has no tasks - "
+                    "showing project list"
+                )
+                # Fall through to project selection below
+
+    log.info("📋 No active task/project - showing project list")
 
     try:
         # Use helper to get projects and context

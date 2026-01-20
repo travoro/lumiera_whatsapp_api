@@ -17,7 +17,7 @@ class ProjectContextService:
     """
 
     PROJECT_EXPIRATION_HOURS = 7
-    TASK_EXPIRATION_HOURS = 24  # 24 hours - users work on tasks throughout the day
+    TASK_EXPIRATION_HOURS = 4  # 4 hours - active task context
 
     def __init__(self):
         """Initialize project context service."""
@@ -217,7 +217,7 @@ class ProjectContextService:
 
         Returns None if:
         - No active task is set
-        - Active task has expired (>1 hour since last activity)
+        - Active task has expired (>4 hours since last activity)
 
         Args:
             user_id: Subcontractor ID (UUID)
@@ -238,9 +238,9 @@ class ProjectContextService:
             if not active_task_id:
                 return None
 
-            # Check if expired (1 hour for tasks)
+            # Check if expired (4 hours for tasks)
             if self._is_expired(last_activity, self.TASK_EXPIRATION_HOURS):
-                log.info(f"Active task context expired for user {user_id} (>1 hour)")
+                log.info(f"Active task context expired for user {user_id} (>4 hours)")
                 await self.clear_active_task(user_id)
                 return None
 
@@ -329,7 +329,7 @@ class ProjectContextService:
 
         Args:
             last_activity: ISO format timestamp string
-            expiration_hours: Number of hours before expiration (7 for projects, 1 for tasks)
+            expiration_hours: Number of hours before expiration (7 for projects, 4 for tasks)
 
         Returns:
             True if expired or no activity, False otherwise
