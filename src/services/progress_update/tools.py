@@ -48,7 +48,7 @@ async def get_active_task_context_tool(user_id: str) -> str:
                 return "❌ Project not found. Please select a project first."
 
             planradar_project_id = project.get("planradar_project_id")
-            project_name = project.get("name", "Unknown Project")
+            project_name = project.get("nom", "Unknown Project")
 
             # Now get task details from PlanRadar using the project ID
             from src.integrations.planradar import planradar_client
@@ -74,7 +74,7 @@ Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le
 2. Non, autre tâche"
 
 IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
-IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
+IMPORTANT: Keep ALL options SHORT (max 20 chars for WhatsApp)! Example: "Oui" / "Autre tâche" (NOT "Changer de tâche")
 - If user says 1 or "oui": USE start_progress_update_session_tool with task_id={active_task_id}, project_id={planradar_project_id}
 - If user says 2 or "non": Ask user if they want to change task in same project OR change project entirely
   * If user says "changer de projet" or "autre projet": Call list_projects_tool to show all projects
@@ -90,7 +90,7 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                 active_project_id, user_id=user_id
             )
             if project:
-                project_name = project.get("name", "Unknown Project")
+                project_name = project.get("nom", "Unknown Project")
                 planradar_project_id = project.get("planradar_project_id")
 
                 # Get tasks for this project
@@ -130,7 +130,7 @@ Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le
 2. Non, autre tâche"
 
 IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
-IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
+IMPORTANT: Keep ALL options SHORT (max 20 chars for WhatsApp)! Example: "Oui" / "Autre tâche" (NOT "Changer de tâche")
 - If user says 1 or "oui": USE start_progress_update_session_tool with task_id={task_id}, project_id={planradar_project_id}
 - If user says 2 or "non": Ask user if they want to change task in same project OR change project entirely
   * If user says "changer de projet" or "autre projet": Call list_projects_tool to show all projects

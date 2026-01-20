@@ -68,6 +68,15 @@ class MessageContext:
     last_bot_options: list = field(default_factory=list)
     should_continue_session: bool = False
 
+    # Context classifier results (for session continuation)
+    session_continuation: bool = False
+    context_ambiguous: bool = False
+    suggestion_context: Optional[Dict[str, Any]] = None
+    stay_in_session: bool = False
+    pending_action: Optional[Dict[str, Any]] = (
+        None  # For interactive choices (issue_choice, etc.)
+    )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for logging."""
         return {
@@ -660,8 +669,235 @@ class MessagePipeline:
             log.warning(f"⚠️ Error checking active session: {e}")
             return Result.ok(None)
 
+    async def _get_active_specialized_session(
+        self, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get active specialized session for user.
+
+        Checks progress_update_sessions table for active session.
+
+        Returns:
+            Dict with session info or None if no active session
+        """
+        try:
+            from src.services.progress_update import progress_update_state
+
+            log.debug(
+                f"🔍 Checking for active specialized session for user {user_id[:8]}..."
+            )
+            session = await progress_update_state.get_session(user_id)
+
+            if session:
+                session_info = {
+                    "id": session["id"],
+                    "type": "progress_update",
+                    "primary_intent": "update_progress",
+                    "task_id": session.get("task_id"),
+                    "project_id": session.get("project_id"),
+                    "fsm_state": session.get("fsm_state"),
+                    "expecting_response": (
+                        session.get("session_metadata", {}).get(
+                            "expecting_response", False
+                        )
+                    ),
+                }
+                log.info(
+                    f"✅ Active session found: {session_info['type']} "
+                    f"(state: {session_info['fsm_state']}, "
+                    f"expecting_response: {session_info['expecting_response']})"
+                )
+                return session_info
+
+            log.debug(f"ℹ️ No active session found for user {user_id[:8]}...")
+            return None
+        except Exception as e:
+            log.warning(f"⚠️ Error getting active specialized session: {e}")
+            return None
+
+    async def _exit_specialized_session(
+        self,
+        user_id: str,
+        session_id: str,
+        session_type: str,
+        reason: str,
+    ):
+        """Exit specialized session with cleanup.
+
+        Args:
+            user_id: User ID
+            session_id: Session ID to exit
+            session_type: Type of session ("progress_update", etc.)
+            reason: Reason for exit (for logging)
+        """
+        log.info(f"🚪 Exiting {session_type} session: {session_id[:8]}...")
+        log.info(f"   Reason: {reason}")
+
+        if session_type == "progress_update":
+            from src.services.progress_update import progress_update_state
+
+            await progress_update_state.clear_session(user_id, reason=reason)
+
+        # Future: Add other session types here
+        # elif session_type == "incident_report":
+        #     await incident_report_state.clear_session(user_id, reason=reason)
+
     async def _classify_intent(self, ctx: MessageContext) -> Result[None]:
-        """Stage 6: Classify user intent with conversation context."""
+        """Stage 6: Classify user intent with LLM-based context awareness.
+
+        Uses context classifier when specialized session is active to determine
+        if message continues session or represents intent change.
+        """
+        try:
+            # Check for active specialized session
+            active_session = await self._get_active_specialized_session(ctx.user_id)
+
+            if not active_session:
+                # No active session - standard classification
+                return await self._standard_intent_classification(ctx)
+
+            # === ACTIVE SESSION EXISTS - USE CONTEXT CLASSIFIER ===
+
+            log.info(f"📋 Active {active_session['type']} session found")
+            log.info(f"   State: {active_session.get('fsm_state')}")
+
+            from src.services.context_classifier import context_classifier
+
+            # Use LLM to classify context
+            context_result = await context_classifier.classify_message_context(
+                message=ctx.message_in_french,
+                session_type=active_session["type"],
+                session_state=active_session.get("fsm_state", "unknown"),
+                last_bot_message=ctx.last_bot_message or "",
+                expecting_response=active_session.get("expecting_response", False),
+                session_metadata=None,
+                user_language=ctx.user_language,
+            )
+
+            context_classification = context_result.get("context")
+            confidence = context_result.get("confidence", 0.0)
+
+            # === DECISION LOGIC ===
+
+            if context_classification == "IN_CONTEXT" and confidence >= 0.7:
+                # ✅ Continue specialized flow
+                ctx.intent = active_session["primary_intent"]
+                ctx.confidence = 0.95
+                ctx.session_continuation = True
+                log.info(f"✅ Staying in {ctx.intent} flow")
+                return Result.ok(None)
+
+            elif context_classification == "OUT_OF_CONTEXT" and confidence >= 0.7:
+                # 🚪 Intent change detected
+
+                log.info(
+                    f"🚪 Intent change: {context_result.get('intent_change_type')}"
+                )
+
+                # === SPECIAL: ISSUE DETECTED ===
+                if context_result.get("suggest_user_choice"):
+                    issue_severity = context_result.get("issue_severity")
+                    issue_desc = context_result.get("issue_description")
+                    log.info(
+                        f"💡 Issue detected - presenting user with choices\n"
+                        f"   Severity: {issue_severity}\n"
+                        f"   Description: {issue_desc}\n"
+                        f"   Original message: {ctx.message_in_french[:50]}..."
+                    )
+
+                    # Set special intent
+                    ctx.intent = "handle_detected_issue"
+                    ctx.confidence = 0.9
+                    ctx.stay_in_session = True  # Don't exit yet
+
+                    ctx.suggestion_context = {
+                        "issue_detected": True,
+                        "issue_severity": issue_severity,
+                        "issue_description": issue_desc,
+                        "original_message": ctx.message_in_french,
+                        "from_session": active_session["type"],
+                        "session_id": active_session["id"],
+                    }
+
+                    log.info(
+                        "✅ Intent set to 'handle_detected_issue', "
+                        "staying in session until user chooses"
+                    )
+                    return Result.ok(None)
+
+                # === SPECIAL: TASK/PROJECT SWITCH ===
+                if context_result.get("suggest_task_switch"):
+                    log.info("🔄 User wants to switch task/project")
+
+                    # Exit session
+                    await self._exit_specialized_session(
+                        user_id=ctx.user_id,
+                        session_id=active_session["id"],
+                        session_type=active_session["type"],
+                        reason="user_initiated_switch",
+                    )
+
+                    # Route based on change type
+                    intent_change = context_result.get("intent_change_type")
+
+                    if intent_change == "change_project":
+                        ctx.intent = "list_projects"
+                        ctx.confidence = 0.9
+                    elif intent_change == "change_task":
+                        ctx.intent = "list_tasks"
+                        ctx.confidence = 0.9
+                    else:
+                        ctx.intent = "general"
+                        ctx.confidence = 0.7
+
+                    log.info(f"🔄 Re-routed to: {ctx.intent}")
+                    return Result.ok(None)
+
+                # === OTHER INTENT CHANGE ===
+                intent_change = context_result.get("intent_change_type")
+
+                if intent_change == "report_incident":
+                    ctx.intent = "report_incident"
+                    ctx.confidence = 0.9
+                elif intent_change == "view_documents":
+                    ctx.intent = "view_documents"
+                    ctx.confidence = 0.9
+                elif intent_change == "escalate":
+                    ctx.intent = "escalate"
+                    ctx.confidence = 0.9
+                else:
+                    # General - re-classify
+                    return await self._standard_intent_classification(ctx)
+
+                # Exit session
+                await self._exit_specialized_session(
+                    user_id=ctx.user_id,
+                    session_id=active_session["id"],
+                    session_type=active_session["type"],
+                    reason="intent_change",
+                )
+
+                log.info(f"✅ Session exited, new intent: {ctx.intent}")
+                return Result.ok(None)
+
+            else:
+                # Ambiguous - keep session, let agent handle
+                ctx.intent = active_session["primary_intent"]
+                ctx.confidence = 0.5
+                ctx.session_continuation = True
+                ctx.context_ambiguous = True
+                log.info("❓ Ambiguous context - keeping session")
+                return Result.ok(None)
+
+        except Exception as e:
+            return Result.from_exception(e)
+
+    async def _standard_intent_classification(
+        self, ctx: MessageContext
+    ) -> Result[None]:
+        """Standard intent classification without session context.
+
+        Used when no active specialized session exists.
+        """
         try:
             # Determine media context
             has_media = bool(ctx.media_url)
@@ -790,6 +1026,11 @@ class MessagePipeline:
                                 f"📦 Captured {len(ctx.attachments)} attachments "
                                 f"from fast path"
                             )
+                    if "pending_action" in result:
+                        ctx.pending_action = result.get("pending_action")
+                        log.info(
+                            f"📋 Captured pending_action: {ctx.pending_action.get('type')}"
+                        )
 
                     log.info(
                         f"✅ Fast path succeeded "
@@ -1184,6 +1425,14 @@ class MessagePipeline:
                 outbound_metadata["tool_outputs"] = ctx.tool_outputs
                 log.debug(
                     f"💾 Storing {len(ctx.tool_outputs)} tool outputs "
+                    f"in message metadata"
+                )
+
+            # Add pending_action if any (for interactive choices like issue_choice)
+            if ctx.pending_action:
+                outbound_metadata["pending_action"] = ctx.pending_action
+                log.debug(
+                    f"💾 Storing pending_action ({ctx.pending_action.get('type')}) "
                     f"in message metadata"
                 )
 

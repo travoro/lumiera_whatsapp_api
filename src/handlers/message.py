@@ -1,5 +1,6 @@
 """Message processing handler."""
 
+import json
 import re
 from typing import Any, Dict, Optional
 
@@ -24,6 +25,7 @@ async def handle_direct_action(
     media_url: Optional[str] = None,
     media_type: Optional[str] = None,
     session_id: Optional[str] = None,
+    recent_messages: Optional[list] = None,
 ) -> Optional[Dict[str, Any]]:
     """Handle direct action execution without AI agent.
 
@@ -590,6 +592,160 @@ async def handle_direct_action(
                         message_body="Non, autre tâche",  # Triggers agent clarification flow
                         session_id=session_id,
                     )
+
+            elif list_type == "option":
+                # Check for pending_action (issue choice, etc.)
+                # Fetch recent messages if not provided
+                if recent_messages is None:
+                    recent_messages = supabase_client.get_recent_messages(
+                        user_id=user_id, limit=5
+                    )
+
+                pending_action = None
+                for msg in recent_messages[
+                    ::-1
+                ]:  # Search backwards (most recent first)
+                    try:
+                        msg_metadata = json.loads(msg.get("metadata", "{}"))
+                        if "pending_action" in msg_metadata:
+                            pending_action = msg_metadata["pending_action"]
+                            log.info(
+                                f"📋 Found pending_action: {pending_action.get('type')}"
+                            )
+                            break
+                    except Exception as e:
+                        log.warning(f"⚠️ Could not parse message metadata: {e}")
+
+                if pending_action and pending_action.get("type") == "issue_choice":
+                    severity = pending_action.get("severity")
+                    description = pending_action.get("description")
+                    original_message = pending_action.get("original_message")
+                    from_session = pending_action.get("from_session")
+
+                    log.info(
+                        f"💡 Processing issue choice selection\n"
+                        f"   User selected: option_{option_number}\n"
+                        f"   Issue severity: {severity}\n"
+                        f"   Issue description: {description}\n"
+                        f"   From session: {from_session}"
+                    )
+
+                    from src.integrations.supabase import supabase_client
+                    from src.services.progress_update import progress_update_state
+
+                    if option_number == "1":
+                        # Option 1: Create incident report
+                        log.info(
+                            f"📋 User chose option 1: Create incident report\n"
+                            f"   Clearing {from_session} session and routing to incident report"
+                        )
+
+                        # Clear the active progress_update session
+                        await progress_update_state.clear_session(
+                            user_id, reason="issue_escalation_to_incident"
+                        )
+
+                        # Route to incident report handler
+                        return await handle_direct_action(
+                            action="report_incident",
+                            user_id=user_id,
+                            phone_number=phone_number,
+                            language=language,
+                            message_body=original_message,
+                            session_id=session_id,
+                        )
+
+                    elif option_number == "2":
+                        # Option 2: Add comment to current task
+                        log.info(
+                            f"💬 User chose option 2: Add comment to task\n"
+                            f"   Staying in {from_session} session"
+                        )
+
+                        from src.services.progress_update.tools import (
+                            add_progress_comment_tool,
+                        )
+
+                        # Get active session to get task_id
+                        session = await progress_update_state.get_session(user_id)
+                        if not session:
+                            log.error("❌ No active session found for adding comment")
+                            return {
+                                "message": "❌ Erreur : session expirée. Veuillez réessayer.",
+                                "tool_outputs": [],
+                            }
+
+                        task_id = session.get("task_id")
+                        project_id = session.get("project_id")
+                        log.info(
+                            f"   Task ID: {task_id[:8] if task_id else 'N/A'}...\n"
+                            f"   Project ID: {project_id[:8] if project_id else 'N/A'}..."
+                        )
+
+                        # Add comment with issue indicator
+                        comment_text = f"⚠️ Problème signalé: {original_message}"
+                        log.info(f"   Adding comment: {comment_text[:50]}...")
+
+                        try:
+                            result = await add_progress_comment_tool.ainvoke(
+                                {
+                                    "user_id": user_id,
+                                    "task_id": task_id,
+                                    "project_id": project_id,
+                                    "comment": comment_text,
+                                }
+                            )
+                            log.info("✅ Comment added successfully to task")
+
+                            # Continue session - show options
+                            if language == "en":
+                                message = "✅ Comment added. What would you like to do?\n\n1. Add photo\n2. Mark complete\n3. Add another comment"
+                            else:
+                                message = "✅ Commentaire ajouté. Que souhaitez-vous faire?\n\n1. Ajouter photo\n2. Marquer terminé\n3. Ajouter commentaire"
+
+                            return {
+                                "message": message,
+                                "tool_outputs": [],
+                                "agent_used": "progress_update",
+                                "response_type": "interactive_list",
+                                "list_type": "option",
+                            }
+
+                        except Exception as e:
+                            log.error(f"❌ Error adding comment: {e}")
+                            return {
+                                "message": f"❌ Erreur lors de l'ajout du commentaire : {str(e)}",
+                                "tool_outputs": [],
+                            }
+
+                    elif option_number == "3":
+                        # Option 3: Skip - continue without noting
+                        log.info(
+                            f"⏭️ User chose option 3: Skip issue documentation\n"
+                            f"   Continuing {from_session} session without noting issue"
+                        )
+
+                        # Continue session - show options
+                        if language == "en":
+                            message = "Okay. What would you like to do?\n\n1. Photo\n2. Comment\n3. Complete"
+                        else:
+                            message = "D'accord. Que souhaitez-vous faire?\n\n1. Photo\n2. Commentaire\n3. Terminé"
+
+                        log.info("✅ Presenting next options to user")
+                        return {
+                            "message": message,
+                            "tool_outputs": [],
+                            "agent_used": "progress_update",
+                            "response_type": "interactive_list",
+                            "list_type": "option",
+                        }
+
+                    else:
+                        log.warning(
+                            f"⚠️ Invalid option number for issue choice: {option_number}\n"
+                            f"   Expected: 1, 2, or 3"
+                        )
+                        return None
 
             elif list_type in ["project", "projects", "option"]:
                 # User selected a project from the list → Show project tasks
