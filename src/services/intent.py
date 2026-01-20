@@ -44,9 +44,11 @@ INTENTS = {
         "keywords": [
             "projects",
             "chantiers",
+            "chantier",
             "list",
             "show",
             "projets",
+            "projet",
             "voir",
             "mostrar",
         ],
@@ -54,7 +56,7 @@ INTENTS = {
         "requires_confirmation": False,
     },
     "list_tasks": {
-        "keywords": ["tasks", "tâches", "todo", "tareas", "tarefas"],
+        "keywords": ["tasks", "tâches", "tâche", "tache", "todo", "tareas", "tarefas"],
         "tools": ["list_tasks_tool"],
         "requires_confirmation": False,
     },
@@ -454,14 +456,14 @@ RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
 
                 prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
-- list_projects (l'utilisateur veut voir ses projets/chantiers)
-- list_tasks (l'utilisateur veut voir les tâches pour un projet)
+- list_projects (l'utilisateur veut voir/sélectionner ses projets/chantiers, changer de projet, autre projet)
+- list_tasks (l'utilisateur veut voir/sélectionner les tâches pour un projet, changer de tâche, autre tâche)
 - view_documents (l'utilisateur veut voir les documents/plans d'un projet)
 - task_details (l'utilisateur veut voir les détails/description/photos d'une tâche spécifique)
 - report_incident (l'utilisateur veut signaler un problème/incident)
 - update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
-- general (tout le reste - questions, clarifications, demandes complexes)
+- general (tout le reste - questions, clarifications, demandes complexes sans contexte clair)
 {media_hint}{fsm_hint}{menu_hint}
 RÈGLES DE CONTEXTE IMPORTANTES :
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
@@ -471,12 +473,27 @@ RÈGLES DE CONTEXTE IMPORTANTES :
 - Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
 - Quand utilisateur répond clairement à question du bot → confiance HAUTE (85-95) pour fast path
 
-⚠️ CAS AMBIGUS - Classifier comme "general" pour clarification :
-- Si utilisateur dit "autre tâche" / "différente tâche" / "changer de tâche" SANS préciser laquelle
-  → L'utilisateur veut une tâche différente mais n'a pas précisé même/autre projet
-  → Classifier "general" pour que le LLM puisse poser des questions de clarification
-  → Exemples : "je souhaite modifier une autre tache" → general:90
-  → Exemples : "je veux travailler sur une autre tâche" → general:85
+⚠️ RÈGLES POUR "CHANGER" / "AUTRE" / "DIFFÉRENT" - Utiliser le contexte :
+
+1. PROJETS - Si message mentionne "projet" (changer le/de projet, autre projet, différent projet):
+   → list_projects:90 (user veut voir/sélectionner un autre projet)
+   → Exemples : "changer le projet" → list_projects:90
+   → Exemples : "autre projet" → list_projects:85
+   → Exemples : "je veux un autre chantier" → list_projects:85
+
+2. TÂCHES AVEC CONTEXTE - Si message mentionne "tâche" ET l'historique montre un projet actif:
+   → Analyser l'historique récent pour détecter mention de projet (ex: "*Champigny*", "chantier X")
+   → Si projet mentionné dans historique → list_tasks:85 (user veut autre tâche du MÊME projet)
+   → Exemples avec contexte "Voici vos tâches pour *Champigny*" :
+      - "autre tâche" → list_tasks:85
+      - "je souhaite mettre à jour une autre tâche" → list_tasks:85
+      - "changer de tâche" → list_tasks:85
+
+3. TÂCHES SANS CONTEXTE - Si message mentionne "tâche" SANS projet clair dans l'historique:
+   → general:85 (besoin de clarifier: quel projet? quelle tâche?)
+   → Exemples SANS contexte projet :
+      - "je souhaite modifier une autre tache" → general:85
+      - "autre tâche" (aucun projet dans historique) → general:85
 
 ⚠️ RÈGLE CRITIQUE POUR update_progress :
 - NE JAMAIS classifier comme "update_progress" si la requête est VAGUE ou sans contexte de tâche claire
