@@ -117,7 +117,7 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                             log.info(
                                 "📌 Only 1 task found - showing confirmation instead of list"
                             )
-                            return """✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
+                            return f"""✅ ACTIVE TASK FOUND (CONFIRMATION NEEDED):
 Task: {task_title}
 Project: {project_name}
 Task ID: {task_id}
@@ -396,17 +396,23 @@ async def start_progress_update_session_tool(
     try:
         # Validation: Ensure we have valid IDs
         if not task_id or not project_id:
+            # Determine which parameters are missing for specific error message
+            missing_params = []
+            if not task_id:
+                missing_params.append("task_id")
+            if not project_id:
+                missing_params.append("project_id")
+
             log.error(
                 f"❌ start_progress_update_session_tool called with missing IDs: task_id={task_id}, project_id={project_id}"
             )
-            return """❌ ERREUR: Impossible de démarrer la session sans task_id et project_id.
 
-AGENT: Tu dois d'abord:
-1. Appeler get_active_task_context_tool pour obtenir le task_id et project_id
-2. OU demander à l'utilisateur de sélectionner une tâche
-3. NE JAMAIS appeler start_progress_update_session_tool sans ces informations!
+            # Return error that works for both agent guidance and potential user visibility
+            return f"""❌ Impossible de démarrer la session: {' et '.join(missing_params)} manquant(s).
 
-Dis à l'utilisateur: "Désolé, je rencontre un problème technique. Pouvez-vous me dire sur quelle tâche vous travaillez ?" """
+Utilise d'abord get_active_task_context_tool pour obtenir les IDs nécessaires, puis rappelle cet outil avec les valeurs correctes.
+
+Si aucun contexte actif n'est trouvé, demande à l'utilisateur quelle tâche il souhaite mettre à jour."""
         # Create session
         session_id = await progress_update_state.create_session(
             user_id=user_id, task_id=task_id, project_id=project_id
