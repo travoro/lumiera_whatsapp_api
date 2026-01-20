@@ -1007,7 +1007,34 @@ class MessagePipeline:
                         session_id=ctx.session_id,
                     )
 
-                    if specialized_result:
+                    if specialized_result and specialized_result.get("session_exited"):
+                        # Specialized agent exited session - need to reclassify intent
+                        log.info(
+                            "🔄 Session exited - reclassifying intent without session bias"
+                        )
+
+                        # Clear FSM context so intent classifier doesn't think there's an active session
+                        ctx.active_session_id = None
+                        ctx.fsm_state = None
+                        ctx.should_continue_session = False
+
+                        # Reclassify intent WITHOUT session context
+                        reclassify_result = await self._standard_intent_classification(
+                            ctx
+                        )
+                        if reclassify_result.is_error():
+                            return reclassify_result
+
+                        log.info(
+                            f"✅ Intent reclassified: {ctx.intent} (confidence: {ctx.confidence:.0%})"
+                        )
+
+                        # Now continue with the new intent - fall through to main LLM
+                        log.info(
+                            f"🤖 Falling back to full AI agent with reclassified intent: {ctx.intent}"
+                        )
+
+                    elif specialized_result:
                         log.info(
                             f"✅ Specialized routing succeeded for intent: {ctx.intent}"
                         )

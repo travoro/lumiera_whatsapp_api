@@ -228,11 +228,10 @@ async def handle_direct_action(
                 f"🔄 Progress update agent exited session - Reason: {result.get('reroute_reason')}"
             )
             log.info(
-                "   → Triggering reroute to main pipeline for fresh intent classification"
+                "   → Signaling pipeline to reclassify intent without session bias"
             )
-            # Return None to trigger main AI pipeline
-            # Pipeline will reclassify intent without session bias
-            return None
+            # Return special marker so pipeline knows to reclassify intent
+            return {"session_exited": True, "reclassify_intent": True}
         else:
             # Fallback to full AI if specialized agent fails
             return None
