@@ -997,6 +997,15 @@ class MessagePipeline:
                     f"(url: {ctx.media_url[:50]}...)"
                 )
 
+            # Log FSM context values before passing to classifier
+            log.info(
+                f"📊 Calling intent classifier with FSM context:\n"
+                f"   active_session_id: {ctx.active_session_id}\n"
+                f"   fsm_state: {ctx.fsm_state}\n"
+                f"   expecting_response: {ctx.expecting_response}\n"
+                f"   should_continue_session: {ctx.should_continue_session}"
+            )
+
             intent_result = await intent_classifier.classify(
                 ctx.message_in_french,
                 ctx.user_id,

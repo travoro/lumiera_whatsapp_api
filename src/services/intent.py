@@ -470,6 +470,13 @@ RÈGLES DE CONTEXTE IMPORTANTES :
 - Si le bot a demandé "quel projet/chantier" et l'utilisateur répond avec nom → list_tasks:90
 - Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
 - Quand utilisateur répond clairement à question du bot → confiance HAUTE (85-95) pour fast path
+
+⚠️ CAS AMBIGUS - Classifier comme "general" pour clarification :
+- Si utilisateur dit "autre tâche" / "différente tâche" / "changer de tâche" SANS préciser laquelle
+  → L'utilisateur veut une tâche différente mais n'a pas précisé même/autre projet
+  → Classifier "general" pour que le LLM puisse poser des questions de clarification
+  → Exemples : "je souhaite modifier une autre tache" → general:90
+  → Exemples : "je veux travailler sur une autre tâche" → general:85
 {context_section}
 Message actuel : {message}{media_reminder}
 
