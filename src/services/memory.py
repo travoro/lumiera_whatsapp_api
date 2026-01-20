@@ -205,9 +205,11 @@ Résumé:"""
             }
             log.info(f"Cached summary for user {user_id}")
 
-        log.info(f"Optimized history: {
+        log.info(
+            f"Optimized history: {
                 len(older_messages)} old messages → summary, {
-                len(recent_messages)} recent messages kept")
+                len(recent_messages)} recent messages kept"
+        )
 
         return recent_messages, summary
 

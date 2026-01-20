@@ -752,7 +752,11 @@ class MessagePipeline:
             active_session = await self._get_active_specialized_session(ctx.user_id)
 
             if not active_session:
-                # No active session - standard classification
+                # No active session - clear any stale FSM context and use standard classification
+                ctx.active_session_id = None
+                ctx.fsm_state = None
+                ctx.expecting_response = False
+                ctx.should_continue_session = False
                 return await self._standard_intent_classification(ctx)
 
             # === ACTIVE SESSION EXISTS ===
@@ -799,6 +803,16 @@ class MessagePipeline:
                     session_type=active_session["type"],
                     reason="new_intent_at_idle_state",
                 )
+
+                # CRITICAL: Clear FSM context from ctx so intent classifier doesn't get biased
+                ctx.active_session_id = None
+                ctx.fsm_state = None
+                ctx.expecting_response = False
+                ctx.should_continue_session = False
+                log.info(
+                    "   🧹 Cleared FSM context from ctx - intent classifier will be unbiased"
+                )
+
                 return await self._standard_intent_classification(ctx)
 
             # === USE CONTEXT CLASSIFIER (only when expecting response) ===
@@ -910,10 +924,29 @@ class MessagePipeline:
                     ctx.intent = "escalate"
                     ctx.confidence = 0.9
                 else:
-                    # General - re-classify
+                    # General - exit session, clear context, then re-classify
+                    log.info(
+                        "🔄 General intent change - exiting session and re-classifying"
+                    )
+                    await self._exit_specialized_session(
+                        user_id=ctx.user_id,
+                        session_id=active_session["id"],
+                        session_type=active_session["type"],
+                        reason="intent_change_general",
+                    )
+
+                    # Clear FSM context from ctx so intent classifier doesn't get biased
+                    ctx.active_session_id = None
+                    ctx.fsm_state = None
+                    ctx.expecting_response = False
+                    ctx.should_continue_session = False
+                    log.info(
+                        "   🧹 Cleared FSM context from ctx for fresh classification"
+                    )
+
                     return await self._standard_intent_classification(ctx)
 
-                # Exit session
+                # Exit session (for specific intent changes: report_incident, view_documents, escalate)
                 await self._exit_specialized_session(
                     user_id=ctx.user_id,
                     session_id=active_session["id"],
@@ -1152,9 +1185,11 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(f"📍 Injecting explicit state: project={
+                log.info(
+                    f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}")
+                        agent_state.active_task_id}"
+                )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
