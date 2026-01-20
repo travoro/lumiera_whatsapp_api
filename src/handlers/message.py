@@ -655,9 +655,9 @@ async def handle_direct_action(
                         log.info(
                             "📋 User selected 'Autre projet' - calling list_projects_tool"
                         )
-                        from src.actions import projects
+                        from src.actions import projects as projects_actions
 
-                        result = await projects.list_projects(user_id)
+                        result = await projects_actions.list_projects(user_id)
 
                         if result["success"] and result["data"]:
                             # Format projects as numbered list
@@ -684,7 +684,7 @@ async def handle_direct_action(
                         log.info(
                             "📋 User selected 'Autre tâche' - calling list_tasks_tool"
                         )
-                        from src.actions import tasks
+                        from src.actions import tasks as tasks_actions
                         from src.services.project_context import project_context_service
 
                         # Get active project
@@ -698,7 +698,7 @@ async def handle_direct_action(
                                 "tool_outputs": [],
                             }
 
-                        result = await tasks.list_tasks(user_id, project_id)
+                        result = await tasks_actions.list_tasks(user_id, project_id)
 
                         if result["success"] and result["data"]:
                             # Format tasks as numbered list
