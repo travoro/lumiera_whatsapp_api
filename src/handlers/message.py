@@ -60,6 +60,7 @@ async def handle_direct_action(
 
         return {
             "message": response,
+            "list_type": "projects",  # Ensure button IDs are projects_1_fr, not option_1_fr
             "tool_outputs": [
                 {
                     "tool": "list_projects_tool",

@@ -525,6 +525,21 @@ Cette distinction est ESSENTIELLE. Analyse le VERBE, pas seulement le nom :
    - Historique vide → se baser uniquement sur le verbe
 
 RÈGLES DE CONTEXTE IMPORTANTES :
+
+🔘 SÉLECTIONS DE MENU/BOUTON (haute priorité) :
+- Si message est "option_X" / "projects_X" / "tasks_X" / "numéro seul" (1, 2, 3, etc.)
+  → Analyser l'historique pour comprendre QUE le user sélectionne
+
+  Exemples :
+  • Historique = "Voici votre chantier actif: 1. 🏗️ Champigny"
+    Message = "option_1" / "1" → list_tasks:95 (user sélectionne projet → voir ses tâches)
+
+  • Historique = "Voici vos tâches pour Champigny: 1. 🔄 Task test 1"
+    Message = "option_1" / "tasks_1" / "1" → task_details:95 (user sélectionne tâche → voir détails)
+
+  • Historique = "Options: 1. Ajouter photo 2. Ajouter commentaire"
+    Message = "option_1" / "1" → update_progress:90 (user sélectionne option de mise à jour)
+
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
 - Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90
 - Si utilisateur demande explicitement "plan", "plans", "documents" d'un projet → view_documents:90
