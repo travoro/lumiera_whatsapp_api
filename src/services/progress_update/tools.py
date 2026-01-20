@@ -446,6 +446,10 @@ Si aucun contexte actif n'est trouvé, demande à l'utilisateur quelle tâche il
 async def exit_progress_update_session_tool(user_id: str, reason: str) -> str:
     """Exit progress update session when user request is OUT OF YOUR SCOPE.
 
+    ⚠️ CRITICAL: After calling this tool, DO NOT generate any message to the user!
+    The tool handles the transition silently and hands off to the main LLM.
+    Your job ends when you call this tool.
+
     WHEN TO USE THIS TOOL:
     Call this tool IMMEDIATELY when the user asks for something you CANNOT handle:
 
@@ -512,7 +516,7 @@ async def exit_progress_update_session_tool(user_id: str, reason: str) -> str:
             result = await fsm_engine.transition(
                 context=context,
                 to_state=SessionState.ABANDONED,
-                trigger="out_of_scope_request",
+                trigger="cancel",  # Use valid trigger from TRANSITION_RULES
                 closure_reason=reason,
             )
 

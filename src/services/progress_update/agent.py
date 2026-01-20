@@ -135,24 +135,31 @@ RÈGLES IMPORTANTES :
 Si l'utilisateur demande QUELQUE CHOSE QUE JE NE PEUX PAS FAIRE :
 → NE PAS essayer de le faire moi-même
 → APPELER IMMÉDIATEMENT exit_progress_update_session_tool
+→ ⚠️ IMPORTANT: Ne génère AUCUN message après avoir appelé ce tool! Le tool s'occupe de tout.
 
 Exemples de détection :
 - "je souhaite mettre a jour une autre tache" → Hors scope (autre tâche)
   → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_different_task")
+  → ⚠️ STOP - ne dis rien d'autre après!
 - "voir mes projets" → Hors scope (lister projets)
   → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_list_projects")
+  → ⚠️ STOP - ne dis rien d'autre après!
 - "autre projet" → Hors scope (changer projet)
   → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_different_project")
+  → ⚠️ STOP - ne dis rien d'autre après!
 - "bonjour" → Hors scope (nouvelle conversation)
   → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_greeting_new_session")
+  → ⚠️ STOP - ne dis rien d'autre après!
 - "voir les documents" → Hors scope (documents)
   → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_documents")
+  → ⚠️ STOP - ne dis rien d'autre après!
 - "il y a un problème avec..." → Hors scope (nouveau incident)
   → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_reporting_new_incident")
+  → ⚠️ STOP - ne dis rien d'autre après!
 
 Ce tool va :
 1. Fermer ma session proprement avec une transition FSM validée
-2. Transmettre la demande au LLM principal
+2. Transmettre la demande au LLM principal (SILENCIEUSEMENT - tu ne dis rien!)
 3. Le LLM principal a TOUS les outils nécessaires (list_projects, list_tasks, documents, etc.)
 
 OUTILS DISPONIBLES :
@@ -296,19 +303,6 @@ class ProgressUpdateAgent:
                 log.warning(f"⚠️ Unexpected output format: {type(output)}")
                 message_text = str(output)
 
-            # CRITICAL: Check if agent called exit_progress_update_session_tool
-            # This signals the request is out of scope and should be rerouted
-            if "EXIT_SESSION_REROUTE_TO_MAIN_LLM" in message_text:
-                log.info("🚪 Agent detected out-of-scope request via exit_session tool")
-                log.info("   → Returning session_exited signal to trigger reroute")
-                return {
-                    "success": False,  # Signals fallback needed
-                    "reroute_reason": "out_of_scope",
-                    "original_message": message,
-                    "session_exited": True,
-                    "agent_used": "progress_update",
-                }
-
             response = {
                 "success": True,
                 "message": message_text,
@@ -325,6 +319,18 @@ class ProgressUpdateAgent:
                     continue
 
                 tool_name = action.tool
+
+                # Case 0: Exit session called (CRITICAL - check first!)
+                if tool_name == "exit_progress_update_session_tool":
+                    log.info("🚪 Agent called exit_progress_update_session_tool")
+                    log.info("   → Session exited, triggering reroute to main LLM")
+                    return {
+                        "success": False,  # Signals fallback needed
+                        "reroute_reason": "out_of_scope",
+                        "original_message": message,
+                        "session_exited": True,
+                        "agent_used": "progress_update",
+                    }
 
                 # Case 1: Escalation called
                 if tool_name == "escalate_to_human_tool":
