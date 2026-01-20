@@ -157,9 +157,39 @@ async def handle_direct_action(
             return None
 
     elif action == "update_progress":
+        # 🛡️ BULLETPROOF CHECK: Only route to progress_update agent if we have confirmed context
+        # This prevents routing vague requests that should be handled by main LLM
+        from src.integrations.supabase import supabase_client
+        from src.services.progress_update import progress_update_state
+
+        # Check if there's an active progress update session
+        has_active_session = await progress_update_state.has_active_session(user_id)
+
+        if not has_active_session:
+            # No active session - check if user has active task context
+            from src.services.project_context import project_context_service
+
+            active_task_id = await project_context_service.get_active_task(user_id)
+
+            if not active_task_id:
+                # No confirmed task - don't route to specialized agent
+                log.warning(
+                    "⚠️ update_progress intent but no active session or task_id - "
+                    "falling back to main LLM for clarification"
+                )
+                log.info(
+                    "   Main LLM will use list_projects_tool and list_tasks_tool to help user select"
+                )
+                return None  # Fall back to main LLM
+
+            log.info(
+                f"✅ Active task found: {active_task_id[:8]}... - proceeding to agent"
+            )
+        else:
+            log.info("✅ Active progress update session found - proceeding to agent")
+
         # Route to specialized Progress Update Agent
         log.info(f"✅ Routing update_progress to specialized agent for user {user_id}")
-        from src.integrations.supabase import supabase_client
         from src.services.progress_update.agent import progress_update_agent
 
         # Get user name
@@ -582,16 +612,124 @@ async def handle_direct_action(
                         "agent_used": "progress_update",
                     }
                 else:
-                    # User said no - route to agent to ask clarification (change task vs change project)
-                    log.info("❌ User declined - routing to agent for clarification")
-                    return await handle_direct_action(
-                        action="update_progress",
-                        user_id=user_id,
-                        phone_number=phone_number,
-                        language=language,
-                        message_body="Non, autre tâche",  # Triggers agent clarification flow
-                        session_id=session_id,
-                    )
+                    # User said no - extract the actual option text they selected
+                    log.info("❌ User declined - extracting actual option text")
+
+                    # Extract option text from the last bot message
+                    selected_option_text = None
+                    for msg in reversed(messages):
+                        if msg and msg.get("direction") == "outbound":
+                            last_bot_content = msg.get("content", "")
+                            # Parse numbered options (format: "1. Option text" or "2. Option text")
+                            import re
+
+                            options_match = re.findall(
+                                r"^\s*(\d+)\.\s*(.+)$", last_bot_content, re.MULTILINE
+                            )
+                            if options_match:
+                                # Find the option matching our number
+                                for opt_num, opt_text in options_match:
+                                    if opt_num == option_number:
+                                        selected_option_text = opt_text.strip()
+                                        log.info(
+                                            f"✅ Extracted option {option_number} text: '{selected_option_text}'"
+                                        )
+                                        break
+                            if selected_option_text:
+                                break
+
+                    # Fallback to default if extraction failed
+                    if not selected_option_text:
+                        selected_option_text = "Autre tâche"
+                        log.warning(
+                            f"⚠️ Could not extract option text, using fallback: '{selected_option_text}'"
+                        )
+
+                    # 🛡️ BULLETPROOF CHECK: Determine if user wants another project or another task
+                    # and call the appropriate tool directly
+                    selected_lower = selected_option_text.lower()
+
+                    if "projet" in selected_lower:
+                        # User wants to see other projects
+                        log.info(
+                            "📋 User selected 'Autre projet' - calling list_projects_tool"
+                        )
+                        from src.actions import projects
+
+                        result = await projects.list_projects(user_id)
+
+                        if result["success"] and result["data"]:
+                            # Format projects as numbered list
+                            message = f"{result['message']}\n\n"
+                            for i, project in enumerate(result["data"], 1):
+                                message += f"{i}. 🏗️ {project['nom']}\n"
+
+                            return {
+                                "message": message,
+                                "tool_outputs": [
+                                    {
+                                        "tool": "list_projects_tool",
+                                        "output": result["data"],
+                                    }
+                                ],
+                                "response_type": "interactive_list",
+                                "list_type": "projects",
+                            }
+                        else:
+                            return {"message": result["message"], "tool_outputs": []}
+
+                    elif "tâche" in selected_lower or "tache" in selected_lower:
+                        # User wants to see other tasks
+                        log.info(
+                            "📋 User selected 'Autre tâche' - calling list_tasks_tool"
+                        )
+                        from src.actions import tasks
+                        from src.services.project_context import project_context_service
+
+                        # Get active project
+                        project_id = await project_context_service.get_active_project(
+                            user_id
+                        )
+
+                        if not project_id:
+                            return {
+                                "message": "⚠️ Aucun projet actif. Veuillez d'abord sélectionner un projet.",
+                                "tool_outputs": [],
+                            }
+
+                        result = await tasks.list_tasks(user_id, project_id)
+
+                        if result["success"] and result["data"]:
+                            # Format tasks as numbered list
+                            message = f"{result['message']}\n\n"
+                            for i, task in enumerate(result["data"], 1):
+                                emoji = "📝"
+                                if task.get("status") == "in_progress":
+                                    emoji = "🔨"
+                                elif task.get("status") == "completed":
+                                    emoji = "✅"
+                                message += f"{i}. {emoji} {task['title']}\n"
+
+                            return {
+                                "message": message,
+                                "tool_outputs": [
+                                    {
+                                        "tool": "list_tasks_tool",
+                                        "output": result["data"],
+                                    }
+                                ],
+                                "response_type": "interactive_list",
+                                "list_type": "tasks",
+                                "agent_used": "fast_path",
+                            }
+                        else:
+                            return {"message": result["message"], "tool_outputs": []}
+                    else:
+                        # Unclear selection - return None to fall back to main LLM
+                        log.warning(
+                            f"⚠️ Could not determine intent from option text: '{selected_option_text}'"
+                        )
+                        return None
 
             elif list_type == "option":
                 # Check for pending_action (issue choice, etc.)

@@ -477,6 +477,18 @@ RÈGLES DE CONTEXTE IMPORTANTES :
   → Classifier "general" pour que le LLM puisse poser des questions de clarification
   → Exemples : "je souhaite modifier une autre tache" → general:90
   → Exemples : "je veux travailler sur une autre tâche" → general:85
+
+⚠️ RÈGLE CRITIQUE POUR update_progress :
+- NE JAMAIS classifier comme "update_progress" si la requête est VAGUE ou sans contexte de tâche claire
+- Exemples VAGUES à classifier comme "general" :
+  → "Mettre à jour les tâches" → general:85 (pas de tâche spécifique mentionnée)
+  → "Je veux faire une mise à jour" → general:85 (vague, aucune tâche)
+  → "Mise à jour de progression" → general:85 (pas de contexte)
+- Classifier "update_progress" SEULEMENT si :
+  → Session active (should_continue_session=True) ET message compatible avec ajout photo/commentaire
+  → OU utilisateur mentionne explicitement une tâche spécifique (ex: "mettre à jour tâche X")
+  → OU contexte indique clairement quelle tâche (dans l'historique récent)
+- Sinon → Toujours "general" pour laisser le LLM principal clarifier quelle tâche/projet
 {context_section}
 Message actuel : {message}{media_reminder}
 
