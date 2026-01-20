@@ -295,6 +295,20 @@ async def handle_update_progress(
     """
     log.info(f"🚀 FAST PATH: Handling update progress for {user_id}")
 
+    # 🛡️ CRITICAL CHECK: If user has active task, defer to specialized agent
+    # The specialized agent will show confirmation: "Update task X? 1. Oui / 2. Non"
+    from src.services.project_context import project_context_service
+
+    active_task_id = await project_context_service.get_active_task(user_id)
+    if active_task_id:
+        log.info(
+            f"✅ Active task exists ({active_task_id[:8]}...) - "
+            "falling through to specialized agent for confirmation"
+        )
+        return None  # Let specialized agent handle confirmation flow
+
+    log.info("📋 No active task - proceeding with project/task selection")
+
     try:
         # Use helper to get projects and context
         projects, current_project_id, no_projects_msg = await get_projects_with_context(
