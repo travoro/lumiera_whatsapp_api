@@ -755,10 +755,42 @@ class MessagePipeline:
                 # No active session - standard classification
                 return await self._standard_intent_classification(ctx)
 
-            # === ACTIVE SESSION EXISTS - USE CONTEXT CLASSIFIER ===
+            # === ACTIVE SESSION EXISTS ===
 
             log.info(f"📋 Active {active_session['type']} session found")
             log.info(f"   State: {active_session.get('fsm_state')}")
+            log.info(
+                f"   Expecting response: {active_session.get('expecting_response')}"
+            )
+
+            # Only use context classifier if we're actively expecting a response
+            # Otherwise, treat as new intent and potentially exit session
+            #
+            # Example: User is in progress_update session at "awaiting_action" state
+            # (not expecting response). User sends "bonjour". We should:
+            # 1. Exit the idle session
+            # 2. Use standard classification → detects "greeting" intent
+            # 3. Show greeting handler with quick reply options
+            #
+            # If we used context classifier here, it might keep session open
+            # and trigger LLM response instead of fast greeting handler.
+            if not active_session.get("expecting_response", False):
+                log.info(
+                    "ℹ️ Session exists but NOT expecting response - "
+                    "exiting session and using standard classification"
+                )
+                # Exit the idle session before classifying new intent
+                await self._exit_specialized_session(
+                    user_id=ctx.user_id,
+                    session_id=active_session["id"],
+                    session_type=active_session["type"],
+                    reason="new_intent_while_idle",
+                )
+                return await self._standard_intent_classification(ctx)
+
+            # === USE CONTEXT CLASSIFIER (only when expecting response) ===
+
+            log.info("🤖 Using context classifier to determine message context")
 
             from src.services.context_classifier import context_classifier
 
