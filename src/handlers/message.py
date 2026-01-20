@@ -597,7 +597,7 @@ async def handle_direct_action(
                 # Check for pending_action (issue choice, etc.)
                 # Fetch recent messages if not provided
                 if recent_messages is None:
-                    recent_messages = supabase_client.get_recent_messages(
+                    recent_messages = await supabase_client.get_recent_messages(
                         user_id=user_id, limit=5
                     )
 
