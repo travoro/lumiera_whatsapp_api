@@ -763,20 +763,33 @@ class MessagePipeline:
                 f"   Expecting response: {active_session.get('expecting_response')}"
             )
 
-            # Only use context classifier if we're actively expecting a response
-            # Otherwise, treat as new intent and potentially exit session
+            # Only use context classifier for SPECIFIC active states
+            # where we're waiting for user input (e.g., collecting_data)
+            #
+            # DO NOT use for idle/menu states like "awaiting_action" where
+            # user can send any new intent (greeting, help, etc.)
             #
             # Example: User is in progress_update session at "awaiting_action" state
-            # (not expecting response). User sends "bonjour". We should:
+            # (idle menu showing options). User sends "bonjour". We should:
             # 1. Exit the idle session
             # 2. Use standard classification → detects "greeting" intent
             # 3. Show greeting handler with quick reply options
             #
             # If we used context classifier here, it might keep session open
             # and trigger LLM response instead of fast greeting handler.
-            if not active_session.get("expecting_response", False):
+
+            fsm_state = active_session.get("fsm_state", "")
+
+            # Define states where we should use context classifier
+            ACTIVE_STATES_FOR_CONTEXT_CLASSIFICATION = [
+                "collecting_data",  # Actively collecting photo/video/data
+                # Add more specific states here as needed
+            ]
+
+            # For idle/menu states, exit session and use standard classification
+            if fsm_state not in ACTIVE_STATES_FOR_CONTEXT_CLASSIFICATION:
                 log.info(
-                    "ℹ️ Session exists but NOT expecting response - "
+                    f"ℹ️ Session in idle state '{fsm_state}' - "
                     "exiting session and using standard classification"
                 )
                 # Exit the idle session before classifying new intent
@@ -784,7 +797,7 @@ class MessagePipeline:
                     user_id=ctx.user_id,
                     session_id=active_session["id"],
                     session_type=active_session["type"],
-                    reason="new_intent_while_idle",
+                    reason="new_intent_at_idle_state",
                 )
                 return await self._standard_intent_classification(ctx)
 
