@@ -26,16 +26,16 @@ class Settings(BaseSettings):
     twilio_webhook_url: str = ""
 
     # LLM Provider Selection
-    llm_provider: str = "openai"  # Options: openai, anthropic
+    llm_provider: str = "anthropic"  # Options: openai, anthropic
 
     # OpenAI GPT
     openai_model: str = "gpt-4o"
     openai_max_tokens: int = 4096
     openai_temperature: float = 0.7
 
-    # Anthropic Claude (Backup)
+    # Anthropic Claude
     anthropic_api_key: str
-    anthropic_model: str = "claude-3-opus-20240229"
+    anthropic_model: str = "claude-opus-4-5-20251101"  # Latest Opus 4.5
     anthropic_max_tokens: int = 4096
     anthropic_temperature: float = 0.7
 
