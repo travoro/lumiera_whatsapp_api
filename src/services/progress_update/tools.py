@@ -111,8 +111,8 @@ IMPORTANT: Keep option 2 text SHORT (max 24 chars for WhatsApp limit)!
                     if tasks:
                         # SPECIAL CASE: If only ONE task, ask for confirmation instead of showing list
                         if len(tasks) == 1:
-                            tasks[0].get("title", "No title")
-                            tasks[0].get("id")
+                            task_title = tasks[0].get("title", "No title")
+                            task_id = tasks[0].get("id")
 
                             log.info(
                                 "📌 Only 1 task found - showing confirmation instead of list"
