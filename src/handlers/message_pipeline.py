@@ -1022,7 +1022,7 @@ class MessagePipeline:
                         reclassify_result = await self._standard_intent_classification(
                             ctx
                         )
-                        if reclassify_result.is_error():
+                        if not reclassify_result.success:
                             return reclassify_result
 
                         log.info(
