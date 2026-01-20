@@ -14,6 +14,7 @@ from src.config import settings
 from src.services.progress_update.tools import (
     add_progress_comment_tool,
     add_progress_image_tool,
+    exit_progress_update_session_tool,
     get_active_task_context_tool,
     get_progress_update_context_tool,
     mark_task_complete_tool,
@@ -111,6 +112,49 @@ RÈGLES IMPORTANTES :
    - Propose IMMÉDIATEMENT : "Souhaitez-vous parler avec quelqu'un de l'équipe ?"
    - Utilise escalate_to_human_tool avec reason="Erreur technique lors de la mise à jour de progression"
 
+⚠️⚠️⚠️ RÈGLES CRITIQUES - LIMITES DE MA RESPONSABILITÉ ⚠️⚠️⚠️
+
+**CE QUE JE PEUX FAIRE (Ma responsabilité)** :
+✅ Ajouter des photos pour la tâche ACTIVE en cours
+✅ Ajouter des commentaires pour la tâche ACTIVE en cours
+✅ Marquer la tâche ACTIVE en cours comme terminée
+✅ Répondre à des questions sur la tâche ACTIVE en cours
+✅ Aider avec des problèmes techniques (erreurs)
+
+**CE QUE JE NE PEUX PAS FAIRE (Hors de ma responsabilité)** :
+❌ Changer de tâche ou de projet
+❌ Lister les projets disponibles
+❌ Lister les tâches disponibles
+❌ Voir les documents ou plans
+❌ Créer un rapport d'incident
+❌ Répondre à des questions générales sur le système
+❌ Gérer des demandes concernant une tâche DIFFÉRENTE
+
+**DÉTECTION CRITIQUE - Quand SORTIR de ma session** :
+
+Si l'utilisateur demande QUELQUE CHOSE QUE JE NE PEUX PAS FAIRE :
+→ NE PAS essayer de le faire moi-même
+→ APPELER IMMÉDIATEMENT exit_progress_update_session_tool
+
+Exemples de détection :
+- "je souhaite mettre a jour une autre tache" → Hors scope (autre tâche)
+  → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_different_task")
+- "voir mes projets" → Hors scope (lister projets)
+  → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_list_projects")
+- "autre projet" → Hors scope (changer projet)
+  → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_different_project")
+- "bonjour" → Hors scope (nouvelle conversation)
+  → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_greeting_new_session")
+- "voir les documents" → Hors scope (documents)
+  → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_wants_documents")
+- "il y a un problème avec..." → Hors scope (nouveau incident)
+  → Appeler exit_progress_update_session_tool(user_id="{user_id}", reason="user_reporting_new_incident")
+
+Ce tool va :
+1. Fermer ma session proprement avec une transition FSM validée
+2. Transmettre la demande au LLM principal
+3. Le LLM principal a TOUS les outils nécessaires (list_projects, list_tasks, documents, etc.)
+
 OUTILS DISPONIBLES :
 - get_active_task_context_tool : Vérifier le contexte actif (projet/tâche) - UTILISE CECI EN PREMIER!
 - get_progress_update_context_tool : Voir l'état de la session de mise à jour
@@ -119,6 +163,7 @@ OUTILS DISPONIBLES :
 - add_progress_comment_tool : Ajouter un commentaire
 - mark_task_complete_tool : Marquer comme terminé
 - escalate_to_human_tool : Escalader vers un humain en cas d'erreur ou si l'utilisateur demande
+- exit_progress_update_session_tool : SORTIR de ma session quand demande hors de ma responsabilité
 
 Historique de conversation :
 {chat_history}
@@ -150,6 +195,7 @@ class ProgressUpdateAgent:
             add_progress_comment_tool,
             mark_task_complete_tool,
             escalate_to_human_tool,
+            exit_progress_update_session_tool,
         ]
 
         # Create prompt
@@ -249,6 +295,19 @@ class ProgressUpdateAgent:
             else:
                 log.warning(f"⚠️ Unexpected output format: {type(output)}")
                 message_text = str(output)
+
+            # CRITICAL: Check if agent called exit_progress_update_session_tool
+            # This signals the request is out of scope and should be rerouted
+            if "EXIT_SESSION_REROUTE_TO_MAIN_LLM" in message_text:
+                log.info("🚪 Agent detected out-of-scope request via exit_session tool")
+                log.info("   → Returning session_exited signal to trigger reroute")
+                return {
+                    "success": False,  # Signals fallback needed
+                    "reroute_reason": "out_of_scope",
+                    "original_message": message,
+                    "session_exited": True,
+                    "agent_used": "progress_update",
+                }
 
             response = {
                 "success": True,

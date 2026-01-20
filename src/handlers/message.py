@@ -222,6 +222,17 @@ async def handle_direct_action(
             if result.get("list_type"):
                 response["list_type"] = result["list_type"]
             return response
+        elif result.get("session_exited"):
+            # Agent gracefully exited session - request is out of scope
+            log.info(
+                f"🔄 Progress update agent exited session - Reason: {result.get('reroute_reason')}"
+            )
+            log.info(
+                "   → Triggering reroute to main pipeline for fresh intent classification"
+            )
+            # Return None to trigger main AI pipeline
+            # Pipeline will reclassify intent without session bias
+            return None
         else:
             # Fallback to full AI if specialized agent fails
             return None

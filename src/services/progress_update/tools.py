@@ -440,3 +440,106 @@ Si aucun contexte actif n'est trouvé, demande à l'utilisateur quelle tâche il
         log.error(f"Error starting progress update session: {e}")
         return f"❌ TECHNICAL ERROR: {
             str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour démarrer la session. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
+
+
+@tool
+async def exit_progress_update_session_tool(user_id: str, reason: str) -> str:
+    """Exit progress update session when user request is OUT OF YOUR SCOPE.
+
+    WHEN TO USE THIS TOOL:
+    Call this tool IMMEDIATELY when the user asks for something you CANNOT handle:
+
+    ❌ OUT OF SCOPE (use this tool):
+    - Change to another task/project ("autre tâche", "autre projet", "changer de tâche")
+    - List projects/tasks ("voir mes projets", "liste des tâches")
+    - View documents/plans ("voir les documents", "voir le plan")
+    - Report NEW incident/problem ("signaler un problème", "il y a un problème")
+    - General questions ("comment ça marche?", "qui es-tu?")
+    - New greetings ("bonjour", "salut", "hello") - indicates session restart
+    - Escalate to human ("parler à quelqu'un", "aide", "contacter l'équipe")
+
+    ✅ IN SCOPE (DO NOT use this tool):
+    - Add photo to CURRENT task
+    - Add comment to CURRENT task
+    - Mark CURRENT task complete
+    - Questions about CURRENT task
+
+    This tool will:
+    1. Trigger FSM transition (COLLECTING_DATA → ABANDONED)
+    2. Clear your session cleanly from database
+    3. Hand off to main LLM which has ALL tools (list_projects, list_tasks, etc.)
+
+    Args:
+        user_id: User ID
+        reason: Short description why exiting (e.g., "user_wants_different_task",
+                "user_greeting", "user_wants_documents")
+
+    Returns:
+        Exit signal that triggers reroute to main LLM
+    """
+    try:
+        log.info(
+            f"🚪 Progress Update Agent exiting session - Reason: {reason}",
+            user_id=user_id,
+        )
+
+        # Get current session for FSM transition
+        session = await progress_update_state.get_session(user_id)
+
+        if session:
+            # Trigger FSM transition: current_state → ABANDONED
+            from src.fsm.core import FSMContext, FSMEngine, SessionState, StateManager
+
+            # Build FSM context from session
+            current_state_str = session.get("fsm_state", "idle")
+            try:
+                current_state = SessionState(current_state_str)
+            except ValueError:
+                log.warning(
+                    f"Invalid FSM state '{current_state_str}', defaulting to IDLE"
+                )
+                current_state = SessionState.IDLE
+
+            context = FSMContext(
+                user_id=user_id,
+                current_state=current_state,
+                session_id=session.get("id"),
+                task_id=session.get("task_id"),
+            )
+
+            # Execute validated FSM transition
+            fsm_engine = FSMEngine(StateManager())
+            result = await fsm_engine.transition(
+                context=context,
+                to_state=SessionState.ABANDONED,
+                trigger="out_of_scope_request",
+                closure_reason=reason,
+            )
+
+            if result.success:
+                log.info(
+                    f"✅ FSM transition successful: {result.from_state.value} → {result.to_state.value}"
+                )
+            else:
+                log.warning(
+                    f"⚠️ FSM transition failed: {result.error} - clearing session anyway"
+                )
+
+        # Clear session from database (even if FSM transition failed)
+        await progress_update_state.clear_session(user_id, reason=reason)
+
+        log.info(
+            f"✅ Session cleared for user {user_id[:8]}... - handing off to main LLM"
+        )
+
+        # Return special signal that agent framework will detect
+        return "EXIT_SESSION_REROUTE_TO_MAIN_LLM"
+
+    except Exception as e:
+        log.error(f"Error exiting progress update session: {e}")
+        # Even on error, try to clear session
+        try:
+            await progress_update_state.clear_session(user_id, reason=f"error_{reason}")
+        except Exception:
+            pass
+        return "EXIT_SESSION_REROUTE_TO_MAIN_LLM"  # Still signal exit
