@@ -18,7 +18,11 @@ from src.services.handlers.project_handlers import (
     handle_report_incident,
 )
 from src.services.handlers.suggestion_handlers import handle_detected_issue_choice
-from src.services.handlers.task_handlers import handle_list_tasks, handle_task_details
+from src.services.handlers.task_handlers import (
+    handle_list_tasks,
+    handle_task_details,
+    handle_update_progress,
+)
 from src.utils.logger import log
 
 # Intent handler mapping
@@ -32,7 +36,7 @@ INTENT_HANDLERS = {
     "escalate": handle_escalation,
     "report_incident": handle_report_incident,
     "handle_detected_issue": handle_detected_issue_choice,  # AI-detected issue suggestion
-    # NOTE: update_progress removed from fast path - now handled by specialized agent in message.py
+    "update_progress": handle_update_progress,  # Show task list for selection
     # Add more handlers as needed
 }
 
@@ -97,5 +101,6 @@ __all__ = [
     "handle_report_incident",
     "handle_list_tasks",
     "handle_task_details",
+    "handle_update_progress",
     "handle_detected_issue_choice",
 ]

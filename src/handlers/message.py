@@ -327,6 +327,20 @@ async def handle_direct_action(
                                 f"🔍 All tool_outputs: {[t.get('tool') for t in tool_outputs]}"
                             )
                             log.info(f"🎯 Previous intent: {previous_intent}")
+                            # DEBUG: Log the actual data in list_tasks_tool
+                            for t in tool_outputs:
+                                if t.get("tool") == "list_tasks_tool":
+                                    output_data = t.get("output", [])
+                                    log.info(
+                                        f"🔍 DEBUG: list_tasks_tool output type={type(output_data)}, len={len(output_data) if isinstance(output_data, (list, dict)) else 'N/A'}"
+                                    )
+                                    if (
+                                        isinstance(output_data, list)
+                                        and len(output_data) > 0
+                                    ):
+                                        log.info(
+                                            f"🔍 DEBUG: First item: {output_data[0]}"
+                                        )
                             break
                     else:
                         # For "option" type, check if it has list_projects_tool OR get_active_task_context_tool
@@ -375,6 +389,19 @@ async def handle_direct_action(
                         if tool_output.get("tool") == "list_tasks_tool":
                             tasks_output = tool_output.get("output", [])
 
+                            # DEBUG: Log what we got
+                            log.info(
+                                f"🔍 DEBUG: tasks_output type={type(tasks_output)}, length={len(tasks_output) if isinstance(tasks_output, (list, str)) else 'N/A'}"
+                            )
+                            if isinstance(tasks_output, list) and len(tasks_output) > 0:
+                                log.info(
+                                    f"🔍 DEBUG: First task sample: {tasks_output[0]}"
+                                )
+                            elif isinstance(tasks_output, str):
+                                log.info(
+                                    f"🔍 DEBUG: tasks_output is string: {tasks_output[:100]}"
+                                )
+
                             # Handle both formats
                             if isinstance(tasks_output, str):
                                 # Re-fetch
@@ -416,6 +443,18 @@ async def handle_direct_action(
 
                                 log.info(
                                     f"✅ Selected task for progress update: {task_title} (ID: {task_id[:8]}...)"
+                                )
+
+                                # Set active task in database so progress update agent can find it
+                                from src.services.project_context import (
+                                    project_context_service,
+                                )
+
+                                await project_context_service.set_active_task(
+                                    user_id, task_id, task_title
+                                )
+                                log.info(
+                                    f"✅ Set active task in database: {task_title} (ID: {task_id[:8]}...)"
                                 )
 
                                 # Route to progress update with selected task
