@@ -163,7 +163,8 @@ async def handle_direct_action(
         from src.services.progress_update import progress_update_state
 
         # Check if there's an active progress update session
-        has_active_session = await progress_update_state.has_active_session(user_id)
+        active_session = await progress_update_state.get_session(user_id)
+        has_active_session = active_session is not None
 
         if not has_active_session:
             # No active session - check if user has active task context
