@@ -56,7 +56,7 @@ INTENTS = {
         "requires_confirmation": False,
     },
     "list_tasks": {
-        "keywords": ["tasks", "tâches", "tâche", "tache", "todo", "tareas", "tarefas"],
+        "keywords": ["tasks", "todo", "tareas", "tarefas"],
         "tools": ["list_tasks_tool"],
         "requires_confirmation": False,
     },
@@ -456,15 +456,74 @@ RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
 
                 prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
-- list_projects (l'utilisateur veut voir/sélectionner ses projets/chantiers, changer de projet, autre projet)
-- list_tasks (l'utilisateur veut voir/sélectionner les tâches pour un projet, changer de tâche, autre tâche)
-- view_documents (l'utilisateur veut voir les documents/plans d'un projet)
-- task_details (l'utilisateur veut voir les détails/description/photos d'une tâche spécifique)
-- report_incident (l'utilisateur veut signaler un problème/incident)
-- update_progress (l'utilisateur veut mettre à jour la progression d'une tâche)
+- list_projects (l'utilisateur veut VOIR/CONSULTER ses projets. Verbes: voir, consulter, montrer, lister, afficher)
+- list_tasks (l'utilisateur veut VOIR/CONSULTER les tâches. Verbes: voir, consulter, montrer, lister, afficher, vérifier)
+- view_documents (l'utilisateur veut VOIR les documents/plans d'un projet)
+- task_details (l'utilisateur veut VOIR les détails/description/photos d'une tâche spécifique)
+- report_incident (l'utilisateur veut SIGNALER un nouveau problème/incident)
+- update_progress (l'utilisateur veut MODIFIER/ACTUALISER la progression d'une tâche. Verbes: mettre à jour, modifier, changer, actualiser, éditer)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
 - general (tout le reste - questions, clarifications, demandes complexes sans contexte clair)
 {media_hint}{fsm_hint}{menu_hint}
+
+⚠️⚠️⚠️ RÈGLE CRITIQUE : DIFFÉRENCIER "LISTER" vs "METTRE À JOUR" ⚠️⚠️⚠️
+
+Cette distinction est ESSENTIELLE. Analyse le VERBE, pas seulement le nom :
+
+📋 list_tasks = L'utilisateur veut VOIR/CONSULTER/AFFICHER une liste de tâches
+   Verbes clés : voir, consulter, montrer, afficher, lister, vérifier, check
+
+   ✅ EXEMPLES list_tasks (confiance 85-95) :
+   - "voir mes tâches" → list_tasks:90
+   - "consulter les tâches" → list_tasks:90
+   - "quelles sont mes tâches ?" → list_tasks:90
+   - "montrer les tâches" → list_tasks:90
+   - "liste des tâches" → list_tasks:95
+   - "affiche mes tâches" → list_tasks:90
+   - "je veux voir les tâches" → list_tasks:90
+   - "show me the tasks" → list_tasks:90
+   - "check my tasks" → list_tasks:85
+
+📊 update_progress = L'utilisateur veut MODIFIER/CHANGER/ACTUALISER une tâche
+   Verbes clés : mettre à jour, modifier, changer, actualiser, update, éditer, compléter
+
+   ✅ EXEMPLES update_progress (confiance 85-95) :
+   - "je souhaite mettre à jour la tâche" → update_progress:95
+   - "mettre à jour la tâche" → update_progress:95
+   - "je veux mettre à jour" → update_progress:90 (si contexte de tâche dans historique)
+   - "modifier la tâche" → update_progress:90
+   - "je veux modifier la progression" → update_progress:90
+   - "actualiser la tâche" → update_progress:85
+   - "changer le statut de la tâche" → update_progress:90
+   - "update the task" → update_progress:95
+   - "I want to update progress" → update_progress:90
+
+   Cas AVEC ARTICLE DÉFINI "LA/LE" (haute confiance) :
+   - "je souhaite mettre à jour LA tâche" → update_progress:95 (LA = tâche spécifique)
+   - "modifier LA tâche" → update_progress:95
+   - "actualiser LE projet" → update_progress:90
+
+   Cas APRÈS AVOIR VU DES DÉTAILS (très haute confiance) :
+   - Si historique montre "📋 Détails de la tâche : X" → L'utilisateur vient de voir les détails
+   - Message contient "mettre à jour" / "modifier" → update_progress:95
+   - Exemple : Historique = "Détails de Task test 1" + Message = "je souhaite mettre à jour la tâche"
+     → update_progress:95 (contexte très clair)
+
+❌ NE PAS CONFONDRE (exemples de mauvaise classification) :
+   - "voir mes tâches" ≠ update_progress (c'est list_tasks:90)
+   - "mettre à jour la tâche" ≠ list_tasks (c'est update_progress:95)
+   - "consulter la progression" ≠ update_progress (c'est task_details:85)
+   - "je veux mettre à jour" + contexte tâche ≠ list_tasks (c'est update_progress:90)
+
+🔍 MÉTHODE DE CLASSIFICATION :
+1. Identifier le VERBE PRINCIPAL dans le message
+2. VERBE = voir/consulter/montrer/afficher/lister → list_tasks
+3. VERBE = mettre à jour/modifier/changer/actualiser → update_progress
+4. Vérifier le CONTEXTE dans l'historique :
+   - Historique montre détails d'une tâche → update_progress plus probable
+   - Historique montre liste de tâches → les deux sont possibles selon le verbe
+   - Historique vide → se baser uniquement sur le verbe
+
 RÈGLES DE CONTEXTE IMPORTANTES :
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
 - Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90
@@ -483,11 +542,20 @@ RÈGLES DE CONTEXTE IMPORTANTES :
 
 2. TÂCHES AVEC CONTEXTE - Si message mentionne "tâche" ET l'historique montre un projet actif:
    → Analyser l'historique récent pour détecter mention de projet (ex: "*Champigny*", "chantier X")
-   → Si projet mentionné dans historique → list_tasks:85 (user veut autre tâche du MÊME projet)
-   → Exemples avec contexte "Voici vos tâches pour *Champigny*" :
-      - "autre tâche" → list_tasks:85
-      - "je souhaite mettre à jour une autre tâche" → list_tasks:85
-      - "changer de tâche" → list_tasks:85
+   → IMPORTANT : Respecter la règle VERBE PRINCIPAL ci-dessus !
+
+   Exemples avec contexte "Voici vos tâches pour *Champigny*" :
+
+   VERBE = VOIR/CONSULTER (→ list_tasks) :
+      - "autre tâche" → list_tasks:85 (veut voir une autre tâche)
+      - "voir une autre tâche" → list_tasks:90
+      - "consulter une autre tâche" → list_tasks:85
+      - "changer de tâche" → list_tasks:85 (veut passer à une autre tâche pour la voir)
+
+   VERBE = METTRE À JOUR/MODIFIER (→ update_progress ou general) :
+      - "je souhaite mettre à jour une autre tâche" → general:85 (quelle tâche? besoin clarification)
+      - "mettre à jour une autre tâche" → general:85 (tâche non spécifiée)
+      - "modifier une autre tâche" → general:85 (besoin de savoir laquelle)
 
 3. TÂCHES SANS CONTEXTE - Si message mentionne "tâche" SANS projet clair dans l'historique:
    → general:85 (besoin de clarifier: quel projet? quelle tâche?)
@@ -495,18 +563,54 @@ RÈGLES DE CONTEXTE IMPORTANTES :
       - "je souhaite modifier une autre tache" → general:85
       - "autre tâche" (aucun projet dans historique) → general:85
 
-⚠️ RÈGLE CRITIQUE POUR update_progress :
-- NE JAMAIS classifier comme "update_progress" si la requête est VAGUE ou sans contexte de tâche claire
-- Exemples VAGUES à classifier comme "general" :
-  → "Mettre à jour les tâches" → general:85 (pas de tâche spécifique mentionnée)
-  → "Je veux faire une mise à jour" → general:85 (vague, aucune tâche)
-  → "Mise à jour de progression" → general:85 (pas de contexte)
-- Classifier "update_progress" SEULEMENT si :
-  → Session active (should_continue_session=True) ET message compatible avec ajout photo/commentaire
-  → OU utilisateur mentionne explicitement une tâche spécifique (ex: "mettre à jour tâche X")
-  → OU contexte indique clairement quelle tâche (dans l'historique récent)
-- Sinon → Toujours "general" pour laisser le LLM principal clarifier quelle tâche/projet
+⚠️ RÈGLE CRITIQUE POUR update_progress - Cas d'usage détaillés :
+
+✅ CLASSIFIER update_progress (confiance HAUTE 85-95) si :
+
+1. Session active (should_continue_session=True) ET message compatible :
+   → "voilà" + photo → update_progress:95
+   → "c'est fait" → update_progress:90
+   → "terminé" → update_progress:90
+
+2. Verbe "mettre à jour/modifier" + article défini LA/LE + contexte tâche dans historique :
+   → Historique = "Détails de la tâche : Task X"
+   → Message = "je souhaite mettre à jour LA tâche" → update_progress:95
+   → Message = "modifier LA tâche" → update_progress:95
+   → Message = "je veux mettre à jour" → update_progress:90
+
+3. Utilisateur mentionne explicitement une tâche spécifique :
+   → "mettre à jour Task test 1" → update_progress:95
+   → "modifier la tâche Mur extérieur" → update_progress:90
+
+❌ NE PAS classifier comme "update_progress" si requête VAGUE (→ general) :
+   → "Mettre à jour les tâches" → general:85 (pluriel, pas spécifique)
+   → "Je veux faire une mise à jour" → general:85 (aucune tâche mentionnée)
+   → "Mise à jour de progression" → general:85 (trop vague)
+   → "mettre à jour une autre tâche" → general:85 (laquelle?)
+
+⚖️ RÉSUMÉ : Le verbe indique l'ACTION, le contexte indique la CIBLE
+   - Verbe "mettre à jour" + contexte clair (LA tâche visible) = update_progress:95
+   - Verbe "mettre à jour" + SANS contexte (quelle tâche?) = general:85
+   - Verbe "voir" + n'importe quel contexte = list_tasks:90
 {context_section}
+
+🎯 ARBRE DE DÉCISION RAPIDE (pour "tâche" dans le message) :
+
+1. Identifier le VERBE principal :
+   📋 VOIR/CONSULTER/MONTRER/AFFICHER/LISTER → list_tasks
+   📊 METTRE À JOUR/MODIFIER/CHANGER/ACTUALISER → vérifier contexte (étape 2)
+   🚨 SIGNALER/REPORTER → report_incident
+
+2. Si verbe = METTRE À JOUR, analyser le CONTEXTE :
+   ✅ Historique = "Détails de la tâche X" → update_progress:95 (tâche connue)
+   ✅ Message = "LA tâche" (article défini) + contexte → update_progress:95
+   ❌ Message = "une autre tâche" / "les tâches" → general:85 (besoin clarification)
+   ❌ Aucun contexte de tâche → general:85
+
+3. Si aucun verbe clair, regarder CONTEXTE + NOM :
+   - "autre tâche" (sans verbe) → list_tasks:85 (présumer qu'il veut la voir)
+   - "changer de tâche" → list_tasks:85 (présumer navigation)
+
 Message actuel : {message}{media_reminder}
 
 Retourne UNIQUEMENT un JSON valide sans texte supplémentaire. Format :
