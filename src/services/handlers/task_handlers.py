@@ -359,6 +359,7 @@ async def handle_update_progress(
             mentioned_project_id or mentioned_project_id_from_text or current_project_id
         )
         tool_outputs = []
+        list_type = None  # Track what type of list we're showing
 
         # Use centralized translations
         message = get_translation("fr", "update_progress_header")
@@ -415,6 +416,9 @@ async def handle_update_progress(
                     progress = task.get("progress", 0)
                     message += f"{i}. {task['title']} ({progress}%)\n"
 
+                # We're showing a task list
+                list_type = "tasks"
+
             message += get_translation("fr", "update_progress_footer")
 
         # Scenario 5: Has projects but no selection (ask which project)
@@ -433,12 +437,16 @@ async def handle_update_progress(
                 }
             )
 
+            # We're showing a project list
+            list_type = "projects"
+
         return {
             "message": message,
             "escalation": False,
             "tools_called": [],
             "fast_path": True,
             "tool_outputs": tool_outputs,
+            "list_type": list_type,  # Include list_type so pipeline knows what we're showing
         }
 
     except Exception as e:
