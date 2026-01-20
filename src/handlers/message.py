@@ -1403,17 +1403,23 @@ async def process_inbound_message(
                 f"📱 Intent '{intent}' in INTERACTIVE_LIST_INTENTS → Formatting as interactive list"
             )
 
-            # Infer list_type from intent
-            if intent in ["list_tasks", "view_tasks"]:
-                list_type = "tasks"
-            elif intent in ["list_projects", "switch_project"]:
-                list_type = "projects"
-            elif intent == "update_progress":
-                list_type = "tasks"
+            # Use list_type from handler if provided, otherwise infer from intent
+            list_type = response_data.get("list_type")
+            if list_type:
+                log.info(f"🏷️  Using list_type from handler: {list_type}")
             else:
-                list_type = "option"
+                # Infer list_type from intent
+                if intent in ["list_tasks", "view_tasks"]:
+                    list_type = "tasks"
+                elif intent in ["list_projects", "switch_project"]:
+                    list_type = "projects"
+                elif intent == "update_progress":
+                    list_type = "tasks"
+                else:
+                    list_type = "option"
 
-            log.info(f"🏷️  Inferred list_type from intent: {list_type}")
+                log.info(f"🏷️  Inferred list_type from intent: {list_type}")
+
             message_text, interactive_data = format_for_interactive(
                 response_text, user_language, list_type
             )
