@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 from src.config import settings
 from src.utils.logger import log
@@ -292,6 +293,13 @@ class IntentClassifier:
         matches = re.findall(pattern, text, re.MULTILINE)
         return len(matches) >= 1
 
+    @traceable(
+        name="Intent Classification (Haiku)",
+        metadata={
+            "model": "claude-3-5-haiku-20241022",
+            "purpose": "classify_user_intent",
+        },
+    )
     async def classify(
         self,
         message: str,

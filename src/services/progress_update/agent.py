@@ -200,12 +200,22 @@ class ProgressUpdateAgent:
             Response dict with message and metadata
         """
         try:
+            log.info(
+                f"🤖 Progress Update Agent starting\n"
+                f"   User: {user_name} ({user_id[:8]}...)\n"
+                f"   Message: {message[:100]}{'...' if len(message) > 100 else ''}\n"
+                f"   Language: {language}\n"
+                f"   Media: {media_type or 'none'}"
+            )
+
             # Enhance message with media context
             enhanced_message = message
             if media_url and "image" in (media_type or ""):
                 enhanced_message = f"{message}\n\n[SYSTEM: L'utilisateur a envoyé une image. URL: {media_url}]"
+                log.info("   📸 Enhanced message with image URL")
 
             # Run agent
+            log.info("   ⚙️ Invoking agent executor...")
             result = await self.agent_executor.ainvoke(
                 {
                     "input": enhanced_message,
