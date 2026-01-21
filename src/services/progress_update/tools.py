@@ -258,9 +258,12 @@ async def get_progress_update_context_tool(user_id: str) -> str:
 async def add_progress_image_tool(user_id: str, image_url: str) -> str:
     """Add an image to the task being updated.
 
+    The image_url is a permanent Supabase storage URL that was already
+    downloaded and stored by the message pipeline (Stage 4).
+
     Args:
         user_id: User ID
-        image_url: Public URL of the image to attach
+        image_url: Permanent Supabase storage URL of the image to attach
 
     Returns:
         Success or error message
