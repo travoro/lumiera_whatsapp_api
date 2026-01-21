@@ -42,6 +42,7 @@ class ProgressUpdateState:
                     {
                         "user_id": user_id,
                         "session_id": session_id,
+                        "session_type": "progress_update",  # Identify this as progress_update session
                         "from_state": from_state,
                         "to_state": to_state,
                         "trigger": trigger,

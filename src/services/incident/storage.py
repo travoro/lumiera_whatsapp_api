@@ -1,7 +1,10 @@
 """Incident storage operations for local database."""
 
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
+
+import httpx
 
 from src.integrations.supabase import supabase_client
 from src.utils.logger import log
@@ -102,6 +105,83 @@ class IncidentStorage:
         except Exception as e:
             log.error(f"Error adding comment to incident {incident_id}: {e}")
             return False
+
+    async def download_and_upload_to_supabase(
+        self, incident_id: str, twilio_media_url: str
+    ) -> Optional[str]:
+        """Download image from Twilio and upload to Supabase storage.
+
+        Args:
+            incident_id: Incident ID (used for folder structure)
+            twilio_media_url: Twilio media URL
+
+        Returns:
+            Supabase public URL if successful, None otherwise
+        """
+        try:
+            from src.config import settings
+
+            log.info(f"📥 Downloading image from Twilio: {twilio_media_url[:80]}...")
+
+            # Twilio media URLs require HTTP Basic Auth (account_sid:auth_token)
+            auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+
+            # Download image from Twilio
+            async with httpx.AsyncClient() as client:
+                response = await client.get(twilio_media_url, auth=auth, timeout=30.0)
+                response.raise_for_status()
+
+            image_data = response.content
+            content_type = response.headers.get("content-type", "image/jpeg")
+
+            log.info(
+                f"   ✅ Downloaded {len(image_data)} bytes ({len(image_data) / 1024:.2f} KB)"
+            )
+
+            # Determine file extension
+            extension = ".jpg"
+            if "png" in content_type.lower():
+                extension = ".png"
+            elif "jpeg" in content_type.lower() or "jpg" in content_type.lower():
+                extension = ".jpg"
+            elif "webp" in content_type.lower():
+                extension = ".webp"
+            elif "gif" in content_type.lower():
+                extension = ".gif"
+
+            # Generate unique filename using UUID
+            filename = f"{uuid.uuid4()}{extension}"
+            # Storage path: incidents/{incident_id}/{filename}
+            storage_path = f"{incident_id}/{filename}"
+
+            log.info(f"   📤 Uploading to Supabase storage: incidents/{storage_path}")
+
+            # Upload to Supabase storage bucket "incidents"
+            upload_response = supabase_client.client.storage.from_("incidents").upload(
+                storage_path,
+                image_data,
+                {"content-type": content_type, "upsert": "false"},
+            )
+
+            # Get public URL
+            public_url = supabase_client.client.storage.from_(
+                "incidents"
+            ).get_public_url(storage_path)
+
+            log.info(f"   ✅ Image uploaded successfully: {public_url}")
+            return public_url
+
+        except httpx.HTTPStatusError as e:
+            log.error(
+                f"   ❌ HTTP error downloading from Twilio: {e.response.status_code}"
+            )
+            return None
+        except Exception as e:
+            log.error(f"   ❌ Error downloading/uploading image: {e}")
+            import traceback
+
+            log.error(f"   Traceback: {traceback.format_exc()}")
+            return None
 
     async def add_image_to_incident(self, incident_id: str, image_url: str) -> bool:
         """Add an image URL to an existing incident.

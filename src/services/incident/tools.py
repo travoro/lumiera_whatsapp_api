@@ -177,9 +177,12 @@ Tell the user: 'Désolé, je rencontre un problème technique lors de l'ajout du
 async def add_incident_image_tool(user_id: str, image_url: str) -> str:
     """Add an image to the incident being reported.
 
+    Downloads the image from Twilio and uploads it to Supabase storage
+    to ensure permanent storage (Twilio media URLs expire).
+
     Args:
         user_id: User ID
-        image_url: Public URL of the image to attach
+        image_url: Twilio media URL of the image
 
     Returns:
         Success or error message
@@ -194,9 +197,18 @@ async def add_incident_image_tool(user_id: str, image_url: str) -> str:
         if not incident_id:
             return "❌ Aucun incident trouvé. Veuillez réessayer."
 
-        # Add image to incident
+        # Download from Twilio and upload to Supabase storage
+        log.info(f"📥 Processing image for incident {incident_id}")
+        supabase_url = await incident_storage.download_and_upload_to_supabase(
+            incident_id=incident_id, twilio_media_url=image_url
+        )
+
+        if not supabase_url:
+            return "❌ Erreur lors du téléchargement de la photo. Veuillez réessayer."
+
+        # Add Supabase URL to incident (permanent storage)
         success = await incident_storage.add_image_to_incident(
-            incident_id=incident_id, image_url=image_url
+            incident_id=incident_id, image_url=supabase_url
         )
 
         if success:

@@ -42,6 +42,7 @@ class IncidentState:
                     {
                         "user_id": user_id,
                         "session_id": session_id,
+                        "session_type": "incident",  # Identify this as incident session
                         "from_state": from_state,
                         "to_state": to_state,
                         "trigger": trigger,
