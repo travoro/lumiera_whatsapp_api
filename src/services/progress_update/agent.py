@@ -14,6 +14,7 @@ from src.config import settings
 from src.services.progress_update.tools import (
     add_progress_comment_tool,
     add_progress_image_tool,
+    ask_task_completion_confirmation_tool,
     exit_progress_update_session_tool,
     get_active_task_context_tool,
     get_progress_update_context_tool,
@@ -63,13 +64,16 @@ RÈGLES IMPORTANTES :
    - Adapte tes suggestions en fonction
    - Si tout est fait (image + commentaire + complété), félicite et termine
 
-6. **Completion directe - RÈGLE CRITIQUE** :
-   - Si l'utilisateur dit "c'est fini", "terminé", "la tâche est finie", "le travail est fait", etc. → APPELLE mark_task_complete_tool(user_id="{user_id}") IMMÉDIATEMENT
-   - Si tu vois "[UTILISATEUR A CLIQUÉ: ✅ Marquer terminé]" → APPELLE mark_task_complete_tool(user_id="{user_id}") IMMÉDIATEMENT
-   - NE DEMANDE JAMAIS de confirmation supplémentaire (genre "Voulez-vous marquer comme terminée ?")
-   - Quand l'utilisateur dit que c'est fini, C'EST DÉJÀ LA CONFIRMATION
-   - Le tool utilisera automatiquement le task_id de la session active
-   - Après avoir appelé le tool, le système enverra automatiquement le résumé avec photos/commentaires ajoutés
+6. **Confirmation de completion - RÈGLE IMPORTANTE** :
+   - Si l'utilisateur dit quelque chose comme "le mur est fini", "c'est terminé", "j'ai fini" :
+     * Ce pourrait être juste un commentaire OU une indication que la tâche entière est terminée
+     * Appelle ask_task_completion_confirmation_tool(user_id="{user_id}", task_title="<nom de la tâche>")
+     * Ce tool demandera : "Voulez-vous marquer la tâche comme terminée ? 1. Oui, terminer 2. Non, continuer"
+   - Si tu vois "[UTILISATEUR A CLIQUÉ: ✅ Marquer terminé]" OU "[UTILISATEUR A CLIQUÉ: Oui, terminer]" :
+     * C'EST UNE CONFIRMATION EXPLICITE
+     * Appelle mark_task_complete_tool(user_id="{user_id}") DIRECTEMENT
+     * NE redemande PAS de confirmation
+   - Le tool mark_task_complete utilisera automatiquement le task_id de la session active
 
 7. **Fluidité** :
    - Sois naturel et conversationnel
@@ -172,7 +176,8 @@ OUTILS DISPONIBLES :
 - start_progress_update_session_tool : Démarrer une session pour une tâche
 - add_progress_image_tool : Ajouter une photo
 - add_progress_comment_tool : Ajouter un commentaire
-- mark_task_complete_tool : Marquer comme terminé - APPELLE DIRECTEMENT quand utilisateur dit "c'est fini/terminé"!
+- ask_task_completion_confirmation_tool : Demander confirmation avant de terminer (quand utilisateur dit "fini" mais pas sûr)
+- mark_task_complete_tool : Marquer comme terminé (après confirmation utilisateur)
 - escalate_to_human_tool : Escalader vers un humain en cas d'erreur ou si l'utilisateur demande
 - exit_progress_update_session_tool : SORTIR de ma session quand demande hors de ma responsabilité
 
@@ -204,6 +209,7 @@ class ProgressUpdateAgent:
             start_progress_update_session_tool,
             add_progress_image_tool,
             add_progress_comment_tool,
+            ask_task_completion_confirmation_tool,
             mark_task_complete_tool,
             escalate_to_human_tool,
             exit_progress_update_session_tool,

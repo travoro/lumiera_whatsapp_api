@@ -671,7 +671,45 @@ async def handle_direct_action(
                     "📋 Option selection detected from progress update confirmation"
                 )
 
-                # Extract confirmation data from tool_outputs
+                # Check if this is task completion confirmation
+                is_completion_confirmation = any(
+                    tool_output.get("tool") == "ask_task_completion_confirmation_tool"
+                    for tool_output in tool_outputs
+                )
+
+                if is_completion_confirmation:
+                    log.info(
+                        "✅ Task completion confirmation detected (ask_task_completion_confirmation_tool)"
+                    )
+
+                    # User selected an option from task completion confirmation
+                    if option_number == "1":
+                        # User confirmed - mark task complete
+                        log.info("✅ User confirmed completion - marking task complete")
+
+                        from src.services.progress_update.tools import (
+                            mark_task_complete_tool,
+                        )
+
+                        result_text = await mark_task_complete_tool.ainvoke(
+                            {"user_id": user_id}
+                        )
+
+                        return {
+                            "message": result_text,
+                            "tool_outputs": [],
+                            "agent_used": "progress_update",
+                        }
+                    else:
+                        # User said no - continue session
+                        log.info("❌ User declined completion - continuing session")
+                        return {
+                            "message": "D'accord, on continue ! 💪\n\nQue souhaitez-vous faire d'autre ?",
+                            "tool_outputs": [],
+                            "agent_used": "progress_update",
+                        }
+
+                # Extract confirmation data from tool_outputs (for session start confirmation)
                 confirmation_data = None
                 for tool_output in tool_outputs:
                     if tool_output.get("tool") == "get_active_task_context_tool":

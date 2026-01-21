@@ -330,6 +330,34 @@ async def add_progress_comment_tool(user_id: str, comment_text: str) -> str:
 
 
 @tool
+async def ask_task_completion_confirmation_tool(user_id: str, task_title: str) -> str:
+    """Ask user to confirm they want to mark the task as complete.
+
+    Call this when user indicates task might be done (e.g., "c'est fini", "terminé")
+    but you're not 100% sure if they mean the entire task or just a comment.
+
+    This tool stores metadata so the system knows you're waiting for completion confirmation.
+
+    Args:
+        user_id: User ID
+        task_title: Task title to show in confirmation
+
+    Returns:
+        Message to send to user asking for confirmation
+    """
+    log.info(
+        f"🤔 Asking task completion confirmation for user {user_id[:8]}... task: {task_title}"
+    )
+
+    # Return formatted confirmation question
+    # The system will automatically format this as an interactive list with "option" type
+    return f"""Voulez-vous marquer la tâche "{task_title}" comme terminée ? ✅
+
+1. Oui, terminer
+2. Non, continuer"""
+
+
+@tool
 async def mark_task_complete_tool(user_id: str) -> str:
     """Mark the task as complete (Resolved status).
 
