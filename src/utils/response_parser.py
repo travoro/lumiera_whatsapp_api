@@ -37,10 +37,18 @@ def detect_numbered_list(
         if not line:
             continue
 
+        # Strip zero-width spaces and other invisible Unicode characters before matching
+        # U+2060: Word Joiner (zero-width no-break space)
+        # U+200B: Zero Width Space
+        # U+FEFF: Zero Width No-Break Space (BOM)
+        clean_line = (
+            line.replace("\u2060", "").replace("\u200b", "").replace("\ufeff", "")
+        )
+
         # Match numbered items: "1. ...", "1) ...", "1 - ..."
-        match = re.match(r"^(\d+)[\.\)]\s+(.+)$", line)
+        match = re.match(r"^(\d+)[\.\)]\s*(.+)$", clean_line)
         if match:
-            current_section.append(line)
+            current_section.append(line)  # Keep original line with formatting
         elif current_section and not match:
             # End of numbered section
             break
@@ -51,7 +59,11 @@ def detect_numbered_list(
 
     # Parse items
     for line in current_section:
-        match = re.match(r"^(\d+)[\.\)]\s+(.+)$", line)
+        # Strip zero-width spaces and other invisible Unicode characters before matching
+        clean_line = (
+            line.replace("\u2060", "").replace("\u200b", "").replace("\ufeff", "")
+        )
+        match = re.match(r"^(\d+)[\.\)]\s*(.+)$", clean_line)
         if not match:
             continue
 
