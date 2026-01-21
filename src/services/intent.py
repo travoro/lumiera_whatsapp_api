@@ -464,10 +464,37 @@ class IntentClassifier:
                 }
 
             # PRIORITY 1: Check for exact keyword matches (high confidence)
-            # Exact keyword matching for high confidence
+            # Detect ambiguous cases that need context analysis
+            action_verbs = [
+                "mettre",
+                "modifier",
+                "actualiser",
+                "update",
+                "changer",
+                "voir",
+                "afficher",
+                "montrer",
+                "consulter",
+            ]
+            definite_articles = [" la ", " le ", " l'", " les "]
+
+            has_action = any(verb in message_lower for verb in action_verbs)
+            has_definite_article = any(
+                article in message_lower for article in definite_articles
+            )
+            word_count = len(message_lower.split())
+            # Ambiguous if: 4+ words, OR 3 words with both action AND article
+            is_ambiguous_length = word_count > 3 or (
+                word_count == 3 and has_action and has_definite_article
+            )
+
+            # Sort keywords by length (longest first) to prioritize phrases
             for intent_name, intent_config in INTENTS.items():
                 keywords = intent_config.get("keywords", [])
-                for keyword in keywords:  # type: ignore[attr-defined]
+                # Sort to check longer phrases before single words
+                keywords_sorted = sorted(keywords, key=len, reverse=True)  # type: ignore[call-overload]
+
+                for keyword in keywords_sorted:
                     if keyword in message_lower:
                         # Exact match = high confidence
                         if (
@@ -475,10 +502,24 @@ class IntentClassifier:
                             or message_lower.startswith(keyword + " ")
                             or message_lower.endswith(" " + keyword)
                         ):
-                            confidence = 0.98
-                            log.info(
-                                f"🎯 Exact keyword match: '{keyword}' → {intent_name} (confidence: {confidence})"
-                            )
+                            # Check if ambiguous case (needs context understanding)
+                            if (
+                                is_ambiguous_length
+                                and len(keyword) <= 6
+                                and (has_action or has_definite_article)
+                            ):
+                                confidence = 0.85  # Let Haiku analyze context
+                                log.info(
+                                    f"⚠️ Ambiguous keyword match: '{keyword}' → {intent_name} "
+                                    f"(confidence: {confidence}, words={word_count}, "
+                                    f"has_action={has_action}, has_article={has_definite_article}) "
+                                    f"- deferring to Haiku"
+                                )
+                            else:
+                                confidence = 0.98
+                                log.info(
+                                    f"🎯 Exact keyword match: '{keyword}' → {intent_name} (confidence: {confidence})"
+                                )
                             intent = intent_name
                             break
                         # Partial match = medium-high confidence
