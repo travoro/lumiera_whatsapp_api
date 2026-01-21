@@ -782,23 +782,21 @@ async def handle_direct_action(
                             f"📝 Option '{selected_option_text}' selected - setting up active task context"
                         )
 
-                        from src.services.progress_update.tools import (
-                            set_active_task_context_tool,
-                        )
+                        from src.services.project_context import project_context_service
 
                         # Set active task context with confirmation data
-                        await set_active_task_context_tool.ainvoke(
-                            {
-                                "user_id": user_id,
-                                "task_id": confirmation_data.get("task_id"),
-                                "project_id": confirmation_data.get("project_id"),
-                            }
-                        )
+                        task_id = confirmation_data.get("task_id")
+                        task_title = confirmation_data.get("task_title")
+
+                        if task_id:
+                            await project_context_service.set_active_task(
+                                user_id, task_id, task_title
+                            )
+                            log.info(
+                                f"✅ Active task context set: {task_title} (ID: {task_id[:8] if task_id else 'N/A'}...)"
+                            )
 
                         # Return None to defer to progress update agent with active context
-                        log.info(
-                            "✅ Active task context set - deferring to progress update agent"
-                        )
                         return None
 
             elif list_type == "option":

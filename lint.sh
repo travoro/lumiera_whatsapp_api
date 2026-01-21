@@ -24,4 +24,8 @@ echo "📦 Checking isort..."
 isort --check-only --profile black src/ tests/
 
 echo ""
+echo "🔍 Running mypy type checker..."
+mypy src/ --ignore-missing-imports --no-strict-optional
+
+echo ""
 echo "✅ All checks passed! Ready to commit."
