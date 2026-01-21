@@ -203,11 +203,16 @@ class MessagePipeline:
             if not result.success:
                 return result  # type: ignore[return-value]
 
-            # Stage 4: Process media (audio transcription)
-            if ctx.media_url and ctx.media_type and "audio" in ctx.media_type:
-                result = await self._process_audio(ctx)
-                if not result.success:
-                    return result  # type: ignore[return-value]
+            # Stage 4: Process media (audio transcription + image storage)
+            if ctx.media_url and ctx.media_type:
+                if "audio" in ctx.media_type:
+                    result = await self._process_audio(ctx)
+                    if not result.success:
+                        return result  # type: ignore[return-value]
+                elif "image" in ctx.media_type:
+                    result = await self._process_image(ctx)
+                    if not result.success:
+                        return result  # type: ignore[return-value]
 
             # Stage 5: Translate to French (internal language)
             result = await self._translate_to_french(ctx)
@@ -602,6 +607,137 @@ class MessagePipeline:
         except Exception as e:
             return Result.from_exception(e)
 
+    async def _process_image(self, ctx: MessageContext) -> Result[None]:
+        """Stage 4: Download and store image messages permanently.
+
+        This stage:
+        1. Downloads image from source URL (e.g., Twilio)
+        2. Uploads to Supabase storage "conversations" bucket for permanent retention
+        3. Updates ctx.media_url to point to stored file (not temporary Twilio URL)
+        """
+        try:
+            if not (ctx.media_url and ctx.media_type and "image" in ctx.media_type):
+                return Result.ok(None)  # Skip if not image
+
+            log.info("📸 Processing image message (download + store)")
+
+            # Download and store image
+            storage_url = await self._download_and_store_image(
+                image_url=ctx.media_url,
+                user_id=ctx.user_id,
+                message_sid=ctx.message_sid or "unknown",
+                content_type=ctx.media_type,
+            )
+
+            if storage_url:
+                # Update media URL to point to stored file (not Twilio URL)
+                ctx.media_url = storage_url
+                log.info(f"✅ Image stored: {storage_url}")
+            else:
+                log.warning("⚠️ Image storage failed - using original URL (may expire)")
+
+            return Result.ok(None)
+
+        except Exception as e:
+            log.error(f"Error processing image: {e}")
+            # Non-fatal: Continue with original URL if storage fails
+            return Result.ok(None)
+
+    async def _download_and_store_image(
+        self,
+        image_url: str,
+        user_id: str,
+        message_sid: str,
+        content_type: str,
+    ) -> Optional[str]:
+        """Download image from Twilio and upload to Supabase storage.
+
+        Args:
+            image_url: Source image URL (e.g., Twilio media URL)
+            user_id: User ID for folder organization
+            message_sid: Message SID for unique filename
+            content_type: Image content type (image/jpeg, image/png, etc.)
+
+        Returns:
+            Public URL of stored image in Supabase, or None if failed
+        """
+        try:
+            import uuid
+
+            import httpx
+
+            from src.config import settings
+
+            log.info(f"📥 Downloading image from {image_url[:80]}...")
+
+            # Check if this is a Twilio URL and add authentication
+            auth = None
+            if "api.twilio.com" in image_url:
+                auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+                log.info("   🔐 Using Twilio authentication")
+
+            # Download image from source (follow redirects as Twilio returns 307)
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.get(image_url, auth=auth)
+                response.raise_for_status()
+
+            image_data = response.content
+            actual_content_type = response.headers.get("content-type", content_type)
+
+            log.info(
+                f"   ✅ Downloaded {len(image_data)} bytes ({len(image_data) / 1024:.2f} KB)"
+            )
+
+            # Determine file extension
+            extension = ".jpg"
+            if "png" in actual_content_type.lower():
+                extension = ".png"
+            elif (
+                "jpeg" in actual_content_type.lower()
+                or "jpg" in actual_content_type.lower()
+            ):
+                extension = ".jpg"
+            elif "webp" in actual_content_type.lower():
+                extension = ".webp"
+            elif "gif" in actual_content_type.lower():
+                extension = ".gif"
+
+            # Generate filename: {user_id}/{message_sid}_{uuid}.ext
+            unique_id = str(uuid.uuid4())[:8]
+            filename = f"{message_sid}_{unique_id}{extension}"
+            storage_path = f"{user_id}/{filename}"
+
+            log.info(
+                f"   📤 Uploading to Supabase storage: conversations/{storage_path}"
+            )
+
+            # Upload to Supabase storage bucket "conversations"
+            upload_response = supabase_client.client.storage.from_(
+                "conversations"
+            ).upload(
+                storage_path,
+                image_data,
+                {"content-type": actual_content_type, "upsert": "false"},
+            )
+
+            # Get public URL
+            public_url = supabase_client.client.storage.from_(
+                "conversations"
+            ).get_public_url(storage_path)
+
+            log.info(f"   ✅ Image uploaded successfully: {public_url}")
+            return public_url
+
+        except httpx.HTTPStatusError as e:
+            log.error(f"   ❌ HTTP error downloading image: {e.response.status_code}")
+            return None
+        except Exception as e:
+            log.error(f"   ❌ Error downloading/uploading image: {e}")
+            import traceback
+
+            log.error(f"   Traceback: {traceback.format_exc()}")
+            return None
+
     async def _process_audio(self, ctx: MessageContext) -> Result[None]:
         """Stage 4: Transcribe and store audio messages.
 
@@ -861,9 +997,7 @@ class MessagePipeline:
                                     "or too old"
                                 )
                         except Exception as e:
-                            log.warning(
-                                f"⚠️ Error parsing last_activity timestamp: {e}"
-                            )
+                            log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
                     else:
                         log.info(
                             f"🔄 Active INCIDENT session found: {ctx.active_session_id[:8]}... "
@@ -1325,9 +1459,11 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(f"📍 Injecting explicit state: project={
+                log.info(
+                    f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}")
+                        agent_state.active_task_id}"
+                )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
