@@ -380,16 +380,13 @@ class MessagePipeline:
                 "saved_only": True,
             }
 
-            # Add media info if present
-            if ctx.media_url:
-                metadata["media_url"] = ctx.media_url
-                metadata["media_type"] = ctx.media_type
-
             await supabase_client.save_message(
-                subcontractor_id=ctx.user_id,
+                user_id=ctx.user_id,
+                message_text=ctx.message_body or "",
+                original_language=ctx.user_language or "fr",
                 direction="inbound",
-                content=ctx.message_body or "",
                 media_url=ctx.media_url,
+                media_type=ctx.media_type,
                 metadata=metadata,
                 session_id=ctx.session_id,
             )
@@ -858,7 +855,9 @@ class MessagePipeline:
                                     "or too old"
                                 )
                         except Exception as e:
-                            log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
+                            log.warning(
+                                f"⚠️ Error parsing last_activity timestamp: {e}"
+                            )
                     else:
                         log.info(
                             f"🔄 Active INCIDENT session found: {ctx.active_session_id[:8]}... "
@@ -1320,11 +1319,9 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(
-                    f"📍 Injecting explicit state: project={
+                log.info(f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}"
-                )
+                        agent_state.active_task_id}")
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
