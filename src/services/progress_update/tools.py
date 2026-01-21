@@ -68,10 +68,10 @@ Task ID: {active_task_id}
 PlanRadar Project ID: {planradar_project_id}
 
 AGENT INSTRUCTIONS - This is a CONFIRMATION, not a task list!
-Say: "Je comprends, vous souhaitez mettre à jour la tâche/le lot {task_title} pour le projet {project_name} ?
+Say: "Je comprends, vous souhaitez mettre à jour le lot {task_title} pour le projet {project_name} ?
 
 1. Oui, c'est ça
-2. Non, autre tâche/lot"
+2. Non, autre lot"
 
 IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
 IMPORTANT: Keep ALL options SHORT (max 20 chars for WhatsApp)! Example: "Oui" / "Autre tâche" (NOT "Changer de tâche")
@@ -164,7 +164,7 @@ Task ID mapping (for your use only, don't show to user):
 {task_id_mapping}
 
 AGENT INSTRUCTIONS:
-1. Say: "Pour quelle tâche/quel lot du projet {project_name} ?"
+1. Say: "Pour quel lot du projet {project_name} ?"
 2. Show the task list above (just numbers and titles, no formatting)
 3. When user selects by number, use start_progress_update_session_tool with the task_id from mapping above and project_id={planradar_project_id}
 4. Be simple and friendly - no technical terms"""
@@ -282,7 +282,7 @@ async def add_progress_image_tool(user_id: str, image_url: str) -> str:
             # Record action
             await progress_update_state.add_action(user_id, "image")
 
-            return "✅ Photo ajoutée avec succès à la tâche !\n\nActions restantes disponibles :\n- 💬 Laisser un commentaire\n- ✅ Marquer comme terminé"
+            return "✅ Photo ajoutée avec succès au lot !\n\nActions restantes disponibles :\n- 💬 Laisser un commentaire\n- ✅ Marquer comme terminé"
         else:
             return "❌ Erreur lors de l'ajout de la photo. Veuillez réessayer."
 
@@ -351,7 +351,7 @@ async def ask_task_completion_confirmation_tool(user_id: str, task_title: str) -
 
     # Return formatted confirmation question
     # The system will automatically format this as an interactive list with "option" type
-    return f"""Voulez-vous marquer la tâche "{task_title}" comme terminée ? ✅
+    return f"""Voulez-vous marquer le lot "{task_title}" comme terminé ? ✅
 
 1. Oui, terminer
 2. Non, continuer"""
@@ -371,7 +371,9 @@ async def mark_task_complete_tool(user_id: str) -> str:
         session = await progress_update_state.get_session(user_id)
 
         if not session:
-            return "❌ Aucune session active. Impossible de marquer la tâche comme terminée."
+            return (
+                "❌ Aucune session active. Impossible de marquer le lot comme terminé."
+            )
 
         success = await planradar_client.mark_task_complete(
             task_id=session["task_id"], project_id=session["project_id"]
@@ -397,7 +399,7 @@ async def mark_task_complete_tool(user_id: str) -> str:
 
             # Get summary
             updated_session = await progress_update_state.get_session(user_id)
-            summary = "✅ Tâche marquée comme terminée !\n\n"
+            summary = "✅ Lot marqué comme terminé !\n\n"
             summary += "📊 Résumé :\n"
             summary += f"- Photos ajoutées : {updated_session['images_uploaded']}\n"
             summary += f"- Commentaires ajoutés : {updated_session['comments_added']}\n"
@@ -414,7 +416,7 @@ async def mark_task_complete_tool(user_id: str) -> str:
     except Exception as e:
         log.error(f"Error marking task complete: {e}")
         return f"❌ TECHNICAL ERROR: {
-            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour marquer la tâche comme terminée. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
+            str(e)}\n\nTell the user: 'Désolé, je rencontre un problème technique pour marquer le lot comme terminé. Souhaitez-vous parler avec quelqu'un de l'équipe ?' and offer to escalate."
 
 
 @tool
