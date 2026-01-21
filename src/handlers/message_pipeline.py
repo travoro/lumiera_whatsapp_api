@@ -385,6 +385,26 @@ class MessagePipeline:
     async def _save_human_agent_message(self, ctx: MessageContext) -> None:
         """Save user message during human agent handoff (no bot response)."""
         try:
+            # Download and store image if present (even during handoff)
+            if ctx.media_url and ctx.media_type and "image" in ctx.media_type:
+                log.info("📸 Human agent handoff: Processing image before saving")
+                log.info(f"   🔗 Original URL: {ctx.media_url[:80]}...")
+
+                storage_url = await self._download_and_store_image(
+                    image_url=ctx.media_url,
+                    user_id=ctx.user_id,
+                    message_sid=ctx.message_sid or "unknown",
+                    content_type=ctx.media_type,
+                )
+
+                if storage_url:
+                    ctx.media_url = storage_url
+                    log.info(f"   ✅ Image stored: {storage_url[:80]}...")
+                else:
+                    log.warning(
+                        "   ⚠️ Image storage failed - using original URL (may expire)"
+                    )
+
             metadata = {
                 "human_agent_active": True,
                 "bot_processing_skipped": True,
@@ -403,6 +423,11 @@ class MessagePipeline:
             )
 
             log.info("💾 Saved user message during human agent handoff")
+            if ctx.media_url:
+                url_type = (
+                    "Supabase" if "supabase" in ctx.media_url.lower() else "Twilio"
+                )
+                log.info(f"   📎 Media URL saved ({url_type}): {ctx.media_url[:80]}...")
 
         except Exception as e:
             log.error(f"Error saving human agent message: {e}")
