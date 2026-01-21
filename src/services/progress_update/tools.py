@@ -532,6 +532,17 @@ async def exit_progress_update_session_tool(user_id: str, reason: str) -> str:
         # Clear session from database (even if FSM transition failed)
         await progress_update_state.clear_session(user_id, reason=reason)
 
+        # Clear active task context if user wants to switch to a different task
+        if "different_task" in reason or "autre_tache" in reason.lower():
+            log.info(
+                "🔄 User wants different task - clearing active task context",
+                user_id=user_id,
+            )
+            from src.services.project_context import project_context_service
+
+            await project_context_service.clear_active_task(user_id)
+            log.info("✅ Active task context cleared")
+
         log.info(
             f"✅ Session cleared for user {user_id[:8]}... - handing off to main LLM"
         )

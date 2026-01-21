@@ -776,9 +776,28 @@ async def handle_direct_action(
                         else:
                             return {"message": result["message"], "tool_outputs": []}
                     else:
-                        # Unclear selection - return None to fall back to main LLM
-                        log.warning(
-                            f"⚠️ Could not determine intent from option text: '{selected_option_text}'"
+                        # User selected something other than project/task (e.g., "Add comment")
+                        # Set up active task context and defer to progress update agent
+                        log.info(
+                            f"📝 Option '{selected_option_text}' selected - setting up active task context"
+                        )
+
+                        from src.services.progress_update.tools import (
+                            set_active_task_context_tool,
+                        )
+
+                        # Set active task context with confirmation data
+                        await set_active_task_context_tool.ainvoke(
+                            {
+                                "user_id": user_id,
+                                "task_id": confirmation_data.get("task_id"),
+                                "project_id": confirmation_data.get("project_id"),
+                            }
+                        )
+
+                        # Return None to defer to progress update agent with active context
+                        log.info(
+                            "✅ Active task context set - deferring to progress update agent"
                         )
                         return None
 
@@ -1104,6 +1123,34 @@ async def process_inbound_message(
         # Get or create session early (for direct actions)
         session = await session_service.get_or_create_session(user_id)
         session_id = session["id"] if session else None
+
+        # Check if message is a plain number and convert to action format if needed
+        plain_number_match = re.match(r"^\s*(\d+)\s*$", message_body.strip())
+        if plain_number_match:
+            number = plain_number_match.group(1)
+            log.info(f"🔢 Plain number detected: {number}")
+
+            # Check last bot message to determine list type
+            messages = await supabase_client.get_messages_by_session(
+                session_id, fields="direction,metadata,created_at"
+            )
+            messages = messages[-5:] if messages else []
+
+            # Look for most recent list
+            for msg in reversed(messages):
+                if msg and msg.get("direction") == "outbound":
+                    metadata = msg.get("metadata", {})
+                    response_type = metadata.get("response_type") if metadata else None
+                    list_type = metadata.get("list_type") if metadata else None
+
+                    if response_type == "interactive_list" and list_type:
+                        log.info(
+                            f"✅ Found recent list (type={list_type}) - converting to action format"
+                        )
+                        # Convert to action format: tasks_2_fr or option_2_fr
+                        message_body = f"{list_type}_{number}_{user_language}"
+                        log.info(f"🔄 Converted plain number to action: {message_body}")
+                        break
 
         # Handle interactive button actions (direct actions bypass pipeline)
         action_pattern = r"^(.+)_([a-z]{2})$"

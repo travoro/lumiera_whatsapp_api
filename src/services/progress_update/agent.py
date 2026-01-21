@@ -314,6 +314,8 @@ class ProgressUpdateAgent:
             intermediate_steps = result.get("intermediate_steps", [])
             log.info(f"🔍 Analyzing {len(intermediate_steps)} intermediate steps")
 
+            # CRITICAL: Check for exit tool FIRST in a separate pass
+            # This prevents early breaks from other tools from blocking exit detection
             for action, observation in intermediate_steps:
                 if not hasattr(action, "tool"):
                     continue
@@ -331,6 +333,17 @@ class ProgressUpdateAgent:
                         "session_exited": True,
                         "agent_used": "progress_update",
                     }
+
+            # Now process other tools
+            for action, observation in intermediate_steps:
+                if not hasattr(action, "tool"):
+                    continue
+
+                tool_name = action.tool
+
+                # Skip exit tool - already handled above
+                if tool_name == "exit_progress_update_session_tool":
+                    continue
 
                 # Case 1: Escalation called
                 if tool_name == "escalate_to_human_tool":
