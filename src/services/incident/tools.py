@@ -4,10 +4,10 @@ from typing import Optional
 
 from langchain.tools import tool
 
+from src.integrations.supabase import supabase_client
 from src.services.incident.state import incident_state
 from src.services.incident.storage import incident_storage
 from src.services.project_context import project_context_service
-from src.integrations.supabase import supabase_client
 from src.utils.logger import log
 
 
@@ -146,7 +146,7 @@ async def add_incident_comment_tool(user_id: str, comment_text: str) -> str:
 
         # Add comment to incident
         success = await incident_storage.add_comment_to_incident(
-            incident_id=incident_id, comment_text=comment_text
+            incident_id=incident_id, comment=comment_text
         )
 
         if success:

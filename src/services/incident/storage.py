@@ -31,7 +31,7 @@ class IncidentStorage:
             Incident ID if created successfully, None otherwise
         """
         try:
-            incident_data = {
+            incident_data: Dict[str, Any] = {
                 "subcontractor_id": user_id,
                 "project_id": project_id,
                 "created_by": user_id,
