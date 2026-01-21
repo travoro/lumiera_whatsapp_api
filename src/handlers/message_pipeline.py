@@ -22,6 +22,32 @@ from src.utils.logger import log
 from src.utils.result import Result
 
 
+def get_message_type_from_mime(media_type: Optional[str]) -> str:
+    """Convert MIME type to message type for database storage.
+
+    Args:
+        media_type: MIME type (e.g., "image/jpeg", "audio/ogg", "video/mp4")
+
+    Returns:
+        Message type: "text", "image", "audio", "video", "document"
+    """
+    if not media_type:
+        return "text"
+
+    media_type_lower = media_type.lower()
+
+    if "image" in media_type_lower:
+        return "image"
+    elif "audio" in media_type_lower:
+        return "audio"
+    elif "video" in media_type_lower:
+        return "video"
+    elif "application" in media_type_lower or "document" in media_type_lower:
+        return "document"
+    else:
+        return "text"
+
+
 @dataclass
 class MessageContext:
     """Context object passed through pipeline stages."""
@@ -432,6 +458,7 @@ class MessagePipeline:
                 original_language=ctx.user_language or "fr",
                 direction="inbound",
                 media_url=ctx.media_url,
+                message_type=get_message_type_from_mime(ctx.media_type),
                 media_type=ctx.media_type,
                 metadata=metadata,
                 session_id=ctx.session_id,
@@ -442,7 +469,9 @@ class MessagePipeline:
                 url_type = (
                     "Supabase" if "supabase" in ctx.media_url.lower() else "Twilio"
                 )
+                message_type = get_message_type_from_mime(ctx.media_type)
                 log.info(f"   📎 Media URL saved ({url_type}): {ctx.media_url[:80]}...")
+                log.info(f"   📝 Message type: {message_type}")
 
         except Exception as e:
             log.error(f"Error saving human agent message: {e}")
@@ -1891,9 +1920,11 @@ class MessagePipeline:
                 url_type = (
                     "Supabase" if "supabase" in ctx.media_url.lower() else "Twilio"
                 )
+                message_type = get_message_type_from_mime(ctx.media_type)
                 log.info("   📎 Saving inbound message with media")
                 log.info(f"   🔗 Media URL ({url_type}): {ctx.media_url[:100]}...")
-                log.info(f"   📋 Media type: {ctx.media_type}")
+                log.info(f"   📋 MIME type: {ctx.media_type}")
+                log.info(f"   📝 Message type: {message_type}")
             else:
                 log.info("   📝 Saving text-only inbound message (no media)")
 
@@ -1905,9 +1936,8 @@ class MessagePipeline:
                 direction="inbound",
                 message_sid=ctx.message_sid,
                 media_url=ctx.media_url,
-                message_type=(
-                    "audio" if ctx.media_type and "audio" in ctx.media_type else "text"
-                ),
+                message_type=get_message_type_from_mime(ctx.media_type),
+                media_type=ctx.media_type,
                 session_id=ctx.session_id,
                 metadata=incident_metadata if incident_metadata else None,
             )
