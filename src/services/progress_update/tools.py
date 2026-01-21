@@ -68,17 +68,17 @@ Task ID: {active_task_id}
 PlanRadar Project ID: {planradar_project_id}
 
 AGENT INSTRUCTIONS - This is a CONFIRMATION, not a task list!
-Say: "Je comprends, vous souhaitez mettre à jour la tâche {task_title} pour le projet {project_name} ?
+Say: "Je comprends, vous souhaitez mettre à jour la tâche/le lot {task_title} pour le projet {project_name} ?
 
 1. Oui, c'est ça
-2. Non, autre tâche"
+2. Non, autre tâche/lot"
 
 IMPORTANT: This should be formatted as list_type="option" (not "tasks")!
 IMPORTANT: Keep ALL options SHORT (max 20 chars for WhatsApp)! Example: "Oui" / "Autre tâche" (NOT "Changer de tâche")
 - If user says 1 or "oui": USE start_progress_update_session_tool with task_id={active_task_id}, project_id={planradar_project_id}
-- If user says 2 or "non": Ask user if they want to change task in same project OR change project entirely
+- If user says 2 or "non": Ask user if they want to change task/lot in same project OR change project entirely
   * If user says "changer de projet" or "autre projet": Call list_projects_tool to show all projects
-  * If user says "changer de tâche" or "autre tâche": Call get_active_task_context_tool to show task list
+  * If user says "changer de tâche/lot" or "autre tâche/lot": Call get_active_task_context_tool to show task list
 - NEVER say "session", "prête", "active", "contexte" - too technical!"""
 
         # Check for active project (7 hour expiration)
@@ -164,7 +164,7 @@ Task ID mapping (for your use only, don't show to user):
 {task_id_mapping}
 
 AGENT INSTRUCTIONS:
-1. Say: "Pour quelle tâche du projet {project_name} ?"
+1. Say: "Pour quelle tâche/quel lot du projet {project_name} ?"
 2. Show the task list above (just numbers and titles, no formatting)
 3. When user selects by number, use start_progress_update_session_tool with the task_id from mapping above and project_id={planradar_project_id}
 4. Be simple and friendly - no technical terms"""
@@ -207,7 +207,7 @@ async def get_progress_update_context_tool(user_id: str) -> str:
         session = await progress_update_state.get_session(user_id)
 
         if not session:
-            return "Aucune session de mise à jour active. Demandez à l'utilisateur pour quelle tâche il souhaite mettre à jour la progression."
+            return "Aucune session de mise à jour active. Demandez à l'utilisateur pour quelle tâche/quel lot il souhaite mettre à jour la progression."
 
         # Get task details from PlanRadar
         from src.integrations.planradar import planradar_client
@@ -496,8 +496,8 @@ async def exit_progress_update_session_tool(user_id: str, reason: str) -> str:
     Call this tool IMMEDIATELY when the user asks for something you CANNOT handle:
 
     ❌ OUT OF SCOPE (use this tool):
-    - Change to another task/project ("autre tâche", "autre projet", "changer de tâche")
-    - List projects/tasks ("voir mes projets", "liste des tâches")
+    - Change to another task/lot/project ("autre tâche", "autre lot", "autre projet", "changer de tâche/lot")
+    - List projects/tasks/lots ("voir mes projets", "liste des tâches", "liste des lots")
     - View documents/plans ("voir les documents", "voir le plan")
     - Report NEW incident/problem ("signaler un problème", "il y a un problème")
     - General questions ("comment ça marche?", "qui es-tu?")
@@ -505,8 +505,8 @@ async def exit_progress_update_session_tool(user_id: str, reason: str) -> str:
     - Escalate to human ("parler à quelqu'un", "aide", "contacter l'équipe")
 
     ✅ IN SCOPE (DO NOT use this tool):
-    - Add photo to CURRENT task
-    - Add comment to CURRENT task
+    - Add photo to CURRENT task/lot
+    - Add comment to CURRENT task/lot
     - Mark CURRENT task complete
     - Questions about CURRENT task
 
