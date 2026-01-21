@@ -1597,6 +1597,13 @@ async def process_inbound_message(
         confidence = response_data.get("confidence", 0.0)
         detected_language = response_data.get("detected_language", user_language)
 
+        # Check if human agent has taken over - no bot response needed
+        if response_data.get("human_agent_active") and response_text is None:
+            log.info(
+                f"🧑 Human agent active for user {user_id[:8]}... - message saved, no bot response sent"
+            )
+            return
+
         # Use detected language (from pipeline) instead of profile language
         if detected_language != user_language:
             log.info(

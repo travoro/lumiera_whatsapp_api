@@ -182,6 +182,12 @@ class MessagePipeline:
                 return Result.ok(
                     {
                         "message": None,  # No bot response
+                        "escalation": False,
+                        "tools_called": [],
+                        "session_id": None,
+                        "intent": None,
+                        "confidence": 0.0,
+                        "detected_language": ctx.user_language or "fr",
                         "human_agent_active": True,
                         "saved_only": True,
                     }
