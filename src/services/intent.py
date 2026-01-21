@@ -56,7 +56,22 @@ INTENTS = {
         "requires_confirmation": False,
     },
     "list_tasks": {
-        "keywords": ["tasks", "todo", "tareas", "tarefas"],
+        "keywords": [
+            # English
+            "tasks",
+            "todo",
+            # French (including construction terminology)
+            "tâche",
+            "tâches",
+            "tache",
+            "taches",
+            "lot",
+            "lots",
+            # Spanish
+            "tareas",
+            # Portuguese
+            "tarefas",
+        ],
         "tools": ["list_tasks_tool"],
         "requires_confirmation": False,
     },
@@ -475,9 +490,9 @@ RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
                 prompt = f"""Classifie ce message dans UN seul intent avec confiance :
 - greeting (hello, hi, bonjour, salut, etc.)
 - list_projects (l'utilisateur veut VOIR/CONSULTER ses projets. Verbes: voir, consulter, montrer, lister, afficher)
-- list_tasks (l'utilisateur veut VOIR/CONSULTER les tâches. Verbes: voir, consulter, montrer, lister, afficher, vérifier)
+- list_tasks (l'utilisateur veut VOIR/CONSULTER les tâches/lots. Note: "lot" = "tâche" dans le contexte construction. Verbes: voir, consulter, montrer, lister, afficher, vérifier)
 - view_documents (l'utilisateur veut VOIR les documents/plans d'un projet)
-- task_details (l'utilisateur veut VOIR les détails/description/photos d'une tâche spécifique)
+- task_details (l'utilisateur veut VOIR les détails/description/photos d'une tâche/lot spécifique)
 - report_incident (l'utilisateur veut SIGNALER un nouveau problème/incident)
 - update_progress (l'utilisateur veut MODIFIER/ACTUALISER la progression d'une tâche. Verbes: mettre à jour, modifier, changer, actualiser, éditer)
 - escalate (l'utilisateur veut parler à un humain/admin/aide)
@@ -488,8 +503,10 @@ RÈGLES PRIORITAIRES (À APPLIQUER EN PREMIER) :
 
 Cette distinction est ESSENTIELLE. Analyse le VERBE, pas seulement le nom :
 
-📋 list_tasks = L'utilisateur veut VOIR/CONSULTER/AFFICHER une liste de tâches
+📋 list_tasks = L'utilisateur veut VOIR/CONSULTER/AFFICHER une liste de tâches/lots
    Verbes clés : voir, consulter, montrer, afficher, lister, vérifier, check
+
+   ⚠️ IMPORTANT : "lot" = "tâche" dans le contexte de la construction (lot = work package)
 
    ✅ EXEMPLES list_tasks (confiance 85-95) :
    - "voir mes tâches" → list_tasks:90
@@ -501,9 +518,17 @@ Cette distinction est ESSENTIELLE. Analyse le VERBE, pas seulement le nom :
    - "je veux voir les tâches" → list_tasks:90
    - "show me the tasks" → list_tasks:90
    - "check my tasks" → list_tasks:85
+   - "voir mes lots" → list_tasks:90
+   - "consulter les lots" → list_tasks:90
+   - "montrer les lots" → list_tasks:90
+   - "montre-moi les lots du projet" → list_tasks:95
+   - "quels sont les lots ?" → list_tasks:90
+   - "liste des lots" → list_tasks:95
 
-📊 update_progress = L'utilisateur veut MODIFIER/CHANGER/ACTUALISER une tâche
+📊 update_progress = L'utilisateur veut MODIFIER/CHANGER/ACTUALISER une tâche/un lot
    Verbes clés : mettre à jour, modifier, changer, actualiser, update, éditer, compléter
+
+   ⚠️ IMPORTANT : "lot" = "tâche" dans le contexte de la construction
 
    ✅ EXEMPLES update_progress (confiance 85-95) :
    - "je souhaite mettre à jour la tâche" → update_progress:95
@@ -515,11 +540,17 @@ Cette distinction est ESSENTIELLE. Analyse le VERBE, pas seulement le nom :
    - "changer le statut de la tâche" → update_progress:90
    - "update the task" → update_progress:95
    - "I want to update progress" → update_progress:90
+   - "je souhaite mettre à jour le lot" → update_progress:95
+   - "mettre à jour le lot" → update_progress:95
+   - "modifier le lot" → update_progress:90
+   - "actualiser le lot" → update_progress:85
 
    Cas AVEC ARTICLE DÉFINI "LA/LE" (haute confiance) :
    - "je souhaite mettre à jour LA tâche" → update_progress:95 (LA = tâche spécifique)
    - "modifier LA tâche" → update_progress:95
    - "actualiser LE projet" → update_progress:90
+   - "mettre à jour LE lot" → update_progress:95 (LE = lot spécifique)
+   - "modifier LE lot" → update_progress:95
 
    Cas APRÈS AVOIR VU DES DÉTAILS (très haute confiance) :
    - Si historique montre "📋 Détails de la tâche : X" → L'utilisateur vient de voir les détails
@@ -559,7 +590,7 @@ RÈGLES DE CONTEXTE IMPORTANTES :
     Message = "option_1" / "1" → update_progress:90 (user sélectionne option de mise à jour)
 
 - Si historique montre LISTE DE PROJETS (🏗️, "projet", "chantier") ET utilisateur sélectionne numéro → list_tasks:95
-- Si historique montre LISTE DE TÂCHES (📝, "tâche") ET utilisateur sélectionne numéro → task_details:90
+- Si historique montre LISTE DE TÂCHES (📝, "tâche", "lot") ET utilisateur sélectionne numéro → task_details:90
 - Si utilisateur demande explicitement "plan", "plans", "documents" d'un projet → view_documents:90
 - Si le bot a demandé "quel projet/chantier" et l'utilisateur répond avec nom → list_tasks:90
 - Si bot pose question sur incident/progression et utilisateur répond → même intent (85-90)
@@ -584,6 +615,9 @@ RÈGLES DE CONTEXTE IMPORTANTES :
       - "voir une autre tâche" → list_tasks:90
       - "consulter une autre tâche" → list_tasks:85
       - "changer de tâche" → list_tasks:85 (veut passer à une autre tâche pour la voir)
+      - "autre lot" → list_tasks:85 (veut voir un autre lot)
+      - "voir un autre lot" → list_tasks:90
+      - "changer de lot" → list_tasks:85
 
    VERBE = METTRE À JOUR/MODIFIER (→ update_progress ou general) :
       - "je souhaite mettre à jour une autre tâche" → general:85 (quelle tâche? besoin clarification)
@@ -627,7 +661,7 @@ RÈGLES DE CONTEXTE IMPORTANTES :
    - Verbe "voir" + n'importe quel contexte = list_tasks:90
 {context_section}
 
-🎯 ARBRE DE DÉCISION RAPIDE (pour "tâche" dans le message) :
+🎯 ARBRE DE DÉCISION RAPIDE (pour "tâche" ou "lot" dans le message) :
 
 1. Identifier le VERBE principal :
    📋 VOIR/CONSULTER/MONTRER/AFFICHER/LISTER → list_tasks
@@ -643,6 +677,8 @@ RÈGLES DE CONTEXTE IMPORTANTES :
 3. Si aucun verbe clair, regarder CONTEXTE + NOM :
    - "autre tâche" (sans verbe) → list_tasks:85 (présumer qu'il veut la voir)
    - "changer de tâche" → list_tasks:85 (présumer navigation)
+   - "autre lot" (sans verbe) → list_tasks:85 (présumer qu'il veut le voir)
+   - "changer de lot" → list_tasks:85 (présumer navigation)
 
 Message actuel : {message}{media_reminder}
 
