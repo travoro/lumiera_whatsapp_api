@@ -126,9 +126,9 @@ class IncidentStorage:
             # Twilio media URLs require HTTP Basic Auth (account_sid:auth_token)
             auth = (settings.twilio_account_sid, settings.twilio_auth_token)
 
-            # Download image from Twilio
-            async with httpx.AsyncClient() as client:
-                response = await client.get(twilio_media_url, auth=auth, timeout=30.0)
+            # Download image from Twilio (follow redirects as Twilio returns 307)
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.get(twilio_media_url, auth=auth)
                 response.raise_for_status()
 
             image_data = response.content
