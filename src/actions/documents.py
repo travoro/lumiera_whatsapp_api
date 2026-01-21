@@ -88,9 +88,16 @@ async def get_documents(
             result={"count": len(formatted_docs)},
         )
 
+        # Proper French singular/plural handling
+        count = len(formatted_docs)
+        if count <= 1:
+            doc_message = f"{count} document trouvé."
+        else:
+            doc_message = f"{count} documents trouvés."
+
         return {
             "success": True,
-            "message": f"{len(formatted_docs)} document(s) trouvé(s).",
+            "message": doc_message,
             "data": formatted_docs,
         }
 

@@ -165,9 +165,17 @@ async def list_tasks(
         log.info(
             f"📊 Returning {len(formatted_tasks)} active tasks (filtered out resolved/closed)"
         )
+
+        # Proper French singular/plural handling
+        count = len(formatted_tasks)
+        if count <= 1:
+            task_message = f"{count} tâche active trouvée."
+        else:
+            task_message = f"{count} tâches actives trouvées."
+
         return {
             "success": True,
-            "message": f"{len(formatted_tasks)} tâche(s) active(s) trouvée(s).",
+            "message": task_message,
             "data": formatted_tasks,
         }
 
@@ -299,9 +307,16 @@ async def get_task_plans(
             result={"count": len(plans)},
         )
 
+        # Proper French singular/plural handling
+        count = len(plans)
+        if count <= 1:
+            plan_message = f"{count} plan trouvé."
+        else:
+            plan_message = f"{count} plans trouvés."
+
         return {
             "success": True,
-            "message": f"{len(plans)} plan(s) trouvé(s).",
+            "message": plan_message,
             "data": plans,
         }
 
@@ -367,9 +382,16 @@ async def get_task_images(
             result={"count": len(attachments)},
         )
 
+        # Proper French singular/plural handling
+        count = len(attachments)
+        if count <= 1:
+            attachment_message = f"{count} pièce jointe trouvée."
+        else:
+            attachment_message = f"{count} pièces jointes trouvées."
+
         return {
             "success": True,
-            "message": f"{len(attachments)} pièce(s) jointe(s) trouvée(s).",
+            "message": attachment_message,
             "data": attachments,
         }
 
@@ -461,9 +483,16 @@ async def get_task_comments(
             result={"count": len(comments)},
         )
 
+        # Proper French singular/plural handling
+        count = len(comments)
+        if count <= 1:
+            comment_message = f"{count} commentaire trouvé."
+        else:
+            comment_message = f"{count} commentaires trouvés."
+
         return {
             "success": True,
-            "message": f"{len(comments)} commentaire(s) trouvé(s).",
+            "message": comment_message,
             "data": comments,
         }
 
