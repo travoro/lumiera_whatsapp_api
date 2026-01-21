@@ -1524,16 +1524,19 @@ async def process_inbound_message(
                 log.info(f"🏷️  Using list_type from handler: {list_type}")
             else:
                 # Infer list_type from intent
+                # IMPORTANT: Only infer "tasks" or "projects" for explicit list intents
+                # For update_progress and other intents, default to "option" since they
+                # typically show action options, not task/project lists
                 if intent in ["list_tasks", "view_tasks"]:
                     list_type = "tasks"
                 elif intent in ["list_projects", "switch_project"]:
                     list_type = "projects"
-                elif intent == "update_progress":
-                    list_type = "tasks"
                 else:
+                    # Default to "option" for all other intents (including update_progress)
+                    # Options like "Add photo", "Mark complete", etc. should use option type
                     list_type = "option"
 
-                log.info(f"🏷️  Inferred list_type from intent: {list_type}")
+                log.info(f"🏷️  Inferred list_type from intent '{intent}': {list_type}")
 
             message_text, interactive_data = format_for_interactive(
                 response_text, user_language, list_type
