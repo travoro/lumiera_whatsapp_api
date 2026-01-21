@@ -1537,7 +1537,116 @@ class MessagePipeline:
                             f"✅ Intent reclassified: {ctx.intent} (confidence: {ctx.confidence:.0%})"
                         )
 
-                        # Now continue with the new intent - fall through to main LLM
+                        # Try fast path for reclassified intent before falling back to full agent
+                        if (
+                            settings.enable_fast_path_handlers
+                            and ctx.confidence >= settings.intent_confidence_threshold
+                        ):
+                            log.info("🚀 Attempting fast path for reclassified intent")
+
+                            # Load last bot message's tool_outputs for resolving numeric selections
+                            reclassified_last_tool_outputs: list[Any] = []
+                            reclassified_last_bot_message = None
+                            try:
+                                messages = (
+                                    await supabase_client.get_messages_by_session(
+                                        ctx.session_id,
+                                        fields="content,direction,metadata",
+                                    )
+                                )
+                                log.debug(
+                                    f"📨 Loaded {len(messages)} messages from session"
+                                )
+
+                                # Find the most recent outbound message (only check last 5 messages)
+                                recent_messages = (
+                                    messages[-5:] if len(messages) > 5 else messages
+                                )
+                                for msg in reversed(recent_messages):
+                                    if msg and msg.get("direction") == "outbound":
+                                        reclassified_last_bot_message = msg.get(
+                                            "content", ""
+                                        )
+                                        metadata = msg.get("metadata", {})
+                                        reclassified_last_tool_outputs = (
+                                            metadata.get("tool_outputs", [])
+                                            if metadata
+                                            else []
+                                        )
+
+                                        if reclassified_last_tool_outputs:
+                                            log.info(
+                                                f"📦 Loaded {len(reclassified_last_tool_outputs)} tool outputs "
+                                                f"from last bot message"
+                                            )
+                                            log.debug(
+                                                f"📋 Tool outputs: "
+                                                f"{[t.get('tool') for t in reclassified_last_tool_outputs]}"
+                                            )
+                                        else:
+                                            log.debug(
+                                                "📭 Last bot message has no tool_outputs in metadata"
+                                            )
+                                        break
+                            except Exception as e:
+                                log.warning(
+                                    f"⚠️ Could not load last message tool_outputs: {e}"
+                                )
+
+                            # Try fast path through router
+                            from src.services.handlers import execute_direct_handler
+
+                            reclassified_result = await execute_direct_handler(
+                                intent=ctx.intent,
+                                user_id=ctx.user_id,
+                                phone_number=ctx.from_number,
+                                user_name=ctx.user_name,
+                                language=ctx.user_language,
+                                message_text=ctx.message_in_french,  # For project extraction
+                                session_id=ctx.session_id,  # For context queries
+                                last_tool_outputs=reclassified_last_tool_outputs,  # Numeric selections
+                                last_bot_message=reclassified_last_bot_message,  # Menu context
+                            )
+
+                            if reclassified_result:
+                                log.info(
+                                    f"✅ Fast path succeeded for reclassified intent: {ctx.intent}"
+                                )
+                                ctx.response_text = reclassified_result.get("message")
+                                ctx.escalation = reclassified_result.get(
+                                    "escalation", False
+                                )
+                                ctx.tools_called = reclassified_result.get(
+                                    "tools_called", []
+                                )
+                                ctx.tool_outputs = reclassified_result.get(
+                                    "tool_outputs", []
+                                )
+
+                                # Capture response metadata from specialized handlers
+                                if "response_type" in reclassified_result:
+                                    ctx.response_type = reclassified_result.get(
+                                        "response_type"
+                                    )
+                                if "list_type" in reclassified_result:
+                                    ctx.list_type = reclassified_result.get("list_type")
+                                if "attachments" in reclassified_result:
+                                    ctx.attachments = reclassified_result.get(
+                                        "attachments"
+                                    )
+                                    if ctx.attachments:
+                                        log.info(
+                                            f"📦 Captured {len(ctx.attachments)} attachments "
+                                            f"from fast path"
+                                        )
+
+                                return Result.ok(None)
+                            else:
+                                log.warning(
+                                    f"❌ Fast path returned None for reclassified intent: {ctx.intent}"
+                                )
+
+                        # If fast path disabled or failed, fall through to full agent
                         log.info(
                             f"🤖 Falling back to full AI agent with reclassified intent: {ctx.intent}"
                         )
