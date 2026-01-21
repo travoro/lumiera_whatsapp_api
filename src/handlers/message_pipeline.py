@@ -203,14 +203,16 @@ class MessagePipeline:
             if not result.success:
                 return result  # type: ignore[return-value]
 
-            # Stage 4: Process media (audio transcription + image storage)
+            # Stage 4: Process media (download ALL media + transcribe audio)
             if ctx.media_url and ctx.media_type:
+                # First, download and store ALL media types permanently
+                result = await self._download_and_store_media(ctx)
+                if not result.success:
+                    return result  # type: ignore[return-value]
+
+                # Then do specific processing (transcription for audio)
                 if "audio" in ctx.media_type:
                     result = await self._process_audio(ctx)
-                    if not result.success:
-                        return result  # type: ignore[return-value]
-                elif "image" in ctx.media_type:
-                    result = await self._process_image(ctx)
                     if not result.success:
                         return result  # type: ignore[return-value]
 
@@ -385,13 +387,26 @@ class MessagePipeline:
     async def _save_human_agent_message(self, ctx: MessageContext) -> None:
         """Save user message during human agent handoff (no bot response)."""
         try:
-            # Download and store image if present (even during handoff)
-            if ctx.media_url and ctx.media_type and "image" in ctx.media_type:
-                log.info("📸 Human agent handoff: Processing image before saving")
+            # Download and store ANY media if present (even during handoff)
+            if ctx.media_url and ctx.media_type:
+                # Determine media type for logging
+                media_icon = "📎"
+                if "image" in ctx.media_type:
+                    media_icon = "📸"
+                elif "audio" in ctx.media_type:
+                    media_icon = "🎵"
+                elif "video" in ctx.media_type:
+                    media_icon = "🎬"
+                elif "application" in ctx.media_type:
+                    media_icon = "📄"
+
+                log.info(
+                    f"{media_icon} Human agent handoff: Processing {ctx.media_type} before saving"
+                )
                 log.info(f"   🔗 Original URL: {ctx.media_url[:80]}...")
 
-                storage_url = await self._download_and_store_image(
-                    image_url=ctx.media_url,
+                storage_url = await self._download_and_store_media_file(
+                    media_url=ctx.media_url,
                     user_id=ctx.user_id,
                     message_sid=ctx.message_sid or "unknown",
                     content_type=ctx.media_type,
@@ -399,10 +414,10 @@ class MessagePipeline:
 
                 if storage_url:
                     ctx.media_url = storage_url
-                    log.info(f"   ✅ Image stored: {storage_url[:80]}...")
+                    log.info(f"   ✅ Media stored: {storage_url[:80]}...")
                 else:
                     log.warning(
-                        "   ⚠️ Image storage failed - using original URL (may expire)"
+                        "   ⚠️ Media storage failed - using original URL (may expire)"
                     )
 
             metadata = {
@@ -632,26 +647,41 @@ class MessagePipeline:
         except Exception as e:
             return Result.from_exception(e)
 
-    async def _process_image(self, ctx: MessageContext) -> Result[None]:
-        """Stage 4: Download and store image messages permanently.
+    async def _download_and_store_media(self, ctx: MessageContext) -> Result[None]:
+        """Stage 4: Download and store ALL media messages permanently.
 
         This stage:
-        1. Downloads image from source URL (e.g., Twilio)
+        1. Downloads media from source URL (e.g., Twilio)
         2. Uploads to Supabase storage "conversations" bucket for permanent retention
         3. Updates ctx.media_url to point to stored file (not temporary Twilio URL)
+
+        Handles: images, audio, video, documents, etc.
         """
         try:
-            if not (ctx.media_url and ctx.media_type and "image" in ctx.media_type):
-                log.info("   ⏭️  Skipping image processing (no image media)")
-                return Result.ok(None)  # Skip if not image
+            if not (ctx.media_url and ctx.media_type):
+                log.info("   ⏭️  Skipping media download (no media)")
+                return Result.ok(None)
 
-            log.info("📸 [STAGE 4] Processing image message (download + store)")
+            # Determine media type for logging
+            media_icon = "📎"
+            if "image" in ctx.media_type:
+                media_icon = "📸"
+            elif "audio" in ctx.media_type:
+                media_icon = "🎵"
+            elif "video" in ctx.media_type:
+                media_icon = "🎬"
+            elif "application" in ctx.media_type:
+                media_icon = "📄"
+
+            log.info(
+                f"{media_icon} [STAGE 4] Processing {ctx.media_type} message (download + store)"
+            )
             log.info(f"   🔗 Original URL: {ctx.media_url[:80]}...")
             log.info(f"   📋 Content-Type: {ctx.media_type}")
 
-            # Download and store image
-            storage_url = await self._download_and_store_image(
-                image_url=ctx.media_url,
+            # Download and store media
+            storage_url = await self._download_and_store_media_file(
+                media_url=ctx.media_url,
                 user_id=ctx.user_id,
                 message_sid=ctx.message_sid or "unknown",
                 content_type=ctx.media_type,
@@ -661,44 +691,46 @@ class MessagePipeline:
                 # Update media URL to point to stored file (not Twilio URL)
                 original_url = ctx.media_url
                 ctx.media_url = storage_url
-                log.info("✅ [STAGE 4] Image processed successfully")
+                log.info("✅ [STAGE 4] Media processed successfully")
                 log.info(f"   📍 Stored URL: {storage_url}")
                 log.info(
                     "   🔄 Context updated: ctx.media_url changed from Twilio to Supabase"
                 )
             else:
                 log.warning(
-                    "⚠️ [STAGE 4] Image storage failed - using original URL (may expire)"
+                    "⚠️ [STAGE 4] Media storage failed - using original URL (may expire)"
                 )
                 log.warning(f"   ⚠️  Will save Twilio URL: {ctx.media_url[:80]}...")
 
             return Result.ok(None)
 
         except Exception as e:
-            log.error(f"❌ [STAGE 4] Error processing image: {e}")
+            log.error(f"❌ [STAGE 4] Error processing media: {e}")
             import traceback
 
             log.error(f"   Traceback: {traceback.format_exc()}")
             # Non-fatal: Continue with original URL if storage fails
             return Result.ok(None)
 
-    async def _download_and_store_image(
+    async def _download_and_store_media_file(
         self,
-        image_url: str,
+        media_url: str,
         user_id: str,
         message_sid: str,
         content_type: str,
     ) -> Optional[str]:
-        """Download image from Twilio and upload to Supabase storage.
+        """Download ANY media file from Twilio and upload to Supabase storage.
+
+        Handles images, audio, video, documents, etc.
 
         Args:
-            image_url: Source image URL (e.g., Twilio media URL)
+            media_url: Source media URL (e.g., Twilio media URL)
             user_id: User ID for folder organization
             message_sid: Message SID for unique filename
-            content_type: Image content type (image/jpeg, image/png, etc.)
+            content_type: Media content type (image/jpeg, audio/ogg, video/mp4, etc.)
 
         Returns:
-            Public URL of stored image in Supabase, or None if failed
+            Public URL of stored media in Supabase, or None if failed
         """
         try:
             import uuid
@@ -707,39 +739,70 @@ class MessagePipeline:
 
             from src.config import settings
 
-            log.info(f"📥 Downloading image from {image_url[:80]}...")
+            log.info(f"📥 Downloading media from {media_url[:80]}...")
 
             # Check if this is a Twilio URL and add authentication
             auth = None
-            if "api.twilio.com" in image_url:
+            if "api.twilio.com" in media_url:
                 auth = (settings.twilio_account_sid, settings.twilio_auth_token)
                 log.info("   🔐 Using Twilio authentication")
 
-            # Download image from source (follow redirects as Twilio returns 307)
+            # Download media from source (follow redirects as Twilio returns 307)
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                response = await client.get(image_url, auth=auth)
+                response = await client.get(media_url, auth=auth)
                 response.raise_for_status()
 
-            image_data = response.content
+            media_data = response.content
             actual_content_type = response.headers.get("content-type", content_type)
 
             log.info(
-                f"   ✅ Downloaded {len(image_data)} bytes ({len(image_data) / 1024:.2f} KB)"
+                f"   ✅ Downloaded {len(media_data)} bytes ({len(media_data) / 1024:.2f} KB)"
             )
 
-            # Determine file extension
-            extension = ".jpg"
-            if "png" in actual_content_type.lower():
+            # Determine file extension based on content type
+            extension = ".bin"  # default fallback
+            content_lower = actual_content_type.lower()
+
+            # Images
+            if "png" in content_lower:
                 extension = ".png"
-            elif (
-                "jpeg" in actual_content_type.lower()
-                or "jpg" in actual_content_type.lower()
-            ):
+            elif "jpeg" in content_lower or "jpg" in content_lower:
                 extension = ".jpg"
-            elif "webp" in actual_content_type.lower():
+            elif "webp" in content_lower:
                 extension = ".webp"
-            elif "gif" in actual_content_type.lower():
+            elif "gif" in content_lower:
                 extension = ".gif"
+            # Audio
+            elif "ogg" in content_lower:
+                extension = ".ogg"
+            elif "mpeg" in content_lower or "mp3" in content_lower:
+                extension = ".mp3"
+            elif "wav" in content_lower:
+                extension = ".wav"
+            elif "m4a" in content_lower:
+                extension = ".m4a"
+            elif "aac" in content_lower:
+                extension = ".aac"
+            # Video
+            elif "mp4" in content_lower:
+                extension = ".mp4"
+            elif "webm" in content_lower:
+                extension = ".webm"
+            elif "avi" in content_lower:
+                extension = ".avi"
+            elif "mov" in content_lower:
+                extension = ".mov"
+            # Documents
+            elif "pdf" in content_lower:
+                extension = ".pdf"
+            elif "doc" in content_lower or "word" in content_lower:
+                extension = ".docx"
+            elif "xls" in content_lower or "excel" in content_lower:
+                extension = ".xlsx"
+            elif "ppt" in content_lower or "powerpoint" in content_lower:
+                extension = ".pptx"
+            elif "text/plain" in content_lower:
+                extension = ".txt"
 
             # Generate filename: {user_id}/{message_sid}_{uuid}.ext
             unique_id = str(uuid.uuid4())[:8]
@@ -755,7 +818,7 @@ class MessagePipeline:
                 "conversations"
             ).upload(
                 storage_path,
-                image_data,
+                media_data,
                 {"content-type": actual_content_type, "upsert": "false"},
             )
 
@@ -764,14 +827,14 @@ class MessagePipeline:
                 "conversations"
             ).get_public_url(storage_path)
 
-            log.info(f"   ✅ Image uploaded successfully: {public_url}")
+            log.info(f"   ✅ Media uploaded successfully: {public_url}")
             return public_url
 
         except httpx.HTTPStatusError as e:
-            log.error(f"   ❌ HTTP error downloading image: {e.response.status_code}")
+            log.error(f"   ❌ HTTP error downloading media: {e.response.status_code}")
             return None
         except Exception as e:
-            log.error(f"   ❌ Error downloading/uploading image: {e}")
+            log.error(f"   ❌ Error downloading/uploading media: {e}")
             import traceback
 
             log.error(f"   Traceback: {traceback.format_exc()}")
