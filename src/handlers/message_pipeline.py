@@ -744,29 +744,58 @@ class MessagePipeline:
     ) -> Optional[Dict[str, Any]]:
         """Get active specialized session for user.
 
-        Checks progress_update_sessions table for active session.
+        Checks progress_update_sessions and incident_sessions tables for active session.
+        Priority order: progress_update > incident (both shouldn't exist simultaneously).
 
         Returns:
             Dict with session info or None if no active session
         """
         try:
-            from src.services.progress_update import progress_update_state
-
             log.debug(
                 f"🔍 Checking for active specialized session for user {user_id[:8]}..."
             )
-            session = await progress_update_state.get_session(user_id)
 
-            if session:
+            # Check for progress_update session first (higher priority)
+            from src.services.progress_update import progress_update_state
+
+            progress_session = await progress_update_state.get_session(user_id)
+
+            if progress_session:
                 session_info = {
-                    "id": session["id"],
+                    "id": progress_session["id"],
                     "type": "progress_update",
                     "primary_intent": "update_progress",
-                    "task_id": session.get("task_id"),
-                    "project_id": session.get("project_id"),
-                    "fsm_state": session.get("fsm_state"),
+                    "task_id": progress_session.get("task_id"),
+                    "project_id": progress_session.get("project_id"),
+                    "fsm_state": progress_session.get("fsm_state"),
                     "expecting_response": (
-                        session.get("session_metadata", {}).get(
+                        progress_session.get("session_metadata", {}).get(
+                            "expecting_response", False
+                        )
+                    ),
+                }
+                log.info(
+                    f"✅ Active session found: {session_info['type']} "
+                    f"(state: {session_info['fsm_state']}, "
+                    f"expecting_response: {session_info['expecting_response']})"
+                )
+                return session_info
+
+            # Check for incident session
+            from src.services.incident.state import incident_state
+
+            incident_session = await incident_state.get_session(user_id)
+
+            if incident_session:
+                session_info = {
+                    "id": incident_session["id"],
+                    "type": "incident",
+                    "primary_intent": "report_incident",
+                    "incident_id": incident_session.get("incident_id"),
+                    "project_id": incident_session.get("project_id"),
+                    "fsm_state": incident_session.get("fsm_state"),
+                    "expecting_response": (
+                        incident_session.get("session_metadata", {}).get(
                             "expecting_response", False
                         )
                     ),
@@ -796,7 +825,7 @@ class MessagePipeline:
         Args:
             user_id: User ID
             session_id: Session ID to exit
-            session_type: Type of session ("progress_update", etc.)
+            session_type: Type of session ("progress_update", "incident", etc.)
             reason: Reason for exit (for logging)
         """
         log.info(f"🚪 Exiting {session_type} session: {session_id[:8]}...")
@@ -807,9 +836,10 @@ class MessagePipeline:
 
             await progress_update_state.clear_session(user_id, reason=reason)
 
-        # Future: Add other session types here
-        # elif session_type == "incident_report":
-        #     await incident_report_state.clear_session(user_id, reason=reason)
+        elif session_type == "incident":
+            from src.services.incident.state import incident_state
+
+            await incident_state.clear_session(user_id, reason=reason)
 
     async def _classify_intent(self, ctx: MessageContext) -> Result[None]:
         """Stage 6: Classify user intent with LLM-based context awareness.
