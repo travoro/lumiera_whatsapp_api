@@ -135,26 +135,113 @@ async def handle_direct_action(
     # === FAST PATH FOR COMPLEX ACTIONS ===
 
     elif action == "report_incident":
-        # Route through intent router (proper layering)
+        # Check for active incident session OR active project context
         log.info(f"🚨 Routing report_incident intent for user {user_id}")
         from src.integrations.supabase import supabase_client
+        from src.services.incident.state import incident_state
 
-        # Get user name using centralized helper
+        # Check if there's an active incident session
+        active_session = await incident_state.get_session(user_id)
+        has_active_session = active_session is not None
+
+        if not has_active_session:
+            # No active session - check if user has active project context (7-hour window)
+            from src.services.project_context import project_context_service
+
+            active_project_id = await project_context_service.get_active_project(
+                user_id
+            )
+
+            if not active_project_id:
+                # No confirmed project - don't route to specialized agent
+                log.warning(
+                    "⚠️ report_incident intent but no active session or project context - "
+                    "falling back to main LLM for clarification"
+                )
+                log.info(
+                    "   Main LLM will use list_projects_tool to help user select project first"
+                )
+                return None  # Fall back to main LLM
+
+            log.info(
+                f"✅ Active project found: {active_project_id[:8]}... - proceeding to incident agent"
+            )
+        else:
+            log.info("✅ Active incident session found - proceeding to incident agent")
+
+        # Route to specialized Incident Agent
+        log.info(f"✅ Routing report_incident to specialized agent for user {user_id}")
+        from src.services.incident.agent import incident_agent
+
+        # Get user name
         user_name = supabase_client.get_user_name(user_id)
 
-        result = await intent_router.route_intent(
-            intent="report_incident",
+        # Get recent chat history (last 5 messages)
+        chat_history = await supabase_client.get_recent_messages(user_id, limit=5)
+
+        # Enhance message if it's an interactive button selection
+        enhanced_message = message_body
+        import re
+
+        button_selection = re.match(r"^option_(\d+)_[a-z]{2}$", message_body.strip())
+        if button_selection:
+            option_num = int(button_selection.group(1))
+            log.info(
+                f"🔘 Detected interactive button: option {option_num} - enriching context"
+            )
+
+            # Look for the last bot message to find what option this was
+            if chat_history:
+                for msg in reversed(chat_history):
+                    if msg.get("direction") == "outbound":
+                        content = msg.get("content", "")
+                        # Extract numbered list from message
+                        option_text_matches = re.findall(
+                            r"^\s*" + str(option_num) + r"\.\s*(.+?)$",
+                            content,
+                            re.MULTILINE,
+                        )
+                        if option_text_matches:
+                            selected_option_text = option_text_matches[0].strip()
+                            log.info(
+                                f"✅ Resolved option {option_num} → '{selected_option_text}'"
+                            )
+                            enhanced_message = f"[UTILISATEUR A CLIQUÉ: {selected_option_text}]\n\nL'utilisateur a sélectionné l'option {option_num}: {selected_option_text}"
+                            break
+
+        # Route to specialized incident agent
+        result = await incident_agent.process(
             user_id=user_id,
-            phone_number=phone_number,
             user_name=user_name,
             language=language,
+            message=enhanced_message,
+            chat_history=chat_history,
+            media_url=media_url,
+            media_type=media_type,
         )
 
-        if result:
-            # Return full structured response from handler (including list_type, attachments, etc.)
-            return result
+        if result.get("success"):
+            response = {
+                "message": result["message"],
+                "tool_outputs": result.get("tool_outputs", []),
+                "agent_used": result.get("agent_used"),
+            }
+            # Pass through response_type if present
+            if result.get("response_type"):
+                response["response_type"] = result["response_type"]
+            return response
+        elif result.get("session_exited"):
+            # Agent gracefully exited session - request is out of scope
+            log.info(
+                f"🔄 Incident agent exited session - Reason: {result.get('reroute_reason')}"
+            )
+            log.info(
+                "   → Signaling pipeline to reclassify intent without session bias"
+            )
+            # Return special marker so pipeline knows to reclassify intent
+            return {"session_exited": True, "reclassify_intent": True}
         else:
-            # Fallback to AI if fast path fails
+            # Fallback to full AI if specialized agent fails
             return None
 
     elif action == "update_progress":

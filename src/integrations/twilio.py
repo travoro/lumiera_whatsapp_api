@@ -164,12 +164,14 @@ class TwilioClient:
             if sections:
                 log.info(f"📋 Section 0: {len(sections[0].get('rows', []))} items")
                 for idx, row in enumerate(sections[0].get("rows", [])):
-                    log.info(f"   - Item {
+                    log.info(
+                        f"   - Item {
                             idx +
                             1}: id={
                             row.get('id')}, title={
                             row.get('title')}, desc={
-                            row.get('description')}")
+                            row.get('description')}"
+                    )
 
             log.info("🔧 Interactive payload structure:")
             log.info("--- START INTERACTIVE ---")
@@ -263,12 +265,14 @@ class TwilioClient:
             if sections:
                 log.info(f"📋 Section 0: {len(sections[0].get('rows', []))} items")
                 for idx, row in enumerate(sections[0].get("rows", [])):
-                    log.info(f"   - Item {
+                    log.info(
+                        f"   - Item {
                             idx +
                             1}: id={
                             row.get('id')}, title={
                             row.get('title')}, desc={
-                            row.get('description')}")
+                            row.get('description')}"
+                    )
 
             log.info("🔧 FULL Interactive payload:")
             log.info("--- START INTERACTIVE ---")

@@ -662,6 +662,74 @@ class MessagePipeline:
             else:
                 log.info("💤 No active progress update session for user")
 
+            # Check for active incident session if no progress update session
+            if not ctx.active_session_id:
+                from src.services.incident.state import incident_state
+
+                incident_session = await incident_state.get_session(ctx.user_id)
+                if incident_session:
+                    ctx.active_session_id = incident_session.get("id")
+                    ctx.fsm_state = incident_session.get("fsm_state")
+                    ctx.fsm_current_step = incident_session.get("current_step")
+
+                    # Check if bot is expecting a response
+                    session_metadata = incident_session.get("session_metadata", {})
+                    if isinstance(session_metadata, dict):
+                        ctx.expecting_response = session_metadata.get(
+                            "expecting_response", False
+                        )
+                        ctx.last_bot_options = session_metadata.get(
+                            "available_actions", []
+                        )
+
+                    # Calculate session age
+                    from datetime import datetime, timezone
+
+                    last_activity_str = incident_session.get("last_activity")
+                    if last_activity_str:
+                        try:
+                            last_activity = datetime.fromisoformat(
+                                last_activity_str.replace("Z", "+00:00")
+                            )
+                            if last_activity.tzinfo is None:
+                                last_activity = last_activity.replace(
+                                    tzinfo=timezone.utc
+                                )
+
+                            now = datetime.now(timezone.utc)
+                            age_seconds = (now - last_activity).total_seconds()
+
+                            log.info(
+                                f"🔄 Active INCIDENT session found: {ctx.active_session_id[:8]}..."
+                            )
+                            log.info(
+                                f"   State: {ctx.fsm_state} | Step: {ctx.fsm_current_step}"
+                            )
+                            log.info(f"   Expecting response: {ctx.expecting_response}")
+                            log.info(f"   Age: {age_seconds:.0f}s")
+
+                            # If expecting response and recent activity (< 5 min)
+                            if ctx.expecting_response and age_seconds < 300:
+                                ctx.should_continue_session = True
+                                log.info(
+                                    "   ✅ Should continue incident session "
+                                    "(recent activity, expecting response)"
+                                )
+                            else:
+                                log.info(
+                                    "   💤 Incident session exists but not expecting response "
+                                    "or too old"
+                                )
+                        except Exception as e:
+                            log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
+                    else:
+                        log.info(
+                            f"🔄 Active INCIDENT session found: {ctx.active_session_id[:8]}... "
+                            f"(no last_activity)"
+                        )
+                else:
+                    log.info("💤 No active incident session for user")
+
             return Result.ok(None)
 
         except Exception as e:
@@ -1085,9 +1153,11 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(f"📍 Injecting explicit state: project={
+                log.info(
+                    f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}")
+                        agent_state.active_task_id}"
+                )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
@@ -1391,7 +1461,22 @@ class MessagePipeline:
     async def _persist_messages(self, ctx: MessageContext) -> None:
         """Stage 9: Save inbound and outbound messages to database."""
         try:
-            # Save inbound message
+            # Check if there's an active incident session to link messages
+            incident_metadata: Dict[str, Any] = {}
+            if ctx.active_session_id and ctx.agent_used == "incident":
+                from src.services.incident.state import incident_state
+
+                incident_session = await incident_state.get_session(ctx.user_id)
+                if incident_session and incident_session.get("incident_id"):
+                    incident_metadata["incident_id"] = incident_session["incident_id"]
+                    incident_metadata["incident_session_id"] = ctx.active_session_id
+                    if ctx.media_url:
+                        incident_metadata["incident_action"] = "image"
+                    log.debug(
+                        f"📎 Linking message to incident {incident_session['incident_id'][:8]}..."
+                    )
+
+            # Save inbound message with incident metadata if applicable
             await supabase_client.save_message(
                 user_id=ctx.user_id,
                 message_text=ctx.message_body,
@@ -1403,6 +1488,7 @@ class MessagePipeline:
                     "audio" if ctx.media_type and "audio" in ctx.media_type else "text"
                 ),
                 session_id=ctx.session_id,
+                metadata=incident_metadata if incident_metadata else None,
             )
 
             # Build metadata for outbound message
@@ -1427,6 +1513,14 @@ class MessagePipeline:
                 log.debug(
                     f"💾 Storing pending_action ({ctx.pending_action.get('type')}) "
                     f"in message metadata"
+                )
+
+            # Add incident metadata to outbound message if applicable
+            if incident_metadata and incident_metadata.get("incident_id"):
+                outbound_metadata["incident_id"] = incident_metadata["incident_id"]
+                outbound_metadata["incident_action"] = "response"
+                log.debug(
+                    f"📎 Linking outbound message to incident {incident_metadata['incident_id'][:8]}..."
                 )
 
             # Save outbound message with metadata
