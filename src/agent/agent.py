@@ -395,47 +395,100 @@ class LumieraAgent:
                 intermediate_steps = result.get("intermediate_steps", [])
                 tool_outputs = []
 
-                for action, tool_result in intermediate_steps:
+                log.info(f"📊 Processing {len(intermediate_steps)} intermediate steps")
+                log.info(
+                    f"🔑 Current user_id parameter: {user_id[:8] if user_id else 'NONE'}..."
+                )
+
+                for idx, (action, tool_result) in enumerate(intermediate_steps):
+                    log.info(f"   Step {idx}: tool={action.tool}")
+
                     # For list_tasks_tool, fetch structured data from action layer
                     # (tool_result is a formatted string, but we need structured data)
                     if action.tool == "list_tasks_tool":
+                        log.info(f"   🎯 Processing list_tasks_tool (step {idx})")
+
                         # Re-fetch structured data from actions layer
                         from src.actions import tasks as task_actions
                         from src.utils.metadata_helpers import compact_tasks
 
                         project_id = action.tool_input.get("project_id")
-                        user_id_input = action.tool_input.get("user_id")
+                        log.info(
+                            f"   📦 tool_input keys: {list(action.tool_input.keys())}"
+                        )
+                        log.info(
+                            f"   📦 project_id from tool_input: {project_id[:8] if project_id else 'NONE'}..."
+                        )
+
+                        # CRITICAL: user_id is NOT in tool_input (uses execution context)
+                        # Use the user_id from process_message parameters instead
+                        user_id_for_fetch = (
+                            user_id  # Use user_id from method parameters
+                        )
+                        log.info(
+                            f"   🔑 user_id from method param: {user_id[:8] if user_id else 'NONE'}..."
+                        )
+                        log.info(
+                            f"   🔑 user_id_for_fetch assigned: {user_id_for_fetch[:8] if user_id_for_fetch else 'NONE'}..."
+                        )
 
                         log.info(
                             f"   🔍 Re-fetching structured data for list_tasks_tool: "
                             f"project_id={project_id[:8] if project_id else None}..., "
-                            f"user_id={user_id_input[:8] if user_id_input else None}..."
+                            f"user_id={user_id_for_fetch[:8] if user_id_for_fetch else None}..."
                         )
 
-                        if project_id and user_id_input:
-                            task_result = await task_actions.list_tasks(
-                                user_id_input, project_id
-                            )
+                        if project_id and user_id_for_fetch:
                             log.info(
-                                f"   📊 Re-fetch result: success={task_result.get('success')}, "
-                                f"has_data={bool(task_result.get('data'))}, "
-                                f"data_len={len(task_result.get('data', []))}"
+                                "   ✅ Both project_id and user_id present, calling list_tasks..."
                             )
-                            if task_result.get("success") and task_result.get("data"):
-                                structured_output = compact_tasks(task_result["data"])
-                                log.info(
-                                    f"   🗜️ Stored structured data for list_tasks_tool: {len(structured_output)} tasks"
+                            try:
+                                task_result = await task_actions.list_tasks(
+                                    user_id_for_fetch, project_id
                                 )
-                            else:
-                                log.warning(
-                                    "   ⚠️ Re-fetch failed or returned no data, using empty array"
+                                log.info(
+                                    f"   📊 Re-fetch result: success={task_result.get('success')}, "
+                                    f"has_data={bool(task_result.get('data'))}, "
+                                    f"data_len={len(task_result.get('data', []))}"
+                                )
+                                if task_result.get("success") and task_result.get(
+                                    "data"
+                                ):
+                                    log.info(
+                                        f"   🗜️ Compacting {len(task_result['data'])} tasks..."
+                                    )
+                                    structured_output = compact_tasks(
+                                        task_result["data"]
+                                    )
+                                    log.info(
+                                        f"   ✅ Stored structured data for list_tasks_tool: {len(structured_output)} tasks"
+                                    )
+                                    if structured_output:
+                                        log.info(
+                                            f"   📝 First task sample: {structured_output[0]}"
+                                        )
+                                else:
+                                    log.warning(
+                                        f"   ⚠️ Re-fetch failed or returned no data (success={task_result.get('success')}), using empty array"
+                                    )
+                                    structured_output = []
+                            except Exception as e:
+                                log.error(
+                                    f"   ❌ Exception during re-fetch: {e}",
+                                    exc_info=True,
                                 )
                                 structured_output = []
                         else:
                             log.warning(
-                                "   ⚠️ Missing project_id or user_id in tool_input, using empty array"
+                                f"   ⚠️ Missing required params: project_id={bool(project_id)} ({project_id if project_id else 'None'}), "
+                                f"user_id={bool(user_id_for_fetch)} ({user_id_for_fetch if user_id_for_fetch else 'None'})"
                             )
+                            log.warning("   ❌ Cannot re-fetch, using empty array")
                             structured_output = []
+
+                        log.info(
+                            f"   📤 Final structured_output length: {len(structured_output)}"
+                        )
 
                         tool_output_entry = {
                             "tool": action.tool,
