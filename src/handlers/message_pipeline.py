@@ -1302,6 +1302,21 @@ class MessagePipeline:
                 "tool_outputs", []
             )  # NEW: Store for persistence
 
+            # CRITICAL: If AI agent called list_tasks_tool or list_projects_tool,
+            # override intent so message gets formatted as interactive list
+            if "list_tasks_tool" in ctx.tools_called:
+                log.info(
+                    "🔄 AI agent called list_tasks_tool → Overriding intent to 'list_tasks'"
+                )
+                ctx.intent = "list_tasks"
+                ctx.list_type = "tasks"
+            elif "list_projects_tool" in ctx.tools_called:
+                log.info(
+                    "🔄 AI agent called list_projects_tool → Overriding intent to 'list_projects'"
+                )
+                ctx.intent = "list_projects"
+                ctx.list_type = "projects"
+
             log.info("✅ Agent processed message")
             return Result.ok(None)
 
