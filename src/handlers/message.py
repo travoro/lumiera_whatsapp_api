@@ -179,7 +179,9 @@ async def handle_direct_action(
         enhanced_message = message_body
         import re
 
-        button_selection = re.match(r"^option_(\d+)_[a-z]{2}$", message_body.strip())
+        button_selection = re.match(
+            r"^option_(\d+)_[a-z]{2}$", message_body.strip() if message_body else ""
+        )
         if button_selection:
             option_num = int(button_selection.group(1))
             log.info(
@@ -287,7 +289,9 @@ async def handle_direct_action(
         enhanced_message = message_body
         import re
 
-        button_selection = re.match(r"^option_(\d+)_[a-z]{2}$", message_body.strip())
+        button_selection = re.match(
+            r"^option_(\d+)_[a-z]{2}$", message_body.strip() if message_body else ""
+        )
         if button_selection:
             option_num = int(button_selection.group(1))
             log.info(
@@ -1322,7 +1326,9 @@ async def process_inbound_message(
         session_id = session["id"] if session else None
 
         # Check if message is a plain number and convert to action format if needed
-        plain_number_match = re.match(r"^\s*(\d+)\s*$", message_body.strip())
+        plain_number_match = re.match(
+            r"^\s*(\d+)\s*$", message_body.strip() if message_body else ""
+        )
         if plain_number_match:
             number = plain_number_match.group(1)
             log.info(f"🔢 Plain number detected: {number}")
@@ -1351,7 +1357,9 @@ async def process_inbound_message(
 
         # Handle interactive button actions (direct actions bypass pipeline)
         action_pattern = r"^(.+)_([a-z]{2})$"
-        action_match = re.match(action_pattern, message_body.strip())
+        action_match = re.match(
+            action_pattern, message_body.strip() if message_body else ""
+        )
 
         if action_match:
             action_id = action_match.group(1)
