@@ -200,12 +200,42 @@ async def handle_direct_action(
         # Get recent chat history (last 5 messages)
         chat_history = await supabase_client.get_recent_messages(user_id, limit=5)
 
+        # Enhance message if it's an interactive button selection
+        enhanced_message = message_body
+        import re
+
+        button_selection = re.match(r"^option_(\d+)_[a-z]{2}$", message_body.strip())
+        if button_selection:
+            option_num = int(button_selection.group(1))
+            log.info(
+                f"🔘 Detected interactive button: option {option_num} - enriching context"
+            )
+
+            # Look for the last bot message to find what option this was
+            if chat_history:
+                for msg in reversed(chat_history):
+                    if msg.get("direction") == "outbound":
+                        content = msg.get("content", "")
+                        # Extract numbered list from message
+                        option_text_matches = re.findall(
+                            r"^\s*" + str(option_num) + r"\.\s*(.+?)$",
+                            content,
+                            re.MULTILINE,
+                        )
+                        if option_text_matches:
+                            selected_option_text = option_text_matches[0].strip()
+                            log.info(
+                                f"✅ Resolved option {option_num} → '{selected_option_text}'"
+                            )
+                            enhanced_message = f"[UTILISATEUR A CLIQUÉ: {selected_option_text}]\n\nL'utilisateur a sélectionné l'option {option_num}: {selected_option_text}"
+                            break
+
         # Route to specialized agent
         result = await progress_update_agent.process(
             user_id=user_id,
             user_name=user_name,
             language=language,
-            message=message_body,
+            message=enhanced_message,
             chat_history=chat_history,
             media_url=media_url,
             media_type=media_type,
