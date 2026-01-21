@@ -14,24 +14,25 @@ from src.utils.whatsapp_formatter import get_translation
 async def get_projects_with_context(
     user_id: str, language: str
 ) -> Tuple[List[Dict[str, Any]], Optional[str], Optional[str]]:
-    """Get user's projects.
+    """Get user's projects with active project context.
 
     This is a common pattern used across multiple handlers to:
     1. Fetch all projects for the user
-    2. Return formatted response based on scenario
+    2. Check for active project context (7-hour window)
+    3. Return formatted response based on scenario
 
     Args:
         user_id: Subcontractor ID
         language: User's language code
 
     Returns:
-        Tuple of (projects, None, message_if_no_projects)
+        Tuple of (projects, current_project_id, message_if_no_projects)
         - projects: List of project dicts
-        - None: Placeholder for backwards compatibility (previously current_project_id)
+        - current_project_id: Active project ID if within 7-hour window, else None
         - message_if_no_projects: Translated "no projects" message if applicable, else None
 
     Example:
-        projects, _, no_projects_msg = await get_projects_with_context(user_id, "fr")
+        projects, current_project_id, no_projects_msg = await get_projects_with_context(user_id, "fr")
         if no_projects_msg:
             return {"message": no_projects_msg, ...}
     """
@@ -44,7 +45,16 @@ async def get_projects_with_context(
             no_projects_msg = get_translation("fr", "no_projects")
             return ([], None, no_projects_msg)
 
-        return (projects, None, None)
+        # Check for active project context (7-hour window)
+        from src.services.project_context import project_context_service
+
+        current_project_id = await project_context_service.get_active_project(user_id)
+        if current_project_id:
+            log.debug(
+                f"✅ Active project context found for user {user_id}: {current_project_id[:8]}..."
+            )
+
+        return (projects, current_project_id, None)
 
     except Exception as e:
         log.error(f"Error in get_projects_with_context for user {user_id}: {e}")
