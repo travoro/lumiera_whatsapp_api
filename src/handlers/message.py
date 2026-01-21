@@ -1163,10 +1163,41 @@ async def handle_direct_action(
                         projects = tool_output.get("output", [])
                         log.info(f"📋 Found {len(projects)} projects in tool_outputs")
 
+                        # Debug: Check if projects is actually a string (corrupted data)
+                        if isinstance(projects, str):
+                            log.error(
+                                f"❌ Projects data is a string, not a list! Length: {len(projects)}"
+                            )
+                            log.debug(f"   Projects data: {str(projects)[:200]}...")
+                            return None
+
+                        # Debug: Check first project structure
+                        if projects and len(projects) > 0:
+                            log.debug(
+                                f"   First project type: {type(projects[0]).__name__}"
+                            )
+                            if isinstance(projects[0], dict):
+                                log.debug(
+                                    f"   First project keys: {list(projects[0].keys())}"
+                                )
+                            else:
+                                log.debug(f"   First project value: {projects[0]}")
+
                         # Get the project at the selected index (1-based)
                         index = int(option_number) - 1
                         if 0 <= index < len(projects):
                             selected_project = projects[index]
+
+                            # Validate project is a dict (defensive coding)
+                            if not isinstance(selected_project, dict):
+                                log.error(
+                                    f"❌ Invalid project data at index {index}: "
+                                    f"expected dict, got {type(selected_project).__name__}"
+                                )
+                                log.debug(f"   Project data: {selected_project}")
+                                log.debug(f"   All projects: {projects[:3]}...")
+                                return None
+
                             project_id = selected_project.get("id")
                             project_name = selected_project.get("nom")
                             log.info(
