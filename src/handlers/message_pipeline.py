@@ -617,9 +617,12 @@ class MessagePipeline:
         """
         try:
             if not (ctx.media_url and ctx.media_type and "image" in ctx.media_type):
+                log.info("   ⏭️  Skipping image processing (no image media)")
                 return Result.ok(None)  # Skip if not image
 
-            log.info("📸 Processing image message (download + store)")
+            log.info("📸 [STAGE 4] Processing image message (download + store)")
+            log.info(f"   🔗 Original URL: {ctx.media_url[:80]}...")
+            log.info(f"   📋 Content-Type: {ctx.media_type}")
 
             # Download and store image
             storage_url = await self._download_and_store_image(
@@ -631,15 +634,26 @@ class MessagePipeline:
 
             if storage_url:
                 # Update media URL to point to stored file (not Twilio URL)
+                original_url = ctx.media_url
                 ctx.media_url = storage_url
-                log.info(f"✅ Image stored: {storage_url}")
+                log.info("✅ [STAGE 4] Image processed successfully")
+                log.info(f"   📍 Stored URL: {storage_url}")
+                log.info(
+                    "   🔄 Context updated: ctx.media_url changed from Twilio to Supabase"
+                )
             else:
-                log.warning("⚠️ Image storage failed - using original URL (may expire)")
+                log.warning(
+                    "⚠️ [STAGE 4] Image storage failed - using original URL (may expire)"
+                )
+                log.warning(f"   ⚠️  Will save Twilio URL: {ctx.media_url[:80]}...")
 
             return Result.ok(None)
 
         except Exception as e:
-            log.error(f"Error processing image: {e}")
+            log.error(f"❌ [STAGE 4] Error processing image: {e}")
+            import traceback
+
+            log.error(f"   Traceback: {traceback.format_exc()}")
             # Non-fatal: Continue with original URL if storage fails
             return Result.ok(None)
 
@@ -1767,6 +1781,8 @@ class MessagePipeline:
     async def _persist_messages(self, ctx: MessageContext) -> None:
         """Stage 9: Save inbound and outbound messages to database."""
         try:
+            log.info("💾 [STAGE 9] Persisting messages to database")
+
             # Check if there's an active incident session to link messages
             incident_metadata: Dict[str, Any] = {}
             if ctx.active_session_id and ctx.agent_used == "incident":
@@ -1782,6 +1798,17 @@ class MessagePipeline:
                         f"📎 Linking message to incident {incident_session['incident_id'][:8]}..."
                     )
 
+            # Log media URL being saved
+            if ctx.media_url:
+                url_type = (
+                    "Supabase" if "supabase" in ctx.media_url.lower() else "Twilio"
+                )
+                log.info("   📎 Saving inbound message with media")
+                log.info(f"   🔗 Media URL ({url_type}): {ctx.media_url[:100]}...")
+                log.info(f"   📋 Media type: {ctx.media_type}")
+            else:
+                log.info("   📝 Saving text-only inbound message (no media)")
+
             # Save inbound message with incident metadata if applicable
             await supabase_client.save_message(
                 user_id=ctx.user_id,
@@ -1796,6 +1823,7 @@ class MessagePipeline:
                 session_id=ctx.session_id,
                 metadata=incident_metadata if incident_metadata else None,
             )
+            log.info("   ✅ Inbound message saved to database")
 
             # Build metadata for outbound message
             outbound_metadata: Dict[str, Any] = {}

@@ -1562,6 +1562,10 @@ async def process_inbound_message(
             interactive_data = {"payload": button_payload, "text": button_text}
 
         log.info("🔄 Processing message through pipeline")
+        if media_url:
+            log.info(
+                f"   📎 Pipeline input - Media: type={media_content_type}, url={media_url[:80]}..."
+            )
         result = await message_pipeline.process(
             from_number=phone_number,
             message_body=message_body,

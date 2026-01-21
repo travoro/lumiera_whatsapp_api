@@ -68,6 +68,14 @@ async def whatsapp_webhook(
         else:
             log.info(f"Received webhook from {From}")
 
+        # Log media information if present
+        if MediaUrl0:
+            log.info(
+                f"📎 Media received: type={MediaContentType0}, url={MediaUrl0[:80]}..."
+            )
+        else:
+            log.info("📝 Text-only message (no media)")
+
         # Process message asynchronously (fire and forget)
         # In production, consider using a task queue like Celery or background tasks
         await process_inbound_message(
