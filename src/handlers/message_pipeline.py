@@ -38,7 +38,10 @@ class MessageContext:
     user_id: Optional[str] = None
     user_name: Optional[str] = None
     user_language: Optional[str] = None
+    user: Optional[Dict[str, Any]] = None  # Full user object for handoff checks
     session_id: Optional[str] = None
+    human_agent_active: bool = False  # Flag to skip bot processing
+    skip_bot_processing: bool = False  # Set when human agent is active
     message_in_french: Optional[str] = None
     last_bot_message: Optional[str] = (
         None  # Last message sent by bot (for menu context)
@@ -166,6 +169,24 @@ class MessagePipeline:
             if not result.success:
                 return result  # type: ignore[return-value]
 
+            # Stage 1.5: Check if human agent has taken over
+            result = await self._check_human_agent_handoff(ctx)
+            if not result.success:
+                return result  # type: ignore[return-value]
+
+            # If human agent is active, skip all bot processing
+            if ctx.skip_bot_processing:
+                log.info(
+                    "✅ Message saved during human agent handoff - skipping bot processing"
+                )
+                return Result.ok(
+                    {
+                        "message": None,  # No bot response
+                        "human_agent_active": True,
+                        "saved_only": True,
+                    }
+                )
+
             # Stage 2: Get or create session
             result = await self._manage_session(ctx)
             if not result.success:
@@ -250,6 +271,7 @@ class MessagePipeline:
             if not user:
                 raise UserNotFoundException(user_id=ctx.from_number)
 
+            ctx.user = user  # Store full user object for handoff checks
             ctx.user_id = user["id"]
             ctx.user_name = user.get("contact_prenom") or user.get("contact_name", "")
             # Normalize language code (handle both "fr" and "french" formats)
@@ -261,6 +283,121 @@ class MessagePipeline:
 
         except Exception as e:
             return Result.from_exception(e)
+
+    async def _check_human_agent_handoff(self, ctx: MessageContext) -> Result[None]:
+        """Stage 1.5: Check if human agent has taken over conversation.
+
+        If human_agent_active is true and not expired:
+        - Save user message with metadata
+        - Skip all bot processing (no LLM, no handlers, no response)
+        - Return success to end pipeline early
+
+        If expired:
+        - Clear handoff flag
+        - Continue normal processing
+        """
+        try:
+            # Check handoff status from user object (loaded in Stage 1)
+            human_agent_active = ctx.user.get("human_agent_active", False)
+
+            if not human_agent_active:
+                # Normal flow - continue to session management
+                return Result.ok(None)
+
+            # Check expiration
+            expires_at_str = ctx.user.get("human_agent_expires_at")
+            if not expires_at_str:
+                # Flag is true but no expiration set - shouldn't happen, clear it
+                log.warning(
+                    f"⚠️ human_agent_active=true but no expires_at for user {ctx.user_id[:8]}... - clearing flag"
+                )
+                await self._clear_human_agent_handoff(ctx.user_id)
+                return Result.ok(None)
+
+            # Parse expiration timestamp
+            from datetime import datetime, timezone
+
+            expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+            now = datetime.now(timezone.utc)
+
+            # Check if expired
+            if now >= expires_at:
+                # Expired - clear flag and resume normal processing
+                log.info(
+                    f"🕐 Human agent handoff expired for user {ctx.user_id[:8]}... - resuming bot"
+                )
+                await self._clear_human_agent_handoff(ctx.user_id)
+                return Result.ok(None)
+
+            # Still active - save message only, skip bot processing
+            agent_since = ctx.user.get("human_agent_since")
+            time_remaining = (expires_at - now).total_seconds() / 3600  # hours
+            log.info(
+                f"🧑 Human agent active for user {ctx.user_id[:8]}... "
+                f"(since: {agent_since}, expires in: {time_remaining:.1f}h) - saving message only"
+            )
+
+            # Save inbound message with metadata
+            await self._save_human_agent_message(ctx)
+
+            # Set flags to skip all bot processing
+            ctx.human_agent_active = True
+            ctx.skip_bot_processing = True
+
+            # Return success - pipeline will check these flags and skip stages
+            return Result.ok(None)
+
+        except Exception as e:
+            log.error(f"Error checking human agent handoff: {e}")
+            # On error, continue normal flow to avoid blocking user
+            return Result.ok(None)
+
+    async def _clear_human_agent_handoff(self, user_id: str) -> None:
+        """Clear human agent handoff flag in database."""
+        try:
+            supabase_client.client.table("subcontractors").update(
+                {
+                    "human_agent_active": False,
+                    "human_agent_since": None,
+                    "human_agent_expires_at": None,
+                }
+            ).eq("id", user_id).execute()
+
+            log.info(f"✅ Cleared human agent handoff for user {user_id[:8]}...")
+
+        except Exception as e:
+            log.error(f"Error clearing human agent handoff: {e}")
+
+    async def _save_human_agent_message(self, ctx: MessageContext) -> None:
+        """Save user message during human agent handoff (no bot response)."""
+        try:
+            metadata = {
+                "human_agent_active": True,
+                "bot_processing_skipped": True,
+                "saved_only": True,
+            }
+
+            # Add media info if present
+            if ctx.media_url:
+                metadata["media_url"] = ctx.media_url
+                metadata["media_type"] = ctx.media_type
+
+            await supabase_client.save_message(
+                subcontractor_id=ctx.user_id,
+                direction="inbound",
+                content=ctx.message_body or "",
+                media_url=ctx.media_url,
+                metadata=metadata,
+                session_id=ctx.session_id,
+            )
+
+            log.info("💾 Saved user message during human agent handoff")
+
+        except Exception as e:
+            log.error(f"Error saving human agent message: {e}")
 
     async def _manage_session(self, ctx: MessageContext) -> Result[None]:
         """Stage 2: Get or create session and load conversation context."""
@@ -721,9 +858,7 @@ class MessagePipeline:
                                     "or too old"
                                 )
                         except Exception as e:
-                            log.warning(
-                                f"⚠️ Error parsing last_activity timestamp: {e}"
-                            )
+                            log.warning(f"⚠️ Error parsing last_activity timestamp: {e}")
                     else:
                         log.info(
                             f"🔄 Active INCIDENT session found: {ctx.active_session_id[:8]}... "
@@ -1185,9 +1320,11 @@ class MessagePipeline:
             )
             state_context = agent_state.to_prompt_context()
             if agent_state.has_active_context():
-                log.info(f"📍 Injecting explicit state: project={
+                log.info(
+                    f"📍 Injecting explicit state: project={
                         agent_state.active_project_id}, task={
-                        agent_state.active_task_id}")
+                        agent_state.active_task_id}"
+                )
 
             # LAYER 2: Load chat history with tool outputs (for short-term memory)
             chat_history: list[Any] = []
