@@ -406,9 +406,20 @@ class LumieraAgent:
                         project_id = action.tool_input.get("project_id")
                         user_id_input = action.tool_input.get("user_id")
 
+                        log.info(
+                            f"   🔍 Re-fetching structured data for list_tasks_tool: "
+                            f"project_id={project_id[:8] if project_id else None}..., "
+                            f"user_id={user_id_input[:8] if user_id_input else None}..."
+                        )
+
                         if project_id and user_id_input:
                             task_result = await task_actions.list_tasks(
                                 user_id_input, project_id
+                            )
+                            log.info(
+                                f"   📊 Re-fetch result: success={task_result.get('success')}, "
+                                f"has_data={bool(task_result.get('data'))}, "
+                                f"data_len={len(task_result.get('data', []))}"
                             )
                             if task_result.get("success") and task_result.get("data"):
                                 structured_output = compact_tasks(task_result["data"])
@@ -416,8 +427,14 @@ class LumieraAgent:
                                     f"   🗜️ Stored structured data for list_tasks_tool: {len(structured_output)} tasks"
                                 )
                             else:
+                                log.warning(
+                                    "   ⚠️ Re-fetch failed or returned no data, using empty array"
+                                )
                                 structured_output = []
                         else:
+                            log.warning(
+                                "   ⚠️ Missing project_id or user_id in tool_input, using empty array"
+                            )
                             structured_output = []
 
                         tool_output_entry = {
