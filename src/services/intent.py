@@ -488,6 +488,52 @@ class IntentClassifier:
                 word_count == 3 and has_action and has_definite_article
             )
 
+            # Detect problem + context scenario (e.g., "soucis sur le chantier")
+            # When both problem words AND context words are present, prioritize report_incident
+            problem_words = [
+                "souci",
+                "soucis",
+                "problème",
+                "probleme",
+                "incident",
+                "panne",
+                "défaut",
+                "defaut",
+                "cassé",
+                "casse",
+                "endommagé",
+                "endommage",
+                "fissuré",
+                "fissure",
+                "problem",
+                "issue",
+                "broken",
+                "damaged",
+            ]
+            context_words = [
+                "chantier",
+                "chantiers",
+                "projet",
+                "projets",
+                "tâche",
+                "tache",
+                "taches",
+                "tâches",
+                "lot",
+                "site",
+            ]
+
+            has_problem_word = any(word in message_lower for word in problem_words)
+            has_context_word = any(word in message_lower for word in context_words)
+            is_problem_with_context = has_problem_word and has_context_word
+
+            if is_problem_with_context:
+                log.info(
+                    f"🎯 Detected problem + context scenario "
+                    f"(has_problem={has_problem_word}, has_context={has_context_word}) "
+                    f"- prioritizing report_incident"
+                )
+
             # Sort keywords by length (longest first) to prioritize phrases
             for intent_name, intent_config in INTENTS.items():
                 keywords = intent_config.get("keywords", [])
@@ -515,6 +561,18 @@ class IntentClassifier:
                                     f"has_action={has_action}, has_article={has_definite_article}) "
                                     f"- deferring to Haiku"
                                 )
+                            # Check if problem + context scenario
+                            elif is_problem_with_context and intent_name in [
+                                "list_projects",
+                                "list_tasks",
+                            ]:
+                                confidence = (
+                                    0.85  # Lower confidence to allow report_incident
+                                )
+                                log.info(
+                                    f"⚠️ Problem + context detected: '{keyword}' → {intent_name} "
+                                    f"(confidence: {confidence}) - deferring to Haiku for proper classification"
+                                )
                             else:
                                 confidence = 0.98
                                 log.info(
@@ -524,10 +582,23 @@ class IntentClassifier:
                             break
                         # Partial match = medium-high confidence
                         elif len(message_lower.split()) <= 3:
-                            confidence = 0.90
-                            log.info(
-                                f"🎯 Strong keyword match: '{keyword}' → {intent_name} (confidence: {confidence})"
-                            )
+                            # Check if problem + context scenario
+                            if is_problem_with_context and intent_name in [
+                                "list_projects",
+                                "list_tasks",
+                            ]:
+                                confidence = (
+                                    0.85  # Lower confidence to allow report_incident
+                                )
+                                log.info(
+                                    f"⚠️ Problem + context detected: '{keyword}' → {intent_name} "
+                                    f"(confidence: {confidence}) - deferring to Haiku"
+                                )
+                            else:
+                                confidence = 0.90
+                                log.info(
+                                    f"🎯 Strong keyword match: '{keyword}' → {intent_name} (confidence: {confidence})"
+                                )
                             intent = intent_name
                             break
                 if confidence >= 0.90:
@@ -798,6 +869,24 @@ RÈGLES DE CONTEXTE IMPORTANTES :
    - Verbe "mettre à jour" + SANS contexte (quelle tâche?) = general:85
    - Verbe "voir" + n'importe quel contexte = list_tasks:90
 {context_section}
+
+🚨 RÈGLE PRIORITAIRE - PROBLÈME + CONTEXTE :
+
+Si le message contient À LA FOIS :
+- Un mot de problème (problème, souci, incident, panne, défaut, cassé, endommagé, fissuré, etc.)
+- ET un mot de contexte (chantier, projet, tâche, lot, site)
+
+→ Classifier comme report_incident:95 (l'utilisateur signale un problème dans un contexte)
+
+Exemples :
+- "j'ai un soucis sur le chantier" → report_incident:95 (problème + contexte chantier)
+- "il y a un problème avec le lot peinture" → report_incident:95 (problème + contexte lot)
+- "incident sur le projet" → report_incident:95 (problème + contexte projet)
+- "la tâche est cassée" → report_incident:95 (problème + contexte tâche)
+
+⚠️ EXCEPTION : Si l'utilisateur demande explicitement une LISTE, alors respecter list_projects/list_tasks :
+- "voir mes chantiers" → list_projects:95 (demande de liste, pas de problème)
+- "montrer les projets" → list_projects:95 (demande de liste)
 
 🎯 ARBRE DE DÉCISION RAPIDE (pour "tâche" ou "lot" dans le message) :
 
