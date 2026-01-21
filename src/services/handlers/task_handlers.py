@@ -648,6 +648,25 @@ async def handle_task_details(
             f"📊 Images result: success={images_result.get('success')}, data_count={len(images_result.get('data', []))}"
         )
 
+        # Check if PlanRadar API failed (both description and images failed)
+        if not desc_result.get("success") and not images_result.get("success"):
+            # API is likely down or rate-limited - ask user to retry
+            log.error(
+                "❌ PlanRadar API failed for both description and images - likely API issue"
+            )
+            error_message = desc_result.get(
+                "message", "Service temporarily unavailable"
+            )
+
+            # Return a user-friendly error message
+            return {
+                "message": "⚠️ Désolé, le service PlanRadar est temporairement indisponible.\n\n"
+                "Veuillez réessayer dans quelques minutes. Si le problème persiste, "
+                "contactez l'équipe support.",
+                "tool_outputs": [],
+                "escalation": False,
+            }
+
         # If we don't have task_title yet (used active context), get it from desc_result
         if not task_title and desc_result.get("success"):
             task_title = desc_result.get("data", {}).get("title", "Tâche")

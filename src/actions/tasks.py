@@ -226,8 +226,22 @@ async def get_task_description(
         log.info("   🌐 Calling PlanRadar API for task details")
         task = await planradar_client.get_task(task_id, planradar_project_id)
 
+        # Check if it's a rate limit error
+        if task and isinstance(task, dict) and task.get("_rate_limited"):
+            log.error("   ❌ PlanRadar API rate limit exceeded")
+            return {
+                "success": False,
+                "message": "Service temporairement indisponible (limite de taux atteinte).",
+                "error_type": "rate_limit",
+            }
+
         if not task:
-            return {"success": False, "message": "Tâche non trouvée."}
+            log.warning("   ⚠️ Task not found or API error")
+            return {
+                "success": False,
+                "message": "Tâche non trouvée ou service temporairement indisponible.",
+                "error_type": "api_error",
+            }
 
         # Handle PlanRadar's JSON:API format - title and description are in attributes
         attributes = task.get("attributes", {})
@@ -373,6 +387,16 @@ async def get_task_images(
         attachments = await planradar_client.get_task_images(
             task_id, planradar_project_id, task_uuid=task_id
         )
+
+        # Check if API call failed (returns None on error)
+        if attachments is None:
+            log.error("   ❌ PlanRadar API failed to retrieve attachments")
+            return {
+                "success": False,
+                "message": "Service temporairement indisponible.",
+                "error_type": "api_error",
+                "data": [],
+            }
 
         # Log action
         await supabase_client.save_action_log(

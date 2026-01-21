@@ -360,7 +360,14 @@ class PlanRadarClient:
             )
             return all_attachments
 
-        log.info("   ℹ️ No attachments found")
+        # Check if API call failed (result is None) vs no attachments (result exists but empty)
+        if result is None:
+            log.error("   ❌ API call failed, returning None to indicate error")
+            return None
+
+        log.info(
+            "   ℹ️ No attachments found (API succeeded but task has no attachments)"
+        )
         return []
 
     async def get_documents(
