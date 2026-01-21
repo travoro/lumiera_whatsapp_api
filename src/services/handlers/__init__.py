@@ -5,17 +5,19 @@ providing fast responses for simple, unambiguous requests.
 
 The handlers are organized into three modules:
 - basic_handlers: greeting, escalation (no project context needed)
-- project_handlers: list_projects, list_documents, report_incident
+- project_handlers: list_projects, list_documents
 - task_handlers: list_tasks, update_progress
+
+Note: report_incident is NOT a fast path handler - it's handled by
+the specialized IncidentAgent in message.py for multi-turn conversations.
 """
 
 from typing import Any, Dict, Optional
 
 from src.services.handlers.basic_handlers import handle_escalation, handle_greeting
-from src.services.handlers.project_handlers import (
+from src.services.handlers.project_handlers import (  # handle_report_incident removed - now handled by specialized IncidentAgent
     handle_list_documents,
     handle_list_projects,
-    handle_report_incident,
 )
 from src.services.handlers.suggestion_handlers import handle_detected_issue_choice
 from src.services.handlers.task_handlers import (
@@ -26,6 +28,7 @@ from src.services.handlers.task_handlers import (
 from src.utils.logger import log
 
 # Intent handler mapping
+# Note: report_incident is NOT in this mapping - it's handled by IncidentAgent
 INTENT_HANDLERS = {
     "greeting": handle_greeting,
     "list_projects": handle_list_projects,
@@ -34,7 +37,7 @@ INTENT_HANDLERS = {
     "list_documents": handle_list_documents,
     "view_documents": handle_list_documents,  # Same handler as list_documents
     "escalate": handle_escalation,
-    "report_incident": handle_report_incident,
+    # "report_incident": removed - handled by specialized IncidentAgent in message.py
     "handle_detected_issue": handle_detected_issue_choice,  # AI-detected issue suggestion
     "update_progress": handle_update_progress,  # Show task list for selection
     # Add more handlers as needed
@@ -98,7 +101,7 @@ __all__ = [
     "handle_escalation",
     "handle_list_projects",
     "handle_list_documents",
-    "handle_report_incident",
+    # "handle_report_incident" removed - handled by IncidentAgent
     "handle_list_tasks",
     "handle_task_details",
     "handle_update_progress",

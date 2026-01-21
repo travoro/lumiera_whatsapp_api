@@ -152,20 +152,16 @@ async def handle_direct_action(
                 user_id
             )
 
-            if not active_project_id:
-                # No confirmed project - don't route to specialized agent
-                log.warning(
-                    "⚠️ report_incident intent but no active session or project context - "
-                    "falling back to main LLM for clarification"
-                )
+            if active_project_id:
                 log.info(
-                    "   Main LLM will use list_projects_tool to help user select project first"
+                    f"✅ Active project found: {active_project_id[:8]}... - proceeding to incident agent"
                 )
-                return None  # Fall back to main LLM
-
-            log.info(
-                f"✅ Active project found: {active_project_id[:8]}... - proceeding to incident agent"
-            )
+            else:
+                # No active project - IncidentAgent will handle project selection
+                log.info(
+                    "ℹ️ No active project - IncidentAgent will use "
+                    "get_active_project_for_incident_tool to help user select project"
+                )
         else:
             log.info("✅ Active incident session found - proceeding to incident agent")
 

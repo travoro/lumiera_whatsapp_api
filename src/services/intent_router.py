@@ -23,13 +23,13 @@ class IntentRouter:
             return self._handlers[intent]
 
         # Lazy import handlers
-        from src.services.handlers import (  # handle_update_progress removed - now handled by specialized agent
+        # Note: handle_report_incident and handle_update_progress removed - handled by specialized agents
+        from src.services.handlers import (
             handle_escalation,
             handle_greeting,
             handle_list_documents,
             handle_list_projects,
             handle_list_tasks,
-            handle_report_incident,
             handle_task_details,
         )
 
@@ -39,8 +39,8 @@ class IntentRouter:
             "task_details": handle_task_details,
             "view_documents": handle_list_documents,
             "list_documents": handle_list_documents,
-            "report_incident": handle_report_incident,
-            # "update_progress": handle_update_progress,  # Removed - use specialized agent
+            # "report_incident": removed - handled by specialized IncidentAgent in message.py
+            # "update_progress": removed - handled by specialized ProgressUpdateAgent
             "greeting": handle_greeting,
             "escalate": handle_escalation,
             "talk_team": handle_escalation,
