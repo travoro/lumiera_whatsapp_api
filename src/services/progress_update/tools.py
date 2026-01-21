@@ -353,6 +353,20 @@ async def mark_task_complete_tool(user_id: str) -> str:
             # Record action
             await progress_update_state.add_action(user_id, "complete")
 
+            # Clear active task from database (since task is now resolved/closed)
+            # Only clear if API returned 200 (success=True means we got 2xx response)
+            from src.services.project_context import project_context_service
+
+            cleared = await project_context_service.clear_active_task(user_id)
+            if cleared:
+                log.info(
+                    f"✅ Cleared active task for user {user_id[:8]}... after successful task completion"
+                )
+            else:
+                log.warning(
+                    f"⚠️ Failed to clear active task for user {user_id[:8]}... after task completion"
+                )
+
             # Get summary
             updated_session = await progress_update_state.get_session(user_id)
             summary = "✅ Tâche marquée comme terminée !\n\n"
