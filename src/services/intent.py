@@ -333,6 +333,24 @@ class IntentClassifier:
             message_lower = message.lower().strip()
             confidence = 0.0
 
+            # SKIP: Don't classify interactive button payloads (they should be handled by direct action handler)
+            # Pattern: tasks_2_fr, option_1_fr, project_3_fr, etc.
+            import re
+
+            interactive_pattern = r"^(tasks?|options?|projects?)_\d+_[a-z]{2}$"
+            if re.match(interactive_pattern, message_lower):
+                log.info(
+                    f"⏭️ Skipping intent classification for interactive button: {message_lower}"
+                )
+                return {
+                    "intent": "unknown",
+                    "confidence": 0.0,
+                    "metadata": {
+                        "source": "interactive_button_skip",
+                        "reason": "Interactive buttons should be handled by direct action handler",
+                    },
+                }
+
             # PRIORITY 1: Check for exact keyword matches (high confidence)
             # Exact keyword matching for high confidence
             for intent_name, intent_config in INTENTS.items():
