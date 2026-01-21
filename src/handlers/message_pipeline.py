@@ -1649,9 +1649,16 @@ class MessagePipeline:
                             continue
 
                         if direction == "inbound":
-                            chat_history.append(
-                                HumanMessage(content=msg.get("content", ""))
-                            )
+                            content = msg.get("content", "")
+                            # Skip messages with empty content (e.g., image-only messages)
+                            # Claude API requires all messages to have non-empty content
+                            if not content or not content.strip():
+                                log.debug(
+                                    f"⏩ Skipping inbound message at index {idx} (empty content)"
+                                )
+                                continue
+
+                            chat_history.append(HumanMessage(content=content))
 
                         elif direction == "outbound":
                             content = msg.get("content", "")
@@ -1747,6 +1754,14 @@ class MessagePipeline:
 
                                 tool_context += "]"
                                 content += tool_context
+
+                            # Skip messages with empty content
+                            # Claude API requires all messages to have non-empty content
+                            if not content or not content.strip():
+                                log.debug(
+                                    f"⏩ Skipping outbound message at index {idx} (empty content)"
+                                )
+                                continue
 
                             chat_history.append(AIMessage(content=content))
 
