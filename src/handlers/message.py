@@ -471,6 +471,54 @@ async def handle_direct_action(
                                 return None
                             break
 
+                # Check if task list came from progress update agent's get_active_task_context_tool
+                for tool_output in tool_outputs:
+                    if tool_output.get("tool") == "get_active_task_context_tool":
+                        output_data = tool_output.get("output", {})
+                        tasks = output_data.get("tasks", [])
+
+                        if tasks:
+                            log.info(
+                                f"📋 Found task list from get_active_task_context_tool: {len(tasks)} tasks"
+                            )
+
+                            # Get the task at the selected index (1-based)
+                            index = int(option_number) - 1
+                            if 0 <= index < len(tasks):
+                                selected_task = tasks[index]
+                                task_id = selected_task.get("id")
+                                task_title = selected_task.get("title")
+
+                                log.info(
+                                    f"✅ Selected task from progress update agent list: {task_title} (ID: {task_id[:8] if task_id else 'N/A'}...)"
+                                )
+
+                                # CRITICAL: Update active task in database
+                                from src.services.project_context import (
+                                    project_context_service,
+                                )
+
+                                await project_context_service.set_active_task(
+                                    user_id, task_id, task_title
+                                )
+                                log.info(
+                                    f"✅ Active task updated to: {task_title} (ID: {task_id[:8]}...)"
+                                )
+
+                                # Route to progress update with selected task
+                                return await handle_direct_action(
+                                    action="update_progress",
+                                    user_id=user_id,
+                                    phone_number=phone_number,
+                                    language=language,
+                                    message_body=task_title,
+                                    session_id=session_id,
+                                )
+                            else:
+                                log.warning(f"⚠️ Task index {index} out of range")
+                                return None
+                            break
+
                 # Default: User selected a task from the list → Show task details
                 for tool_output in tool_outputs:
                     if tool_output.get("tool") == "list_tasks_tool":

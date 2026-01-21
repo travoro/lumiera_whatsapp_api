@@ -787,13 +787,14 @@ class MessagePipeline:
             # Define states where we should use context classifier
             ACTIVE_STATES_FOR_CONTEXT_CLASSIFICATION = [
                 "collecting_data",  # Actively collecting photo/video/data
+                "awaiting_action",  # Waiting for user to choose action (add photo, comment, complete, or exit)
                 # Add more specific states here as needed
             ]
 
             # For idle/menu states, exit session and use standard classification
             if fsm_state not in ACTIVE_STATES_FOR_CONTEXT_CLASSIFICATION:
                 log.info(
-                    f"ℹ️ Session in idle state '{fsm_state}' - "
+                    f"ℹ️ Session in idle/menu state '{fsm_state}' - "
                     "exiting session and using standard classification"
                 )
                 # Exit the idle session before classifying new intent
