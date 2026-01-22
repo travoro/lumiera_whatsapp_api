@@ -1777,6 +1777,7 @@ async def process_inbound_message(
             log.info(f"📎 Sending {len(attachments)} attachments")
 
             try:
+                from src.config import settings
                 from src.integrations.twilio import twilio_client
 
                 # Send each attachment as a separate message
@@ -1790,11 +1791,30 @@ async def process_inbound_message(
                     )
 
                     try:
-                        # Send media message with URL
-                        twilio_client.send_message(
+                        # Download the file locally first (fixes Twilio error 63019)
+                        # PlanRadar S3 URLs are signed and expire, so Twilio can't download them directly
+                        log.info(
+                            "📥 Downloading attachment from external URL to avoid Twilio 63019 error"
+                        )
+                        local_file_path = twilio_client.download_and_upload_media(
+                            media_url=url,
+                            content_type=content_type,
+                            filename=filename,
+                        )
+
+                        if not local_file_path:
+                            log.error(
+                                f"❌ Failed to download attachment {idx}/{len(attachments)}"
+                            )
+                            continue
+
+                        # Send via temporary hosting
+                        log.info("📤 Sending attachment via temporary hosting")
+                        twilio_client.send_message_with_local_media(
                             to=from_number,
                             body=filename,  # Use filename as caption
-                            media_url=[url],  # Must be a list
+                            local_file_path=local_file_path,
+                            server_url=settings.server_url,
                         )
                         log.info(
                             f"✅ Attachment {idx}/{len(attachments)} sent successfully"
