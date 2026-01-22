@@ -27,6 +27,7 @@ async def handle_list_tasks(
     message_text: str = "",
     last_tool_outputs: list = None,
     session_id: str = None,
+    selected_project_id: str = None,  # Explicitly selected project (e.g., from interactive list)
     **kwargs,
 ) -> Dict[str, Any]:
     """Handle list tasks intent with context-aware project selection.
@@ -35,6 +36,7 @@ async def handle_list_tasks(
         message_text: User's message text for extracting project name if mentioned
         last_tool_outputs: Tool outputs from previous bot message (for resolving numeric selections)
         session_id: Session ID for context
+        selected_project_id: Explicitly selected project ID (takes highest priority)
 
     Returns:
         Dict with message, escalation, tools_called
@@ -51,9 +53,21 @@ async def handle_list_tasks(
         if no_projects_msg:
             return build_no_projects_response(language)
 
-        # Scenario 2: Resolve numeric selection from last tool_outputs
-        mentioned_project_id = None
-        if message_text and message_text.strip().isdigit() and last_tool_outputs:
+        # Scenario 2: Use explicitly selected project (highest priority)
+        # This comes from interactive list selections where project_id is already resolved
+        mentioned_project_id = selected_project_id
+        if mentioned_project_id:
+            log.info(
+                f"✅ Using explicitly selected project_id: {mentioned_project_id[:8]}... (from interactive selection)"
+            )
+
+        # Scenario 3: Resolve numeric selection from last tool_outputs
+        if (
+            not mentioned_project_id
+            and message_text
+            and message_text.strip().isdigit()
+            and last_tool_outputs
+        ):
             selection_index = int(message_text.strip()) - 1  # Convert to 0-based index
             log.debug(
                 f"🔢 Attempting to resolve numeric selection: '{message_text}' (index: {selection_index})"
@@ -120,18 +134,18 @@ async def handle_list_tasks(
                 log.debug(f"❌ Fuzzy match failed for '{message_text}'")
 
         # Use mentioned project if found, otherwise use active context
-        selected_project_id = mentioned_project_id or current_project_id
+        resolved_project_id = mentioned_project_id or current_project_id
 
         # Scenario 3c: Single project available - Auto-select it
-        if not selected_project_id and len(projects) == 1:
-            selected_project_id = projects[0].get("id")
+        if not resolved_project_id and len(projects) == 1:
+            resolved_project_id = projects[0].get("id")
             project_name = projects[0].get("nom")
             log.info(
-                f"✅ Auto-selected single available project: {project_name} (ID: {selected_project_id[:8]}...)"
+                f"✅ Auto-selected single available project: {project_name} (ID: {resolved_project_id[:8]}...)"
             )
 
         # Scenario 3d: Multiple projects available - Show project picker
-        if not selected_project_id and len(projects) > 1:
+        if not resolved_project_id and len(projects) > 1:
             log.info(
                 f"📋 Multiple projects available ({len(projects)}) - Showing project picker"
             )
@@ -161,25 +175,29 @@ async def handle_list_tasks(
             }
 
         # Log parameter resolution result
-        if selected_project_id:
+        if resolved_project_id:
             resolution_method = (
-                "mentioned"
-                if mentioned_project_id
-                else "active_context" if current_project_id else "auto_selected"
+                "explicit_selection"
+                if selected_project_id  # Came from interactive list
+                else (
+                    "mentioned"
+                    if mentioned_project_id
+                    else "active_context" if current_project_id else "auto_selected"
+                )
             )
             log.info(
-                f"✅ Parameter resolution successful: project_id={selected_project_id[:8]}... (method: {resolution_method})"
+                f"✅ Parameter resolution successful: project_id={resolved_project_id[:8]}... (method: {resolution_method})"
             )
 
         tool_outputs = []
 
         # Scenario 4: Has selected project (from message or context or auto-select)
-        if selected_project_id:
+        if resolved_project_id:
             # Use header for showing tasks
             message = get_translation("fr", "list_tasks_header")
             # Get selected project or fallback
             project, project_name, project_id = get_selected_project(
-                projects, selected_project_id
+                projects, resolved_project_id
             )
 
             # Set active project in database when user makes a selection

@@ -1219,6 +1219,7 @@ async def handle_direct_action(
                                 message_text=project_name,
                                 session_id=session_id,
                                 last_tool_outputs=tool_outputs,
+                                selected_project_id=project_id,  # Pass resolved project_id directly
                             )
 
                             if result:
