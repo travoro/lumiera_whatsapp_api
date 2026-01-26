@@ -14,7 +14,7 @@ langchain-community>=0.3.27,<0.5.0
 anthropic>=0.41.0
 
 # Twilio for WhatsApp
-twilio==9.9.1
+twilio==9.10.0
 
 # Supabase
 supabase==2.27.2
@@ -41,7 +41,7 @@ loguru==0.7.3
 langsmith>=0.3.45,<1.0.0  # Required by langchain-core 0.3.27+
 
 # Error Tracking (Optional)
-sentry-sdk==2.49.0
+sentry-sdk==2.50.0
 
 # Retry Logic
 tenacity==9.1.2
@@ -72,4 +72,4 @@ pre-commit==4.5.1
 
 # Type Stubs
 types-requests==2.32.4.20260107
-types-python-dateutil==2.9.0.20251115
+types-python-dateutil==2.9.0.20260124
