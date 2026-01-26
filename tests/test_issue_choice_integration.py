@@ -6,8 +6,6 @@ Tests the full flow:
 3. User selection routing (create report / add comment / skip)
 """
 
-import json
-from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
