@@ -25,7 +25,7 @@ aiohttp==3.13.3
 requests==2.32.5
 
 # OpenAI for Whisper transcription
-openai==2.15.0
+openai==2.16.0
 
 # Environment & Configuration
 python-dotenv==1.2.1
@@ -41,7 +41,7 @@ loguru==0.7.3
 langsmith>=0.3.45,<1.0.0  # Required by langchain-core 0.3.27+
 
 # Error Tracking (Optional)
-sentry-sdk==2.50.0
+sentry-sdk==2.51.0
 
 # Retry Logic
 tenacity==9.1.2
